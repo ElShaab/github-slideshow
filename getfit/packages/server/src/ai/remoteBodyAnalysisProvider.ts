@@ -2,7 +2,7 @@ import type { BodyAnalysisResult } from '@getfit/shared';
 import { env } from '../config/env';
 import { AppError } from '../utils/errors';
 import { logger } from '../utils/logger';
-import { buildHologramData, makeRandom } from './mockBodyAnalysisProvider';
+import { MockBodyAnalysisProvider, buildHologramData, makeRandom } from './mockBodyAnalysisProvider';
 import type { BodyAnalysisInput, BodyAnalysisProvider } from './types';
 
 /**
@@ -106,7 +106,6 @@ let cached: BodyAnalysisProvider | null = null;
 /** Resolves the provider named by MOCK_AI_MODE / AI_PROVIDER. */
 export function getBodyAnalysisProvider(): BodyAnalysisProvider {
   if (cached) return cached;
-  const { MockBodyAnalysisProvider } = require('./mockBodyAnalysisProvider') as typeof import('./mockBodyAnalysisProvider');
   if (env.mockAiMode || env.aiProvider === 'mock') {
     logger.info('Body analysis running in MOCK_AI_MODE');
     cached = new MockBodyAnalysisProvider();

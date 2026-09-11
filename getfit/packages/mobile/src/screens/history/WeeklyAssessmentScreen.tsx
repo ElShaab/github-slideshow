@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BodyAssessment } from '@getfit/shared';
 import {

@@ -23,7 +23,7 @@ import {
 import { errors } from '../utils/errors';
 import { ExerciseSelectionService, type SelectionContext } from './exerciseSelectionService';
 import { selectCardio } from './cardioService';
-import { estimateExerciseSeconds, estimateWorkoutSeconds, type TimedExerciseEstimate } from './sessionBudget';
+import { estimateWorkoutSeconds, type TimedExerciseEstimate } from './sessionBudget';
 import { estimateStartingWeight, type StartingWeightContext } from './startingWeight';
 import { getSplit, type DayTemplate } from './splits';
 

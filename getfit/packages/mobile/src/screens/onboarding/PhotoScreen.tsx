@@ -80,18 +80,33 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
     setBusy(true);
     setError(null);
 
+    // Every earlier screen is required, but say so plainly rather than sending
+    // nulls and surfacing the server's validation error instead.
+    const { sex, trainingLevel, trainingLocation, trainingDays, sessionDurationMinutes } = draft;
+    if (
+      sex === null ||
+      trainingLevel === null ||
+      trainingLocation === null ||
+      trainingDays === null ||
+      sessionDurationMinutes === null
+    ) {
+      setError('Some answers are missing. Please go back and complete every step.');
+      setBusy(false);
+      return;
+    }
+
     try {
       await onboardingApi.submit({
         age: Number.parseInt(draft.age, 10),
-        sex: draft.sex!,
+        sex,
         heightCm: Number.parseFloat(draft.heightCm),
         weightKg: Number.parseFloat(draft.weightKg),
-        trainingLevel: draft.trainingLevel!,
-        trainingLocation: draft.trainingLocation!,
-        trainingDays: draft.trainingDays!,
-        sessionDurationMinutes: draft.sessionDurationMinutes!,
+        trainingLevel,
+        trainingLocation,
+        trainingDays,
+        sessionDurationMinutes,
         goals: draft.goals,
-        equipment: draft.trainingLocation === 'home' ? draft.equipment : [],
+        equipment: trainingLocation === 'home' ? draft.equipment : [],
       });
 
       await refresh();

@@ -17,6 +17,9 @@
     "db:migrate": "npm run build:shared && npm run migrate --workspace @getfit/server",
     "db:seed": "npm run build:shared && npm run seed --workspace @getfit/server",
     "db:reset": "npm run build:shared && npm run reset --workspace @getfit/server",
+    "lint": "eslint packages",
+    "lint:fix": "eslint packages --fix",
+    "verify": "npm run lint && npm run typecheck && npm test",
     "test": "npm run build:shared && npm run test --workspace @getfit/server",
     "typecheck": "npm run typecheck --workspace @getfit/shared && npm run typecheck --workspace @getfit/server && npm run typecheck --workspace @getfit/mobile",
     "mobile": "npm run start --workspace @getfit/mobile",
@@ -25,5 +28,11 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "typescript-eslint": "^8.70.0"
   }
 }

@@ -19,7 +19,6 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   componentDidCatch(error: Error): void {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
       console.error('Unhandled render error', error);
     }
   }

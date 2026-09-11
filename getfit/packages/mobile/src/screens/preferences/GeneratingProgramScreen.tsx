@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet } from 'react-native';
 import { ErrorState, Screen, Text } from '../../components';
 import { ApiError } from '../../api/client';
 import { programApi } from '../../api/endpoints';

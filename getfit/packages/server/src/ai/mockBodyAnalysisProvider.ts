@@ -190,8 +190,11 @@ export function buildHologramData(input: HologramInput): HologramData {
   const symmetryNormalized = clamp01((symmetryPercent - 60) / 38);
 
   // Shoulder-to-waist is what actually reads as "athletic" in a silhouette.
+  // The waist term uses the measured waist-to-height ratio rather than body fat
+  // so the drawn waist agrees with the figure shown beside the hologram.
+  const waistNormalized = clamp01((waistBodyRatio - 0.38) / 0.24);
   const shoulderToWaist = clamp(
-    (sex === 'male' ? 1.42 : 1.3) + muscleNormalized * 0.28 - bodyFatNormalized * 0.3,
+    (sex === 'male' ? 1.42 : 1.3) + muscleNormalized * 0.28 - waistNormalized * 0.3,
     1.02,
     1.85,
   );

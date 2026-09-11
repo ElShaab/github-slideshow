@@ -278,15 +278,18 @@ npm run dev:server      # API with watch mode
 npm run build:server    # Compile the API to dist/
 npm run start:server    # Run the compiled API
 npm run build:shared    # Compile the shared package
-npm run typecheck       # Typecheck shared + server
+npm run lint            # ESLint across all three packages
+npm run typecheck       # Typecheck shared + server + mobile
 npm test                # Run the server test suite
+npm run verify          # lint, then typecheck, then tests
 npm run mobile          # Expo dev server
 npm run mobile:ios      # Build and run on iOS
 npm run mobile:android  # Build and run on Android
 npm run db:migrate | db:seed | db:reset
 ```
 
-Inside `packages/mobile`, `npm run typecheck` checks the app.
+`npm run verify` is the gate to run before pushing. Every command that needs
+the shared package builds it first, so a fresh clone works without a setup step.
 
 ---
 
