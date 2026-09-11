@@ -58,7 +58,9 @@ async function api<T = Record<string, unknown>>(
   const headers: Record<string, string> = {};
   if (options.token) headers.authorization = `Bearer ${options.token}`;
 
-  let body: BodyInit | undefined;
+  // Typed locally rather than as BodyInit, which is only declared when the
+  // DOM lib is present.
+  let body: string | FormData | undefined;
   if (options.form) {
     body = options.form;
   } else if (options.body !== undefined) {
