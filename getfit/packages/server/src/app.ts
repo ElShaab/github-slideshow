@@ -58,8 +58,10 @@ export function createApp(): express.Express {
 
   app.use(generalLimiter);
 
+  // Unauthenticated, so it reports liveness only — the mock/dev flags it used
+  // to return told an attacker whether billing could be forged.
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', mockAiMode: env.mockAiMode, devMode: env.devMode });
+    res.json({ status: 'ok' });
   });
 
   app.use('/api/auth', sensitiveLimiter, authRoutes);

@@ -124,7 +124,7 @@ getfit/
 │   │       ├── muscles.ts        Muscle groups, equipment, volume factors
 │   │       ├── constants.ts      Product rules (≤3 per muscle, 7-day lock, …)
 │   │       ├── volume.ts         Direct / secondary / effective set maths
-│   │       └── exercises/        147 exercises with full metadata
+│   │       └── exercises/        159 strength + 8 cardio exercises, full metadata
 │   │
 │   ├── server/          Node + Express + PostgreSQL API
 │   │   ├── src/
@@ -258,7 +258,7 @@ filename order and tracked in `schema_migrations`. Each runs in a transaction.
 
 ```bash
 npm run db:migrate     # apply pending migrations
-npm run db:seed        # migrate, then seed muscle groups and 147 exercises
+npm run db:seed        # migrate, then seed muscle groups and 159 strength and 8 cardio exercises
 npm run db:reset       # drop, recreate, migrate and seed (refuses in production)
 ```
 

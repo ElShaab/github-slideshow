@@ -44,9 +44,13 @@ export const env = {
   jwtSecret: str('JWT_SECRET', 'getfit-development-secret-do-not-use-in-production'),
   jwtExpiresIn: str('JWT_EXPIRES_IN', '30d'),
 
-  /** When true every AI call is served by the deterministic mock provider. */
-  mockAiMode: bool('MOCK_AI_MODE', true),
-  aiProvider: str('AI_PROVIDER', 'mock'),
+  /**
+   * When true every AI call is served by the deterministic mock provider.
+   * Defaults off in production: shipping fabricated body analysis to a paying
+   * user because an env var was forgotten is worse than failing to start.
+   */
+  mockAiMode: bool('MOCK_AI_MODE', !isProduction),
+  aiProvider: str('AI_PROVIDER', isProduction ? '' : 'mock'),
   aiApiKey: process.env.AI_API_KEY ?? '',
   aiBaseUrl: process.env.AI_BASE_URL ?? '',
 
@@ -74,11 +78,42 @@ export const env = {
     .filter(Boolean),
 };
 
+/**
+ * Production refuses to start misconfigured rather than running in a degraded
+ * state. Each of these would be invisible at runtime but harmful to real users.
+ */
 if (env.isProduction) {
-  if (env.jwtSecret.includes('development-secret')) {
-    throw new Error('JWT_SECRET must be set to a strong secret in production.');
+  const failures: string[] = [];
+
+  if (env.jwtSecret.includes('development-secret') || env.jwtSecret.length < 32) {
+    failures.push('JWT_SECRET must be set to a random secret of at least 32 characters.');
   }
   if (env.mockBilling) {
-    throw new Error('MOCK_BILLING must be false in production.');
+    failures.push('MOCK_BILLING must be false — mock receipts would grant free memberships.');
+  }
+  if (env.devMode) {
+    failures.push('DEV_MODE must be false.');
+  }
+  if (env.mockAiMode || env.aiProvider === 'mock' || env.aiProvider === '') {
+    failures.push('AI_PROVIDER must name a real provider and MOCK_AI_MODE must be false.');
+  }
+  if (env.aiProvider !== 'mock' && (!env.aiBaseUrl || !env.aiApiKey)) {
+    failures.push('AI_BASE_URL and AI_API_KEY are required for a real AI provider.');
+  }
+  if (env.corsOrigins.includes('*')) {
+    failures.push('CORS_ORIGINS must list explicit origins rather than "*".');
+  }
+  if (env.storageDriver === 'local') {
+    failures.push('STORAGE_DRIVER=local stores photos on ephemeral disk; use s3.');
+  }
+  if (!env.appleSharedSecret) {
+    failures.push('APPLE_SHARED_SECRET is required to verify App Store receipts.');
+  }
+  if (!env.googleServiceAccountJson) {
+    failures.push('GOOGLE_SERVICE_ACCOUNT_JSON is required to verify Play purchases.');
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`Refusing to start in production:\n  - ${failures.join('\n  - ')}`);
   }
 }

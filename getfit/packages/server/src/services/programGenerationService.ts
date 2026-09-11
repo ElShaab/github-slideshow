@@ -85,6 +85,9 @@ export class ProgramGenerationService {
     // quietly push a muscle far past what it can recover from.
     const weeklyBudget = buildWeeklyBudget(goals, profile.trainingLevel, profile.trainingDays);
     const weeklyUsed: Record<string, number> = {};
+    // Spread each muscle's allowance across the days that actually train it, so
+    // day one cannot spend the whole week and starve day five.
+    const pacing = buildPacing(split.days);
 
     const days: ProgramDay[] = [];
 
@@ -98,6 +101,7 @@ export class ProgramGenerationService {
         weightContext,
         weeklyBudget,
         weeklyUsed,
+        allowanceByDay: pacing[index],
       });
       days.push(day);
     }
@@ -122,8 +126,10 @@ export class ProgramGenerationService {
     weightContext: StartingWeightContext;
     weeklyBudget: Record<string, number>;
     weeklyUsed: Record<string, number>;
+    allowanceByDay: Record<string, number>;
   }): ProgramDay {
-    const { template, dayNumber, input, selectionContext, weightContext, weeklyBudget, weeklyUsed } = args;
+    const { template, dayNumber, input, selectionContext, weightContext, weeklyBudget, weeklyUsed, allowanceByDay } =
+      args;
     const { profile, goals } = input;
 
     const budgetSeconds = profile.sessionDurationMinutes * 60;
@@ -148,7 +154,21 @@ export class ProgramGenerationService {
     const usedExerciseIds = new Set<string>();
     const perMuscleCount: Record<string, number> = {};
 
-    for (const slot of slots) {
+    // Session time is the binding constraint, so the order slots are considered
+    // in decides what actually gets trained. Work tier by tier, and within a
+    // tier take the muscle furthest below its weekly target first — a fixed
+    // order spends the whole session on the first few slots and starves the rest.
+    const remaining = [...slots];
+
+    while (remaining.length > 0) {
+      remaining.sort(
+        (a, b) =>
+          a.tier - b.tier ||
+          slotNeed(b, weeklyUsed, allowanceByDay) - slotNeed(a, weeklyUsed, allowanceByDay) ||
+          b.priority - a.priority,
+      );
+      const slot = remaining.shift() as Slot;
+
       const { pool } = this.selection.resolvePool(slot.muscle, input.exercisePreferences, selectionContext);
       if (pool.length === 0) continue;
 
@@ -156,7 +176,9 @@ export class ProgramGenerationService {
       if (alreadyForMuscle >= slot.maxPerSession) continue;
 
       const used = weeklyUsed[slot.muscle] ?? 0;
-      if (used >= weeklyBudget[slot.muscle]) continue;
+      // Pace against this day's share of the week rather than the whole week.
+      const share = allowanceByDay[slot.muscle] ?? 1;
+      if (used >= weeklyBudget[slot.muscle] * share) continue;
 
       const exercise = pickExercise(pool, usedExerciseIds, chosen, slot, dayNumber);
       if (!exercise) continue;
@@ -177,6 +199,11 @@ export class ProgramGenerationService {
         startingWeight: estimateStartingWeight(exercise, weightContext),
       };
 
+      // Reject anything whose full charge — direct *and* secondary — would push
+      // a muscle past what it can recover from in a week. Without this, six
+      // pressing movements quietly bury the triceps and front delts.
+      if (exceedsCeiling(weeklyUsed, exercise, candidate.sets)) continue;
+
       const projected = estimateWorkoutSeconds(
         [...chosen, candidate].map(toTimedEstimate),
         0,
@@ -189,6 +216,23 @@ export class ProgramGenerationService {
       usedExerciseIds.add(exercise.id);
       perMuscleCount[slot.muscle] = alreadyForMuscle + 1;
       applyVolume(weeklyUsed, exercise, candidate.sets);
+    }
+
+    // A day that booked nothing — every muscle already at its weekly ceiling —
+    // would render as an empty workout. Take the day's lead movement anyway.
+    if (chosen.length === 0) {
+      const fallback = this.buildFallbackExercise({
+        template,
+        input,
+        selectionContext,
+        weightContext,
+        profile,
+        goals,
+      });
+      if (fallback) {
+        chosen.push(fallback);
+        applyVolume(weeklyUsed, fallback.exercise, fallback.sets);
+      }
     }
 
     // Recompute cardio against the time actually left over.
@@ -229,6 +273,68 @@ export class ProgramGenerationService {
       cardio,
     };
   }
+
+  /** Last-resort pick for a day that the budget would otherwise leave empty. */
+  private buildFallbackExercise(args: {
+    template: DayTemplate;
+    input: ProgramGenerationInput;
+    selectionContext: SelectionContext;
+    weightContext: StartingWeightContext;
+    profile: ProgramGenerationInput['profile'];
+    goals: GoalType[];
+  }): ChosenExercise | null {
+    const { template, input, selectionContext, weightContext, profile, goals } = args;
+
+    for (const muscle of [...template.primary, ...template.secondary]) {
+      const { pool } = this.selection.resolvePool(muscle, input.exercisePreferences, selectionContext);
+      if (pool.length === 0) continue;
+
+      const exercise = pool[0];
+      const prescription = buildPrescription(exercise, {
+        goals,
+        level: profile.trainingLevel,
+        sessionDuration: profile.sessionDurationMinutes,
+        isFirstCompound: exercise.isCompound,
+        compoundIndex: 0,
+      });
+
+      return {
+        exercise,
+        muscle,
+        priority: 100,
+        ...prescription,
+        startingWeight: estimateStartingWeight(exercise, weightContext),
+      };
+    }
+
+    return null;
+  }
+}
+
+/**
+ * Each muscle's weekly allowance, spread across the days that actually train
+ * it. After day N of the K days that touch a muscle, at most N/K of its weekly
+ * budget may have been spent — so a four-day split still trains chest twice.
+ */
+function buildPacing(days: DayTemplate[]): Array<Record<string, number>> {
+  const touchDays = new Map<string, number[]>();
+
+  days.forEach((template, index) => {
+    for (const muscle of new Set([...template.primary, ...template.secondary])) {
+      const list = touchDays.get(muscle) ?? [];
+      list.push(index);
+      touchDays.set(muscle, list);
+    }
+  });
+
+  return days.map((_, dayIndex) => {
+    const fractions: Record<string, number> = {};
+    for (const [muscle, indices] of touchDays) {
+      const soFar = indices.filter((i) => i <= dayIndex).length;
+      fractions[muscle] = soFar / indices.length;
+    }
+    return fractions;
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -241,6 +347,12 @@ interface Slot {
   maxPerSession: number;
   /** Second pass slots ask for an isolation movement to complement the first. */
   preferIsolation: boolean;
+  /**
+   * Breadth-first wave. Every slot in an earlier tier is offered the session's
+   * remaining time before any slot in a later one, so a muscle cannot take a
+   * second exercise while another muscle on the same day still has none.
+   */
+  tier: number;
 }
 
 /**
@@ -253,15 +365,15 @@ function buildSlots(template: DayTemplate, level: TrainingLevel, duration: Sessi
   const maxPerSession = duration <= 30 ? 1 : 2;
 
   template.primary.forEach((muscle, index) => {
-    slots.push({ muscle, priority: 100 - index, maxPerSession, preferIsolation: false });
+    slots.push({ muscle, priority: 100 - index, maxPerSession, preferIsolation: false, tier: 0 });
   });
   template.secondary.forEach((muscle, index) => {
-    slots.push({ muscle, priority: 60 - index, maxPerSession: 1, preferIsolation: true });
+    slots.push({ muscle, priority: 60 - index, maxPerSession: 1, preferIsolation: true, tier: 1 });
   });
 
   if (maxPerSession > 1) {
     template.primary.forEach((muscle, index) => {
-      slots.push({ muscle, priority: 40 - index, maxPerSession, preferIsolation: true });
+      slots.push({ muscle, priority: 40 - index, maxPerSession, preferIsolation: true, tier: 2 });
     });
   }
 
@@ -272,6 +384,7 @@ function buildSlots(template: DayTemplate, level: TrainingLevel, duration: Sessi
       priority: 10,
       maxPerSession: 3,
       preferIsolation: true,
+      tier: 3,
     });
   }
 
@@ -493,6 +606,53 @@ function buildWeeklyBudget(
  * three pressing exercises in a week are correctly charged to the triceps and
  * front delts as well as the chest.
  */
+/** Weekly effective-set floor per muscle — the minimum worth programming. */
+const WEEKLY_FLOOR: Record<string, number> = Object.fromEntries(
+  MUSCLE_GROUPS.map((group) => [group.id, group.weeklySetsMin]),
+);
+
+/**
+ * How badly a muscle needs this slot: its shortfall against the share of the
+ * weekly minimum it should have reached by now. Negative once it is on track.
+ */
+function slotNeed(
+  slot: Slot,
+  used: Record<string, number>,
+  allowanceByDay: Record<string, number>,
+): number {
+  const floor = WEEKLY_FLOOR[slot.muscle] ?? 0;
+  const target = floor * (allowanceByDay[slot.muscle] ?? 1);
+  return target - (used[slot.muscle] ?? 0);
+}
+
+/** Weekly effective-set ceiling per muscle — the recovery limit, not a target. */
+const WEEKLY_CEILING: Record<string, number> = Object.fromEntries(
+  MUSCLE_GROUPS.map((group) => [group.id, group.weeklySetsMax]),
+);
+
+/**
+ * Assisting muscles get headroom above their ceiling. Holding them to the same
+ * limit as the muscle actually being trained lets one saturated helper — a
+ * forearm at 9 of 10 sets — veto an entire back day.
+ */
+const SECONDARY_CEILING_TOLERANCE = 1.25;
+
+/**
+ * True when booking this exercise would carry the muscle it trains past its
+ * weekly ceiling, or bury an assisting muscle well beyond its own.
+ */
+function exceedsCeiling(used: Record<string, number>, exercise: Exercise, sets: number): boolean {
+  const volume = computeVolume([{ exerciseId: exercise.id, workingSets: sets }]);
+  for (const [muscle, entry] of Object.entries(volume)) {
+    if (entry.effectiveSets <= 0) continue;
+    const ceiling = WEEKLY_CEILING[muscle];
+    if (ceiling === undefined) continue;
+    const limit = entry.directSets > 0 ? ceiling : ceiling * SECONDARY_CEILING_TOLERANCE;
+    if ((used[muscle] ?? 0) + entry.effectiveSets > limit) return true;
+  }
+  return false;
+}
+
 function applyVolume(used: Record<string, number>, exercise: Exercise, sets: number): void {
   const volume = computeVolume([{ exerciseId: exercise.id, workingSets: sets }]);
   for (const [muscle, entry] of Object.entries(volume)) {

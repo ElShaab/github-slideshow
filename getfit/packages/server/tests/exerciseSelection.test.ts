@@ -51,10 +51,40 @@ test('choices only include exercises the user can actually perform', () => {
   }
 });
 
-test('flags muscles where equipment limits the available choices', () => {
-  const sets = service.buildChoiceSets(selectionContext({ location: 'home', equipment: ['bodyweight'] }));
+test('every realistic home setup still offers four choices per muscle', () => {
+  const setups: EquipmentId[][] = [
+    ['bodyweight'],
+    ['bodyweight', 'resistance_bands'],
+    ['bodyweight', 'dumbbells'],
+    ['bodyweight', 'kettlebell'],
+    ['bodyweight', 'pullup_bar'],
+    ['bodyweight', 'dumbbells', 'bench'],
+  ];
+
+  for (const equipment of setups) {
+    const sets = service.buildChoiceSets(selectionContext({ location: 'home', equipment }));
+    for (const set of sets) {
+      assert.equal(
+        set.choices.length,
+        EXERCISE_CHOICES_PER_MUSCLE,
+        `${set.muscleGroup} with [${equipment.join(', ')}] offered ${set.choices.length} choices`,
+      );
+      assert.equal(
+        set.limitedByEquipment,
+        false,
+        `${set.muscleGroup} with [${equipment.join(', ')}] reported as equipment-limited`,
+      );
+    }
+  }
+});
+
+test('flags muscles where equipment genuinely limits the available choices', () => {
+  // Degenerate setup: a gym user owning nothing rules out the home-improvised
+  // movements (towel, door frame) that carry the bodyweight-only case.
+  const sets = service.buildChoiceSets(selectionContext({ location: 'gym', equipment: ['bodyweight'] }));
   const biceps = sets.find((s) => s.muscleGroup === 'biceps');
   assert.ok(biceps);
+  assert.ok(biceps.choices.length < EXERCISE_CHOICES_PER_MUSCLE);
   assert.equal(biceps.limitedByEquipment, true);
 });
 
