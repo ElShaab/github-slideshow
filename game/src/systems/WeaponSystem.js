@@ -83,14 +83,19 @@ export class WeaponSystem {
     if (!target) return;
 
     this.fireCooldown -= dt;
-    const interval = 1 / Math.max(1, weapon.fireRate * 2);
+    // Volleys follow the weapon's fire rate so an upgrade is visible as well
+    // as felt.  The tracer COUNT is capped instead of scaling with the squad:
+    // 300 soldiers do not need 300 bullets on screen to read as heavy fire.
+    const interval = 1 / Math.max(2, weapon.fireRate * 4);
     if (this.fireCooldown > 0) return;
     this.fireCooldown = interval;
 
-    const shooters = Math.min(6, Math.max(1, Math.round(Math.sqrt(this.squad.rendered))));
+    const shooters = Math.min(8, Math.max(2, Math.round(Math.sqrt(this.squad.rendered))));
     const bullets = Math.max(1, Math.min(4, Math.round(weapon.bullets)));
     for (let i = 0; i < shooters; i++) {
       this.squad.sampleFiringPosition(this._from, this._tracerIndex++);
+      // Muzzle flash: one spark at the barrel, which also sells the fire rate.
+      this.vfx.addImpact(this._from.x, this._from.y, this._from.z, 1);
       for (let b = 0; b < bullets; b++) {
         this._to.set(
           target.x + (Math.random() - 0.5) * 0.5 * b,

@@ -55,7 +55,11 @@ export class LevelGenerator {
     // sharper.  Generation therefore converges instead of spinning.  What was
     // learnt is remembered per stage, so later runs start from a setting that
     // already worked instead of rediscovering it every time.
-    let intensity = this.intensityMemory.get(stage) || 1;
+    // Keyed by stage AND squad scale: what a ten-soldier squad can survive is
+    // nothing like what a three-hundred-soldier squad can, so sharing one
+    // learned value between them just wastes attempts.
+    const memoryKey = `${stage}:${Math.round(Math.log2(Math.max(2, entry.squad)))}`;
+    let intensity = this.intensityMemory.get(memoryKey) || 0.85;
 
     while (attempts < this.config.generation.maxAttempts) {
       attempts++;
@@ -65,7 +69,7 @@ export class LevelGenerator {
 
       if (verdict.ok) {
         this.stats.accepted++;
-        this.intensityMemory.set(stage, intensity);
+        this.intensityMemory.set(memoryKey, intensity);
         candidate.validation = verdict.report;
         candidate.seed = seed;
         candidate.attempts = attempts;

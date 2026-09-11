@@ -51,7 +51,7 @@ export class VFXManager {
     );
     this.sparks = new InstancedPool(
       scene,
-      new THREE.TetrahedronGeometry(0.22, 0),
+      new THREE.TetrahedronGeometry(0.16, 0),
       new THREE.MeshBasicMaterial({ color: 0xff8b3d }),
       config.render.maxParticles
     );
@@ -68,7 +68,7 @@ export class VFXManager {
     this.tracers.spawn({
       x: from.x, y: from.y, z: from.z,
       tx: to.x, ty: to.y, tz: to.z,
-      life: 0.09, maxLife: 0.09
+      life: 0.13, maxLife: 0.13
     });
   }
 

@@ -118,8 +118,8 @@ export const CONFIG = {
     // strength; the stage-level guarantee above is then measured and enforced
     // by the validator.  A weakened squad loses proportionally far more, which
     // is what makes a bad gate choice fatal.
-    fightLossBase: 0.11,         // stage 1: a wave costs ~11% of the squad
-    fightLossAtCap: 0.21,        // ... rising to ~21% once difficulty caps
+    fightLossBase: 0.11,          // stage 1: a wave costs ~11% of the squad
+    fightLossAtCap: 0.21,         // ... rising to ~21% once difficulty caps
     bossLossMultiplier: 1.7,     // the boss bites harder than a wave
     partialWaveLossMultiplier: 1.35, // taking an occupied lane of a dodgeable wave
     entryRequirementTolerance: 0.02,
