@@ -154,3 +154,13 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
 function storeName(): string {
   return Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
 }
+
+
+/**
+ * The full-screen renewal shown when a membership has expired. It replaces the
+ * whole app until the membership is restored, which is what keeps every
+ * subscription-gated feature blocked.
+ */
+export function RenewalScreen(): React.ReactElement {
+  return <PaywallScreen variant="renewal" />;
+}

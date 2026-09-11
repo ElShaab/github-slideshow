@@ -8,6 +8,7 @@ import {
 } from '@getfit/shared';
 import { getBodyAnalysisProvider } from '../ai/remoteBodyAnalysisProvider';
 import { assessmentRepository } from '../repositories/assessmentRepository';
+import { progressRepository } from '../repositories/progressRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
 import { errors } from '../utils/errors';
 import { logger } from '../utils/logger';
@@ -121,12 +122,40 @@ export class BodyAnalysisService {
       throw errors.analysisFailed();
     }
 
-    return assessmentRepository.create({
+    const assessment = await assessmentRepository.create({
       userId: args.userId,
       weightKg,
       analysis,
       sourcePhotoId: photo.id,
     });
+
+    const recordDate = assessment.createdAt.slice(0, 10);
+    try {
+      await progressRepository.recordMany([
+        { userId: args.userId, recordDate, recordType: 'weight_kg', referenceId: assessment.id, value: weightKg, unit: 'kg' },
+        {
+          userId: args.userId,
+          recordDate,
+          recordType: 'body_fat_percent',
+          referenceId: assessment.id,
+          value: analysis.bodyFatPercent,
+          unit: '%',
+        },
+        {
+          userId: args.userId,
+          recordDate,
+          recordType: 'muscle_mass_kg',
+          referenceId: assessment.id,
+          value: analysis.estimatedMuscleMassKg,
+          unit: 'kg',
+        },
+      ]);
+    } catch (error) {
+      // The assessment itself is already saved; a snapshot failure is not fatal.
+      logger.warn('Failed to write assessment progress snapshot', { error: String(error) });
+    }
+
+    return assessment;
   }
 
   /** Fraction of scheduled sessions the user actually completed. */

@@ -524,6 +524,25 @@ describe('GetFit end-to-end journey', () => {
     );
   });
 
+  test('completing a workout writes its progress snapshot', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const { progressRepository } = await import('../src/repositories/progressRepository');
+
+    const volume = await progressRepository.series(state.userId, 'workout_volume');
+    const sets = await progressRepository.series(state.userId, 'workout_sets');
+    const cardio = await progressRepository.series(state.userId, 'cardio_minutes');
+
+    assert.equal(volume.length, 1, 'no volume snapshot was written');
+    assert.ok(volume[0].value > 0);
+    assert.equal(sets.length, 1);
+    assert.equal(cardio[0]?.value, 8, 'logged cardio minutes were not snapshotted');
+
+    // The assessment taken during onboarding is snapshotted too.
+    const bodyFat = await progressRepository.series(state.userId, 'body_fat_percent');
+    assert.ok(bodyFat.length >= 1, 'no body-fat snapshot was written');
+  });
+
   test('the next prescription reflects what was actually lifted', async (t) => {
     if (!databaseAvailable) return t.skip('No database available');
 
@@ -815,6 +834,7 @@ describe('GetFit end-to-end journey', () => {
       'workout_programs',
       'user_photos',
       'subscriptions',
+      'progress_records',
     ]) {
       const result = await pool.query(`SELECT COUNT(*)::int AS count FROM ${table} WHERE user_id = $1`, [
         state.userId,

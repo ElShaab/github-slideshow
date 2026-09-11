@@ -7,6 +7,7 @@ import {
   type TrainingStats,
 } from '@getfit/shared';
 import { assessmentRepository } from '../repositories/assessmentRepository';
+import { progressRepository } from '../repositories/progressRepository';
 import { userRepository } from '../repositories/userRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
 import { GoalTrackingService } from './goalTrackingService';
@@ -98,12 +99,19 @@ export class ProgressAnalysisService {
       workoutRepository.listCompleted(userId, 60),
     ]);
 
+    // Snapshots cover sessions logged since they were introduced; the
+    // aggregate over completed_workouts remains the source of truth so older
+    // history is never dropped from the chart.
+    const snapshotVolume = await progressRepository
+      .series(userId, 'workout_volume')
+      .catch(() => []);
+
     return {
       completionRatePercent:
         counts.total === 0 ? 0 : Math.round((counts.completed / counts.total) * 100),
       workoutsCompleted: totals.workouts,
       workoutsScheduled: counts.total,
-      weeklyVolume,
+      weeklyVolume: weeklyVolume.length > 0 ? weeklyVolume : snapshotVolume,
       totalSets: totals.sets,
       currentStreakDays: computeStreak(completed.map((w) => w.completedAt)),
     };

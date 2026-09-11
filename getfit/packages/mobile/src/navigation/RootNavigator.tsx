@@ -10,7 +10,7 @@ import { HomeScreen } from '../screens/main/HomeScreen';
 import { ProgressScreen } from '../screens/main/ProgressScreen';
 import { WorkoutsScreen } from '../screens/main/WorkoutsScreen';
 import { CreateAccountScreen } from '../screens/membership/CreateAccountScreen';
-import { PaywallScreen } from '../screens/membership/PaywallScreen';
+import { PaywallScreen, RenewalScreen } from '../screens/membership/PaywallScreen';
 import { BasicsScreen } from '../screens/onboarding/BasicsScreen';
 import { EquipmentScreen } from '../screens/onboarding/EquipmentScreen';
 import { GoalsScreen } from '../screens/onboarding/GoalsScreen';
@@ -102,7 +102,7 @@ export function RootNavigator(): React.ReactElement {
   }, [colors, isDark]);
 
   const PaywallRoute = useCallback(() => <PaywallScreen variant="paywall" />, []);
-  const RenewalRoute = useCallback(() => <PaywallScreen variant="renewal" />, []);
+  const RenewalRoute = useCallback(() => <RenewalScreen />, []);
   const PreferencesRoute = useCallback(
     () => <ExercisePreferencesScreen onDone={session.markPreferencesComplete} />,
     [session.markPreferencesComplete],

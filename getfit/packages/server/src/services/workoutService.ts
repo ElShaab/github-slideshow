@@ -8,6 +8,7 @@ import {
   type ScheduledWorkout,
 } from '@getfit/shared';
 import { programRepository } from '../repositories/programRepository';
+import { progressRepository } from '../repositories/progressRepository';
 import { userRepository } from '../repositories/userRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
 import { errors } from '../utils/errors';
@@ -111,6 +112,7 @@ export class WorkoutService {
 
     const personalRecords = await this.recordPersonalRecords(request.userId, completed.id, sets, now);
     const progressionNotes = await this.applyProgression(request.userId, day, sets);
+    await this.recordProgressSnapshot(request.userId, completed, request.cardioMinutes);
 
     if (request.scheduledWorkoutId) {
       await workoutRepository.updateScheduleEntry(request.userId, request.scheduledWorkoutId, {
@@ -125,6 +127,59 @@ export class WorkoutService {
       exerciseCount: sets.length,
       progressionNotes,
     };
+  }
+
+  /** Snapshots the session so the Progress tab stays fast as history grows. */
+  private async recordProgressSnapshot(
+    userId: string,
+    completed: CompletedWorkout,
+    cardioMinutes: number,
+  ): Promise<void> {
+    const recordDate = completed.completedAt.slice(0, 10);
+    try {
+      await progressRepository.recordMany([
+        {
+          userId,
+          recordDate,
+          recordType: 'workout_volume',
+          referenceId: completed.id,
+          value: completed.totalVolumeKg,
+          unit: 'kg',
+          metadata: { focus: completed.focus, dayNumber: completed.dayNumber },
+        },
+        {
+          userId,
+          recordDate,
+          recordType: 'workout_sets',
+          referenceId: completed.id,
+          value: completed.totalSets,
+          unit: 'sets',
+        },
+        {
+          userId,
+          recordDate,
+          recordType: 'workout_duration',
+          referenceId: completed.id,
+          value: completed.durationSeconds,
+          unit: 'seconds',
+        },
+        ...(cardioMinutes > 0
+          ? [
+              {
+                userId,
+                recordDate,
+                recordType: 'cardio_minutes' as const,
+                referenceId: completed.id,
+                value: cardioMinutes,
+                unit: 'minutes',
+              },
+            ]
+          : []),
+      ]);
+    } catch (error) {
+      // A snapshot is a convenience, never a reason to lose a saved workout.
+      logger.warn('Failed to write progress snapshot', { error: String(error) });
+    }
   }
 
   private async recordPersonalRecords(
