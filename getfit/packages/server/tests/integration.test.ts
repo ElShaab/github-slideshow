@@ -259,6 +259,24 @@ describe('GetFit end-to-end journey', () => {
     assert.ok(types.includes('purchase_failed'), 'the failed attempt was not audited');
   });
 
+  test('mock purchases are refused when mock billing is disabled', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const { env } = await import('../src/config/env');
+    const original = env.mockBilling;
+    try {
+      (env as { mockBilling: boolean }).mockBilling = false;
+      const response = await api<{ error: { code: string } }>('POST', '/api/subscription/purchase', {
+        token: state.token,
+        body: { platform: 'mock', receipt: 'mock-success' },
+      });
+      assert.equal(response.status, 403);
+      assert.equal(response.body.error.code, 'forbidden');
+    } finally {
+      (env as { mockBilling: boolean }).mockBilling = original;
+    }
+  });
+
   test('the account is completed after payment, keeping the same user', async (t) => {
     if (!databaseAvailable) return t.skip('No database available');
 

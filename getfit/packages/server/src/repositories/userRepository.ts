@@ -133,14 +133,21 @@ export const userRepository = {
       await client.query(`UPDATE user_goals SET is_active = FALSE WHERE user_id = $1`, [userId]);
       const saved: UserGoal[] = [];
       for (const goal of goals) {
-        const result = await client.query(
-          `INSERT INTO user_goals (user_id, goal_type, target_value, target_unit, target_exercise_id, start_value, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,TRUE)
-           ON CONFLICT (user_id, goal_type) WHERE is_active DO UPDATE SET
-             target_value = EXCLUDED.target_value,
-             target_unit = EXCLUDED.target_unit,
-             target_exercise_id = EXCLUDED.target_exercise_id,
-             is_active = TRUE
+        // Reactivate the existing row where one exists, so a goal that is
+        // switched off and back on keeps the start value it was first measured
+        // against rather than restarting from today.
+        const reactivated = await client.query(
+          `UPDATE user_goals SET
+             is_active = TRUE,
+             target_value = $3,
+             target_unit = $4,
+             target_exercise_id = $5,
+             start_value = COALESCE(start_value, $6)
+           WHERE id = (
+             SELECT id FROM user_goals
+             WHERE user_id = $1 AND goal_type = $2
+             ORDER BY created_at ASC LIMIT 1
+           )
            RETURNING *`,
           [
             userId,
@@ -151,7 +158,25 @@ export const userRepository = {
             goal.startValue ?? null,
           ],
         );
-        saved.push(mapGoal(result.rows[0]));
+
+        if (reactivated.rows[0]) {
+          saved.push(mapGoal(reactivated.rows[0]));
+          continue;
+        }
+
+        const inserted = await client.query(
+          `INSERT INTO user_goals (user_id, goal_type, target_value, target_unit, target_exercise_id, start_value, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,TRUE) RETURNING *`,
+          [
+            userId,
+            goal.goalType,
+            goal.targetValue ?? null,
+            goal.targetUnit ?? null,
+            goal.targetExerciseId ?? null,
+            goal.startValue ?? null,
+          ],
+        );
+        saved.push(mapGoal(inserted.rows[0]));
       }
       return saved;
     });

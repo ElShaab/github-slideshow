@@ -112,10 +112,11 @@ export class ProgramService {
       program.days.map((d) => d.dayNumber),
     );
 
-    const entries = plan.map((slot, index) => ({
-      workoutDayId: dayIds[index],
-      scheduledDate: slot.date,
-    }));
+    const entries = plan
+      .map((slot, index) => ({ workoutDayId: dayIds[index], scheduledDate: slot.date }))
+      .filter((entry): entry is { workoutDayId: string; scheduledDate: string } =>
+        Boolean(entry.workoutDayId),
+      );
 
     await workoutRepository.replaceSchedule(userId, program.id, entries);
   }

@@ -37,10 +37,13 @@ export const workoutRepository = {
     entries: Array<{ workoutDayId: string; scheduledDate: string }>,
   ): Promise<void> {
     await transaction(async (client) => {
-      // Completed sessions are never removed; only future scheduled slots are.
+      // Completed and missed sessions are never removed — only slots that have
+      // not happened yet, including ones already moved by the adaptation pass.
       await client.query(
         `DELETE FROM scheduled_workouts
-         WHERE user_id = $1 AND status = 'scheduled' AND scheduled_date >= CURRENT_DATE`,
+         WHERE user_id = $1
+           AND status IN ('scheduled', 'rescheduled')
+           AND scheduled_date >= CURRENT_DATE`,
         [userId],
       );
       for (const entry of entries) {
@@ -231,21 +234,24 @@ export const workoutRepository = {
     );
     if (!workoutResult.rows[0]) return null;
 
+    // The workout above is already proven to belong to this user, but every
+    // sub-query is scoped again so a future refactor cannot widen access.
     const exercisesResult = await query(
-      `SELECT * FROM completed_exercises WHERE completed_workout_id = $1 ORDER BY order_index`,
-      [workoutId],
+      `SELECT * FROM completed_exercises
+       WHERE completed_workout_id = $1 AND user_id = $2 ORDER BY order_index`,
+      [workoutId, userId],
     );
     const setsResult = await query(
       `SELECT cs.* FROM completed_sets cs
        JOIN completed_exercises ce ON ce.id = cs.completed_exercise_id
-       WHERE ce.completed_workout_id = $1 ORDER BY cs.set_number`,
-      [workoutId],
+       WHERE ce.completed_workout_id = $1 AND cs.user_id = $2 ORDER BY cs.set_number`,
+      [workoutId, userId],
     );
     const recordsResult = await query(
       `SELECT pr.*, e.name AS exercise_name FROM personal_records pr
        JOIN exercises e ON e.id = pr.exercise_id
-       WHERE pr.completed_workout_id = $1`,
-      [workoutId],
+       WHERE pr.completed_workout_id = $1 AND pr.user_id = $2`,
+      [workoutId, userId],
     );
 
     const setsByExercise = new Map<string, CompletedSet[]>();

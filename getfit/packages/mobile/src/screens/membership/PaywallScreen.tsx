@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
 import {
   ErrorState,
@@ -133,7 +133,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         style={{ marginTop: spacing.xxl }}
       />
 
-      <View style={[styles.notes, { marginTop: spacing.xl, gap: spacing.sm }]}>
+      <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
         <Text variant="caption" color="muted">
           No free trial. Cancel any time from Settings or your store account.
         </Text>
@@ -152,10 +152,5 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
 }
 
 function storeName(): string {
-  const { Platform } = require('react-native') as typeof import('react-native');
   return Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
 }
-
-const styles = StyleSheet.create({
-  notes: {},
-});
