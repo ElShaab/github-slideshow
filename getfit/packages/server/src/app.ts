@@ -23,6 +23,12 @@ export function createApp(): express.Express {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
+  // Express 4 parses req.query with qs, whose 6.15.x line carries two DoS
+  // advisories and which express pins out of reach of an override. Nothing
+  // here reads a nested query object, so the built-in parser removes that
+  // code path entirely at no cost.
+  app.set('query parser', 'simple');
+
   app.use(
     helmet({
       // The API serves JSON and private images only; no HTML is rendered.

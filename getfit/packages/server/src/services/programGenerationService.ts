@@ -601,11 +601,6 @@ function buildWeeklyBudget(
   return budget;
 }
 
-/**
- * Books both the direct sets and the secondary contribution of a compound, so
- * three pressing exercises in a week are correctly charged to the triceps and
- * front delts as well as the chest.
- */
 /** Weekly effective-set floor per muscle — the minimum worth programming. */
 const WEEKLY_FLOOR: Record<string, number> = Object.fromEntries(
   MUSCLE_GROUPS.map((group) => [group.id, group.weeklySetsMin]),
@@ -653,6 +648,11 @@ function exceedsCeiling(used: Record<string, number>, exercise: Exercise, sets: 
   return false;
 }
 
+/**
+ * Books both the direct sets and the secondary contribution of a compound, so
+ * three pressing exercises in a week are correctly charged to the triceps and
+ * front delts as well as the chest.
+ */
 function applyVolume(used: Record<string, number>, exercise: Exercise, sets: number): void {
   const volume = computeVolume([{ exerciseId: exercise.id, workingSets: sets }]);
   for (const [muscle, entry] of Object.entries(volume)) {
