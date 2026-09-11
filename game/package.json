@@ -1,0 +1,13 @@
+{
+  "name": "army-runner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Original cartoon 3D mobile army-runner game (three.js).",
+  "scripts": {
+    "test": "node --test tests/",
+    "test:stress": "node tests/stress-levels.test.mjs",
+    "serve": "npx --yes http-server .. -p 8080 -c-1"
+  },
+  "license": "MIT"
+}

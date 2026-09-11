@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1b26">
+  <meta name="description" content="Squad Rush - an original cartoon 3D army runner. Swipe between three lanes, pick your gates, grow your squad.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Squad Rush — 3D Army Runner</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎖️</text></svg>">
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene"></canvas>
+
+    <!-- ============================ HUD ============================ -->
+    <div id="hud" class="layer hidden" aria-hidden="true">
+      <div class="hud-top">
+        <div class="hud-chip squad-chip">
+          <span class="chip-icon">🎖️</span>
+          <span id="hud-squad" class="chip-value">10</span>
+        </div>
+        <div class="hud-stage">
+          <div class="stage-label">STAGE <span id="hud-stage">1</span></div>
+          <div class="progress-track"><div id="hud-progress" class="progress-fill"></div></div>
+        </div>
+        <div class="hud-chip gem-chip">
+          <span class="chip-icon">💎</span>
+          <span id="hud-gems" class="chip-value">3</span>
+        </div>
+      </div>
+
+      <div class="hud-weapon">
+        <div id="hud-weapon-name" class="weapon-name">Pistol</div>
+        <div id="hud-weapon-stats" class="weapon-stats"></div>
+      </div>
+
+      <div id="boss-bar" class="boss-bar hidden">
+        <div class="boss-name" id="boss-name">BOSS</div>
+        <div class="boss-track"><div id="boss-fill" class="boss-fill"></div></div>
+      </div>
+
+      <div id="toast-stack" class="toast-stack"></div>
+      <button id="pause-button" class="icon-button" aria-label="Pause">❚❚</button>
+    </div>
+
+    <!-- ========================== MAIN MENU ======================== -->
+    <div id="menu" class="layer panel-layer">
+      <div class="panel title-panel">
+        <h1 class="game-title">SQUAD<span>RUSH</span></h1>
+        <p class="tagline">Swipe. Choose your gate. Grow the army.</p>
+        <div class="stat-row">
+          <div class="stat"><span class="stat-value" id="menu-points">0</span><span class="stat-label">Soldier Points</span></div>
+          <div class="stat"><span class="stat-value" id="menu-gems">3</span><span class="stat-label">Gems</span></div>
+          <div class="stat"><span class="stat-value" id="menu-best">1</span><span class="stat-label">Best Stage</span></div>
+        </div>
+        <button id="play-button" class="button primary large">PLAY</button>
+        <div class="button-row">
+          <button id="skins-button" class="button">SKINS</button>
+          <button id="store-button" class="button">GEMS</button>
+        </div>
+        <p class="hint">Swipe left / right — or use the ← → arrow keys</p>
+      </div>
+    </div>
+
+    <!-- ========================= DEATH SCREEN ====================== -->
+    <div id="death" class="layer panel-layer hidden">
+      <div class="panel">
+        <h2 class="panel-title danger">DEFEATED</h2>
+        <div class="result-grid">
+          <div class="result"><span class="result-label">Stage reached</span><span class="result-value" id="death-stage">1</span></div>
+          <div class="result"><span class="result-label">Soldiers</span><span class="result-value" id="death-squad">0</span></div>
+          <div class="result"><span class="result-label">Enemies defeated</span><span class="result-value" id="death-kills">0</span></div>
+          <div class="result"><span class="result-label">Lifetime Soldier Points</span><span class="result-value" id="death-points">0</span></div>
+        </div>
+        <div class="continue-box">
+          <div class="continue-line">
+            <span>Continue cost</span>
+            <strong id="death-cost">💎 1</strong>
+          </div>
+          <div class="continue-line subtle">
+            <span>Gems available</span>
+            <strong id="death-gems">💎 3</strong>
+          </div>
+          <p class="continue-note" id="death-restore"></p>
+        </div>
+        <button id="continue-button" class="button primary large">CONTINUE</button>
+        <button id="endrun-button" class="button ghost">END RUN</button>
+      </div>
+    </div>
+
+    <!-- ========================== SKIN SHOP ======================== -->
+    <div id="skins" class="layer panel-layer hidden">
+      <div class="panel wide">
+        <h2 class="panel-title">SKINS</h2>
+        <p class="panel-sub">Cosmetic only — they never change how your squad fights.</p>
+        <div class="balance-line">🎖️ <span id="skins-points">0</span> Soldier Points</div>
+        <div id="skin-list" class="card-list"></div>
+        <button class="button ghost close-button" data-close="skins">BACK</button>
+      </div>
+    </div>
+
+    <!-- ========================== GEM STORE ======================== -->
+    <div id="store" class="layer panel-layer hidden">
+      <div class="panel wide">
+        <h2 class="panel-title">GEMS</h2>
+        <p class="panel-sub">Gems buy continues. This build uses a mock store — no real purchase is made.</p>
+        <div class="balance-line">💎 <span id="store-gems">3</span> Gems</div>
+        <div id="pack-list" class="card-list"></div>
+        <button class="button ghost close-button" data-close="store">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============================ PAUSE ========================== -->
+    <div id="pause" class="layer panel-layer hidden">
+      <div class="panel">
+        <h2 class="panel-title">PAUSED</h2>
+        <button id="resume-button" class="button primary large">RESUME</button>
+        <button id="quit-button" class="button ghost">QUIT RUN</button>
+        <label class="toggle-line">
+          <input type="checkbox" id="audio-toggle" checked> Sound
+        </label>
+      </div>
+    </div>
+
+    <!-- ====================== STAGE TRANSITION ===================== -->
+    <div id="stage-banner" class="stage-banner hidden">
+      <div class="banner-title">STAGE CLEAR</div>
+      <div class="banner-sub" id="banner-sub">Stage 2</div>
+    </div>
+
+    <!-- ======================== DEBUG OVERLAY ====================== -->
+    <div id="debug" class="debug-overlay hidden">
+      <div class="debug-head">DEBUG <button id="debug-close" class="debug-x">×</button></div>
+      <pre id="debug-readout"></pre>
+      <div class="debug-buttons">
+        <button data-debug="squad+">+50 squad</button>
+        <button data-debug="squad-">−50 squad</button>
+        <button data-debug="skip">Skip stage</button>
+        <button data-debug="spawn">Spawn wave</button>
+        <button data-debug="gems">+10 gems</button>
+        <button data-debug="weapon">Weapon upgrade</button>
+        <button data-debug="regen">Regenerate level</button>
+        <button data-debug="kill">Kill squad</button>
+        <button data-debug="lanes">Lane numbers</button>
+        <button data-debug="paths">Log winning paths</button>
+      </div>
+    </div>
+
+    <div id="loading" class="layer loading-layer">
+      <div class="loading-text">LOADING…</div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

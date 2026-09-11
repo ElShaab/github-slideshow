@@ -11,3 +11,21 @@ I'm the GitHub Learning Lab bot and I'm here to help guide you in your journey t
 I'll meet you over there, can't wait to get started!
 
 This course is using the :sparkles: open source project [reveal.js](https://github.com/hakimel/reveal.js/). In some cases we’ve made changes to the history so it would behave during class, so head to the original project repo to learn more about the cool people behind this project.
+
+---
+
+## 🎖️ Squad Rush — 3D army runner
+
+This repository also hosts **Squad Rush**, an original cartoon 3D mobile army
+runner built with three.js. Swipe between three lanes, choose your gates, grow
+the squad and fight through waves and bosses — every stage is generated
+backwards from its boss and proven beatable before you ever see it.
+
+* **Play:** [`game/index.html`](game/index.html)
+* **Docs, architecture and tests:** [`game/README.md`](game/README.md)
+
+```bash
+cd game
+npm test          # rules, combat, economy, and a 10,000-level solvability stress test
+npm run serve     # then open http://127.0.0.1:8080/game/index.html
+```
