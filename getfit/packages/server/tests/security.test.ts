@@ -1,0 +1,419 @@
+/**
+ * Cross-user isolation and authentication hardening.
+ *
+ * Builds two independent paid accounts and then tries, from each ID-bearing
+ * route, to reach the other user's data. Nothing here may ever return another
+ * user's record, and nothing may be mutated on their behalf.
+ *
+ * Skipped automatically when no database is reachable.
+ */
+import assert from 'node:assert/strict';
+import { after, before, describe, test } from 'node:test';
+import type { Server } from 'node:http';
+import { randomBytes } from 'node:crypto';
+import * as jwt from 'jsonwebtoken';
+
+process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
+process.env.MOCK_AI_MODE = 'true';
+process.env.MOCK_BILLING = 'true';
+process.env.DEV_MODE = 'true';
+process.env.LOG_LEVEL = 'error';
+
+let baseUrl = '';
+let server: Server | null = null;
+let databaseAvailable = true;
+
+async function boot(): Promise<void> {
+  const { pool } = await import('../src/db/pool');
+  try {
+    await pool.query('SELECT 1');
+  } catch {
+    databaseAvailable = false;
+    return;
+  }
+
+  const { runMigrations } = await import('../src/db/migrate');
+  const { seed } = await import('../src/db/seed');
+  await runMigrations();
+  await seed();
+
+  const { createApp } = await import('../src/app');
+  const app = createApp();
+  await new Promise<void>((resolve) => {
+    server = app.listen(0, () => resolve());
+  });
+  const address = server?.address();
+  if (address && typeof address === 'object') baseUrl = `http://127.0.0.1:${address.port}`;
+}
+
+async function api<T = Record<string, unknown>>(
+  method: string,
+  path: string,
+  options: { token?: string; body?: unknown; form?: FormData } = {},
+): Promise<{ status: number; body: T }> {
+  const headers: Record<string, string> = {};
+  if (options.token) headers.authorization = `Bearer ${options.token}`;
+
+  let body: string | FormData | undefined;
+  if (options.form) {
+    body = options.form;
+  } else if (options.body !== undefined) {
+    headers['content-type'] = 'application/json';
+    body = JSON.stringify(options.body);
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, { method, headers, body });
+  // Photo routes answer with image bytes, so only JSON is parsed.
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    return { status: response.status, body: {} as T };
+  }
+  const text = await response.text();
+  return { status: response.status, body: (text ? JSON.parse(text) : {}) as T };
+}
+
+function jpegFixture(seed: string): Blob {
+  const header = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+    0x00, 0x01, 0x00, 0x00,
+    0xff, 0xc0, 0x00, 0x11, 0x08, 0x06, 0x40, 0x04, 0xb0, 0x03,
+    0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+  ]);
+  const payload = Buffer.alloc(160_000);
+  payload.write(seed.repeat(64));
+  payload.fill(seed.charCodeAt(0), 64);
+  return new Blob([header, payload, Buffer.from([0xff, 0xd9])], { type: 'image/jpeg' });
+}
+
+interface Account {
+  token: string;
+  userId: string;
+  photoId: string;
+  workoutDayId: string;
+  scheduledWorkoutId: string;
+  completedWorkoutId: string;
+}
+
+/** Drives one user all the way to a completed workout so every id exists. */
+async function buildAccount(seed: string): Promise<Account> {
+  const guest = await api<{ accessToken: string; userId: string }>('POST', '/api/auth/guest');
+  let token = guest.body.accessToken;
+  const userId = guest.body.userId;
+
+  await api('POST', '/api/onboarding', {
+    token,
+    body: {
+      age: 30,
+      sex: 'male',
+      heightCm: 180,
+      weightKg: 82,
+      trainingLevel: 'intermediate',
+      trainingLocation: 'gym',
+      trainingDays: 4,
+      sessionDurationMinutes: 60,
+      goals: ['muscle_gain'],
+      equipment: [],
+    },
+  });
+
+  const form = new FormData();
+  form.append('photo', jpegFixture(seed), 'body.jpg');
+  const assessment = await api<{ assessment: { sourcePhotoId: string } }>(
+    'POST',
+    '/api/assessments/initial',
+    { token, form },
+  );
+
+  await api('POST', '/api/subscription/purchase', {
+    token,
+    body: { platform: 'mock', receipt: 'mock-success' },
+  });
+
+  const account = await api<{ accessToken: string }>('POST', '/api/auth/account', {
+    token,
+    body: {
+      email: `sec-${seed}-${randomBytes(4).toString('hex')}@getfit.test`,
+      password: 'a-strong-password',
+    },
+  });
+  token = account.body.accessToken;
+
+  await api('POST', '/api/exercises/preferences/generate', { token });
+  await api('POST', '/api/program/generate', { token });
+
+  const today = await api<{
+    workout: { scheduledWorkoutId: string; day: { id: string; exercises: Array<{
+      id: string; exerciseId: string; prescribedSets: Array<{ setNumber: number; prescribedWeight: number | null;
+        prescribedRepsMin: number; prescribedRepsMax: number; isWarmup: boolean }> }> } };
+  }>('GET', '/api/workouts/today', { token });
+
+  const day = today.body.workout.day;
+  const completed = await api<{ summary: { id: string } }>('POST', '/api/workouts/complete', {
+    token,
+    body: {
+      scheduledWorkoutId: today.body.workout.scheduledWorkoutId,
+      workoutDayId: day.id,
+      startedAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
+      durationSeconds: 40 * 60,
+      cardioMinutes: 5,
+      exercises: day.exercises.map((exercise, index) => ({
+        exerciseId: exercise.exerciseId,
+        workoutExerciseId: exercise.id,
+        orderIndex: index,
+        sets: exercise.prescribedSets.map((set) => ({
+          setNumber: set.setNumber,
+          actualWeight: set.prescribedWeight,
+          actualReps: set.prescribedRepsMax,
+          prescribedWeight: set.prescribedWeight,
+          prescribedRepsMin: set.prescribedRepsMin,
+          prescribedRepsMax: set.prescribedRepsMax,
+          isWarmup: set.isWarmup,
+          completedAt: new Date().toISOString(),
+        })),
+      })),
+    },
+  });
+
+  const schedule = await api<{ upcoming: Array<{ id: string }> }>('GET', '/api/program/schedule', {
+    token,
+  });
+
+  return {
+    token,
+    userId,
+    photoId: assessment.body.assessment.sourcePhotoId,
+    workoutDayId: day.id,
+    scheduledWorkoutId: schedule.body.upcoming[0]?.id ?? '',
+    completedWorkoutId: completed.body.summary.id,
+  };
+}
+
+before(async () => {
+  await boot();
+});
+
+after(async () => {
+  if (server) await new Promise<void>((resolve) => server?.close(() => resolve()));
+  const { closePool } = await import('../src/db/pool');
+  await closePool().catch(() => undefined);
+});
+
+describe('cross-user isolation', () => {
+  let alice: Account;
+  let bob: Account;
+
+  test('two independent paid accounts can be created', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    alice = await buildAccount('a');
+    bob = await buildAccount('b');
+
+    assert.notEqual(alice.userId, bob.userId);
+    assert.ok(alice.photoId && bob.photoId, 'both users should have a stored photo');
+    assert.ok(alice.completedWorkoutId && bob.completedWorkoutId);
+    assert.notEqual(alice.workoutDayId, bob.workoutDayId);
+  });
+
+  test("another user's photo is never served", async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await api('GET', `/api/photos/${alice.photoId}`, { token: bob.token });
+    assert.equal(response.status, 404, "Bob reached Alice's photo");
+
+    // And the owner still can.
+    const owner = await api('GET', `/api/photos/${alice.photoId}`, { token: alice.token });
+    assert.equal(owner.status, 200, 'the owner lost access to their own photo');
+  });
+
+  test('photos are never listed across users', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await api<{ photos: Array<{ id: string }> }>('GET', '/api/photos', {
+      token: bob.token,
+    });
+    assert.equal(response.status, 200);
+    const ids = response.body.photos.map((p) => p.id);
+    assert.ok(!ids.includes(alice.photoId), "Alice's photo appeared in Bob's list");
+  });
+
+  test("another user's workout day is not readable", async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await api('GET', `/api/program/day/${alice.workoutDayId}`, {
+      token: bob.token,
+    });
+    assert.ok(
+      response.status === 404 || response.status === 403,
+      `expected 404/403, got ${response.status}`,
+    );
+  });
+
+  test("another user's completed workout is not readable", async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await api('GET', `/api/workouts/history/${alice.completedWorkoutId}`, {
+      token: bob.token,
+    });
+    assert.ok(
+      response.status === 404 || response.status === 403,
+      `expected 404/403, got ${response.status}`,
+    );
+
+    const owner = await api('GET', `/api/workouts/history/${alice.completedWorkoutId}`, {
+      token: alice.token,
+    });
+    assert.equal(owner.status, 200, 'the owner lost access to their own workout');
+  });
+
+  test("another user's scheduled workout cannot be skipped", async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+    if (!alice.scheduledWorkoutId) return t.skip('No scheduled workout to test');
+
+    const response = await api('POST', `/api/workouts/skip/${alice.scheduledWorkoutId}`, {
+      token: bob.token,
+    });
+    assert.ok(
+      response.status === 404 || response.status === 403,
+      `Bob skipped Alice's workout (${response.status})`,
+    );
+
+    // The decisive check: Alice's schedule is untouched either way.
+    const schedule = await api<{ upcoming: Array<{ id: string; status: string }> }>(
+      'GET',
+      '/api/program/schedule',
+      { token: alice.token },
+    );
+    const entry = schedule.body.upcoming.find((e) => e.id === alice.scheduledWorkoutId);
+    assert.ok(entry, "Alice's scheduled workout disappeared");
+    assert.notEqual(entry.status, 'missed', "Bob marked Alice's workout as missed");
+  });
+
+  test("a workout cannot be completed against another user's day", async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await api('POST', '/api/workouts/complete', {
+      token: bob.token,
+      body: {
+        scheduledWorkoutId: alice.scheduledWorkoutId || null,
+        workoutDayId: alice.workoutDayId,
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        durationSeconds: 600,
+        cardioMinutes: 0,
+        exercises: [],
+      },
+    });
+    assert.notEqual(response.status, 201, "Bob logged a workout against Alice's program");
+  });
+
+  test('progress and assessments only ever describe the caller', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const [aliceProgress, bobProgress] = await Promise.all([
+      api<{ records: unknown[] }>('GET', '/api/progress/records', { token: alice.token }),
+      api<{ records: unknown[] }>('GET', '/api/progress/records', { token: bob.token }),
+    ]);
+    assert.equal(aliceProgress.status, 200);
+    assert.equal(bobProgress.status, 200);
+
+    const serialised = JSON.stringify(bobProgress.body);
+    assert.ok(!serialised.includes(alice.userId), "Bob's progress referenced Alice");
+    assert.ok(
+      !serialised.includes(alice.completedWorkoutId),
+      "Bob's progress referenced Alice's workout",
+    );
+  });
+
+  test('deleting one account leaves the other intact', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const victim = await buildAccount('c');
+    const deletion = await api('DELETE', '/api/auth/account', { token: victim.token });
+    assert.equal(deletion.status, 200);
+
+    // The deleted user's token stops working immediately.
+    const after = await api('GET', '/api/progress/records', { token: victim.token });
+    assert.equal(after.status, 401, 'a deleted account kept a working session');
+
+    // Their photo is gone for everyone, including them.
+    const photo = await api('GET', `/api/photos/${victim.photoId}`, { token: alice.token });
+    assert.equal(photo.status, 404);
+
+    // Alice is untouched.
+    const alive = await api('GET', '/api/progress/records', { token: alice.token });
+    assert.equal(alive.status, 200, 'deleting one account broke another');
+  });
+});
+
+describe('authentication hardening', () => {
+  test('protected routes reject a missing or malformed token', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const paths = [
+      '/api/progress/overview',
+      '/api/program/active',
+      '/api/workouts/today',
+      '/api/settings',
+      '/api/photos',
+      '/api/subscription/entitlement',
+    ];
+
+    for (const path of paths) {
+      const none = await api('GET', path);
+      assert.equal(none.status, 401, `${path} served an unauthenticated request`);
+
+      const malformed = await api('GET', path, { token: 'not-a-jwt' });
+      assert.equal(malformed.status, 401, `${path} accepted a malformed token`);
+    }
+  });
+
+  test('a token signed with the wrong secret is rejected', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const guest = await api<{ userId: string }>('POST', '/api/auth/guest');
+    const forged = jwt.sign({ sub: guest.body.userId, guest: false }, 'not-the-real-secret', {
+      expiresIn: '30d',
+    });
+
+    const response = await api('GET', '/api/progress/overview', { token: forged });
+    assert.equal(response.status, 401, 'a forged token was accepted');
+  });
+
+  test('an expired token is rejected', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const { env } = await import('../src/config/env');
+    const guest = await api<{ userId: string }>('POST', '/api/auth/guest');
+    const expired = jwt.sign({ sub: guest.body.userId, guest: true }, env.jwtSecret, {
+      expiresIn: '-1s',
+    });
+
+    const response = await api('GET', '/api/settings', { token: expired });
+    assert.equal(response.status, 401, 'an expired token was accepted');
+  });
+
+  test('a token for a non-existent user is rejected', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const { env } = await import('../src/config/env');
+    const ghost = jwt.sign(
+      { sub: '00000000-0000-4000-8000-000000000000', guest: false },
+      env.jwtSecret,
+      { expiresIn: '30d' },
+    );
+
+    const response = await api('GET', '/api/settings', { token: ghost });
+    assert.equal(response.status, 401, 'a token for a deleted user was accepted');
+  });
+
+  test('photo responses forbid caching and content sniffing', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const account = await buildAccount('d');
+    const response = await fetch(`${baseUrl}/api/photos/${account.photoId}`, {
+      headers: { authorization: `Bearer ${account.token}` },
+    });
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control') ?? '', /no-store/);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  });
+});

@@ -80,9 +80,14 @@ workoutRoutes.get(
 workoutRoutes.post(
   '/skip/:scheduledWorkoutId',
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
-    await workoutRepository.updateScheduleEntry(req.userId, req.params.scheduledWorkoutId, {
-      status: 'missed',
-    });
+    // A row belonging to someone else matches nothing, so this is also what
+    // refuses a skip against another user's schedule.
+    const skipped = await workoutRepository.updateScheduleEntry(
+      req.userId,
+      req.params.scheduledWorkoutId,
+      { status: 'missed' },
+    );
+    if (!skipped) throw errors.notFound('That scheduled workout was not found.');
     res.json({ skipped: true });
   }),
 );

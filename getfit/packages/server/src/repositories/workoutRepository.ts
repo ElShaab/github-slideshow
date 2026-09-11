@@ -92,12 +92,13 @@ export const workoutRepository = {
     return result.rows[0] ? mapScheduled(result.rows[0]) : null;
   },
 
+  /** Returns false when the row does not exist or belongs to another user. */
   async updateScheduleEntry(
     userId: string,
     id: string,
     patch: { scheduledDate?: string; status?: ScheduleStatus; completedWorkoutId?: string | null },
-  ): Promise<void> {
-    await query(
+  ): Promise<boolean> {
+    const result = await query(
       `UPDATE scheduled_workouts
        SET scheduled_date = COALESCE($3, scheduled_date),
            status = COALESCE($4, status),
@@ -105,6 +106,7 @@ export const workoutRepository = {
        WHERE id = $1 AND user_id = $2`,
       [id, userId, patch.scheduledDate ?? null, patch.status ?? null, patch.completedWorkoutId ?? null],
     );
+    return (result.rowCount ?? 0) > 0;
   },
 
   async countSchedule(userId: string): Promise<{ completed: number; total: number }> {
