@@ -1,0 +1,28 @@
+{
+  "name": "getfit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GetFit — AI-powered fitness application (iOS + Android)",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/mobile"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace @getfit/shared",
+    "dev:server": "npm run dev --workspace @getfit/server",
+    "build:server": "npm run build --workspace @getfit/server",
+    "start:server": "npm run start --workspace @getfit/server",
+    "db:migrate": "npm run migrate --workspace @getfit/server",
+    "db:seed": "npm run seed --workspace @getfit/server",
+    "db:reset": "npm run reset --workspace @getfit/server",
+    "test": "npm run test --workspace @getfit/server",
+    "typecheck": "npm run typecheck --workspace @getfit/shared && npm run typecheck --workspace @getfit/server",
+    "mobile": "npm run start --workspace @getfit/mobile",
+    "mobile:ios": "npm run ios --workspace @getfit/mobile",
+    "mobile:android": "npm run android --workspace @getfit/mobile"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
