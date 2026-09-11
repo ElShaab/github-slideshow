@@ -96,9 +96,8 @@ export class PhotoStorageService {
 
   private async writeObject(storageKey: string, buffer: Buffer): Promise<void> {
     if (env.storageDriver === 's3') {
-      throw new Error(
-        'S3 storage driver is configured but no S3 client is bundled. Set STORAGE_DRIVER=local or add an S3 adapter.',
-      );
+      await s3PutObject(storageKey, buffer);
+      return;
     }
     const target = this.localPath(storageKey);
     await fs.mkdir(path.dirname(target), { recursive: true });
@@ -106,10 +105,15 @@ export class PhotoStorageService {
   }
 
   private async readObject(storageKey: string): Promise<Buffer> {
+    if (env.storageDriver === 's3') return s3GetObject(storageKey);
     return fs.readFile(this.localPath(storageKey));
   }
 
   private async deleteObject(storageKey: string): Promise<void> {
+    if (env.storageDriver === 's3') {
+      await s3DeleteObject(storageKey);
+      return;
+    }
     await fs.rm(this.localPath(storageKey), { force: true });
   }
 
@@ -122,6 +126,54 @@ export class PhotoStorageService {
     }
     return resolved;
   }
+}
+
+/* ------------------------------ S3 driver ------------------------------ */
+
+/**
+ * The bucket is private: objects are written with no ACL and are only ever
+ * read back through this service, which has already checked ownership. No
+ * presigned URL is ever handed to a client, so a photo cannot outlive the
+ * request that fetched it.
+ */
+type S3Client = import('@aws-sdk/client-s3').S3Client;
+
+let s3Client: S3Client | null = null;
+
+async function getS3(): Promise<{ client: S3Client; sdk: typeof import('@aws-sdk/client-s3') }> {
+  const sdk = await import('@aws-sdk/client-s3');
+  if (!s3Client) {
+    s3Client = new sdk.S3Client({ region: env.storageS3Region || undefined });
+  }
+  return { client: s3Client, sdk };
+}
+
+async function s3PutObject(storageKey: string, buffer: Buffer): Promise<void> {
+  const { client, sdk } = await getS3();
+  await client.send(
+    new sdk.PutObjectCommand({
+      Bucket: env.storageS3Bucket,
+      Key: storageKey,
+      Body: buffer,
+      ServerSideEncryption: 'AES256',
+    }),
+  );
+}
+
+async function s3GetObject(storageKey: string): Promise<Buffer> {
+  const { client, sdk } = await getS3();
+  const result = await client.send(
+    new sdk.GetObjectCommand({ Bucket: env.storageS3Bucket, Key: storageKey }),
+  );
+  if (!result.Body) throw new Error('Empty object body');
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+
+async function s3DeleteObject(storageKey: string): Promise<void> {
+  const { client, sdk } = await getS3();
+  await client.send(
+    new sdk.DeleteObjectCommand({ Bucket: env.storageS3Bucket, Key: storageKey }),
+  );
 }
 
 function normaliseContentType(contentType: string): string {

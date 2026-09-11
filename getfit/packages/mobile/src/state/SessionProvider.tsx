@@ -12,6 +12,17 @@ import type { Entitlement, UserProfile } from '@getfit/shared';
 import { ApiError, clearCache, clearToken, loadToken, onUnauthorized } from '../api/client';
 import { assessmentApi, authApi, onboardingApi, subscriptionApi } from '../api/endpoints';
 
+/**
+ * Ends the session on this device. The offline cache holds body-composition
+ * figures and workout history, so it is discarded with the token — otherwise
+ * the next person to sign in on a shared device could be served the previous
+ * account's data from disk.
+ */
+async function endLocalSession(): Promise<void> {
+  await clearToken();
+  await clearCache();
+}
+
 /** Where in the product journey the user currently is. */
 export type SessionStage =
   | 'loading'
@@ -138,7 +149,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       setState(next);
     } catch (error) {
       if (error instanceof ApiError && error.isUnauthorized) {
-        await clearToken();
+        await endLocalSession();
         setState((current) => ({ ...current, stage: 'onboarding', userId: null, error: null }));
       } else if (error instanceof ApiError && error.isOffline) {
         // Offline at launch: stay where we are rather than throwing the user
@@ -174,7 +185,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
 
   useEffect(() => {
     onUnauthorized(() => {
-      void clearToken().then(() => {
+      void endLocalSession().then(() => {
         setState((current) => ({ ...current, stage: 'onboarding', userId: null }));
       });
     });
@@ -182,6 +193,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
   }, []);
 
   const startGuestSession = useCallback(async () => {
+    // A fresh session must never inherit the previous account's cached data.
+    await endLocalSession();
     const tokens = await authApi.startGuestSession();
     setState((current) => ({
       ...current,
@@ -193,8 +206,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
   }, []);
 
   const signOut = useCallback(async () => {
-    await clearToken();
-    await clearCache();
+    await endLocalSession();
     setState({
       stage: 'onboarding',
       userId: null,

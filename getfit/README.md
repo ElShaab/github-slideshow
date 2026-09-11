@@ -455,9 +455,17 @@ Photos are **private by default** and are never served from a public URL.
 - Account deletion removes the stored files as well as the rows.
 
 `STORAGE_DRIVER=local` writes to `STORAGE_LOCAL_PATH` with mode `0600`, with
-path traversal blocked at the driver. For S3, add an adapter in
-`PhotoStorageService.writeObject` / `readObject` and keep the same
-ownership-checked read path.
+path traversal blocked at the driver. It suits development and self-hosting on
+a persistent volume.
+
+`STORAGE_DRIVER=s3` stores objects with `ServerSideEncryption: AES256` in
+`STORAGE_S3_BUCKET`, using the same user-namespaced keys. The bucket must stay
+private: no ACL is set and no presigned URL is ever issued, so every read still
+goes through the ownership-checked `GET /api/photos/:id`. Credentials are taken
+from the standard AWS chain (instance role, environment, or profile).
+
+Production refuses to start on `local`, since container disks do not survive a
+deploy and the photos would be lost.
 
 ---
 

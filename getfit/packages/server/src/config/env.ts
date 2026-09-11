@@ -106,6 +106,9 @@ if (env.isProduction) {
   if (env.storageDriver === 'local') {
     failures.push('STORAGE_DRIVER=local stores photos on ephemeral disk; use s3.');
   }
+  if (env.storageDriver === 's3' && (!env.storageS3Bucket || !env.storageS3Region)) {
+    failures.push('STORAGE_S3_BUCKET and STORAGE_S3_REGION are required for s3 storage.');
+  }
   if (!env.appleSharedSecret) {
     failures.push('APPLE_SHARED_SECRET is required to verify App Store receipts.');
   }
