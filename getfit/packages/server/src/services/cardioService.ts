@@ -25,11 +25,14 @@ const CARDIO_LADDER: Array<{ bodyFat: number; minutes: number }> = [
   { bodyFat: 27, minutes: 15 },
 ];
 
+/**
+ * Body fat alone sets the duration. A goal bonus used to be added on top, but
+ * it pushed the fat-loss case into the 15-minute cap: dropping from 27% to 24%
+ * body fat produced no change at all, so the one group watching this number
+ * most closely saw no reward for the progress they had made.
+ */
 export function baseCardioMinutes(bodyFatPercent: number, goals: GoalType[]): number {
   let minutes = interpolateLadder(bodyFatPercent);
-
-  if (goals.includes('fat_loss')) minutes += 3;
-  else if (goals.includes('recomposition')) minutes += 1;
 
   // Someone training purely for strength with low body fat does not need it.
   if (minutes < 3 && !goals.includes('fat_loss') && !goals.includes('general_fitness')) {

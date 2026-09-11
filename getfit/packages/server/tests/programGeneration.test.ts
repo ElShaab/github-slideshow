@@ -7,11 +7,13 @@ import {
   MAX_WARMUP_SETS,
   SESSION_DURATIONS,
   TRAINING_DAY_OPTIONS,
+  type GoalType,
   type SessionDuration,
   type TrainingDays,
 } from '@getfit/shared';
 import { ExerciseSelectionService } from '../src/services/exerciseSelectionService';
 import { ProgramGenerationService } from '../src/services/programGenerationService';
+import { baseCardioMinutes } from '../src/services/cardioService';
 import { programInput, selectionContext } from './helpers';
 
 const generator = new ProgramGenerationService();
@@ -244,6 +246,44 @@ test('cardio never exceeds fifteen minutes and falls as body fat improves', () =
   assert.ok(high >= mid, `cardio should not rise as body fat falls (${high} vs ${mid})`);
   assert.ok(mid >= low, `cardio should not rise as body fat falls (${mid} vs ${low})`);
   assert.ok(low < high, 'leaner users should get less cardio');
+});
+
+test('cardio hits the specified duration at every body-fat anchor', () => {
+  // The product spec fixes these four points. A goal must not move them — a
+  // fat-loss bonus once pinned 27% and 24% both to the cap, so the user saw no
+  // change for real progress.
+  const anchors: Array<[number, number]> = [
+    [27, 15],
+    [24, 12],
+    [21, 8],
+    [18, 5],
+  ];
+  const goalSets: GoalType[][] = [
+    ['muscle_gain'],
+    ['fat_loss'],
+    ['strength'],
+    ['general_fitness'],
+    ['recomposition'],
+  ];
+
+  for (const goals of goalSets) {
+    for (const [bodyFatPercent, expected] of anchors) {
+      assert.equal(
+        baseCardioMinutes(bodyFatPercent, goals),
+        expected,
+        `${goals.join('+')} at ${bodyFatPercent}% body fat should get ${expected} minutes`,
+      );
+    }
+
+    // And it never rises as the user gets leaner.
+    const series = [32, 27, 24, 21, 18, 15, 12].map((bf) => baseCardioMinutes(bf, goals));
+    for (let i = 1; i < series.length; i += 1) {
+      assert.ok(
+        series[i] <= series[i - 1],
+        `${goals.join('+')} cardio rose as body fat fell: ${series.join(' -> ')}`,
+      );
+    }
+  }
 });
 
 test('computes direct, secondary and effective weekly volume', () => {
