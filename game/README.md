@@ -65,6 +65,25 @@ The suite covers the arithmetic, the combat rules, the economy, save/load,
 level generation and — most importantly — **parity between the live game and
 the simulator** (see below).
 
+### Mobile check
+
+Layout and touch need a real browser, so they live in a separate harness that
+runs against a served build:
+
+```bash
+npm run serve                       # in one terminal
+node tools/mobile-check.mjs         # in another (needs Playwright available)
+```
+
+It drives iPhone, Pixel and iPad profiles with genuine touch events and fails
+if the HUD leaves the screen, a swipe does not move the squad, WebGL is
+missing, or the page scrolls under the finger. It is not part of `npm test`
+because the game itself has no dependencies and the suite should stay that way.
+
+Worth knowing: `body { overflow: hidden }` means a HUD element can sit *off*
+the screen without ever showing up in `scrollWidth`, so this harness measures
+element rectangles against the viewport instead.
+
 ## Architecture
 
 Everything under `src/core/` is pure logic with no browser or three.js

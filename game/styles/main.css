@@ -61,11 +61,15 @@ html, body {
   background: rgba(13, 27, 38, 0.66);
   border: 2px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 6px clamp(8px, 3vw, 14px);
   font-weight: 800;
-  font-size: clamp(16px, 4.4vmin, 26px);
+  font-size: clamp(15px, 4.4vmin, 26px);
   backdrop-filter: blur(6px);
-  min-width: 84px;
+  /* Fixed-size ends of the HUD row: the stage block in the middle absorbs
+     whatever is left. Without flex-shrink:0 plus a shrinkable middle, a 320px
+     phone pushes the gem counter clean off the screen. */
+  flex: 0 0 auto;
+  min-width: clamp(64px, 19vw, 84px);
   justify-content: center;
 }
 .squad-chip { color: #bff5cf; }
@@ -80,7 +84,9 @@ html, body {
   100% { transform: scale(1); }
 }
 
-.hud-stage { flex: 1; text-align: center; }
+/* min-width:0 lets this shrink below its content width, which flex items
+   refuse to do by default -- that refusal is what forced the overflow. */
+.hud-stage { flex: 1 1 auto; min-width: 0; text-align: center; }
 .stage-label {
   font-size: clamp(11px, 2.8vmin, 15px);
   letter-spacing: 0.16em;
@@ -90,7 +96,8 @@ html, body {
 }
 .progress-track {
   margin: 5px auto 0;
-  width: min(52vw, 320px);
+  width: 100%;
+  max-width: 320px;
   height: 7px;
   border-radius: 999px;
   background: rgba(13, 27, 38, 0.6);
@@ -107,6 +114,7 @@ html, body {
 .hud-weapon {
   position: absolute;
   left: 12px;
+  max-width: calc(100vw - 80px);
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   background: rgba(13, 27, 38, 0.6);
   border: 2px solid rgba(255,255,255,0.14);
@@ -134,7 +142,8 @@ html, body {
   top: calc(env(safe-area-inset-top, 0px) + 70px);
   left: 50%;
   transform: translateX(-50%);
-  width: min(76vw, 440px);
+  width: min(72vw, 440px);
+  max-width: calc(100vw - 120px);
   text-align: center;
 }
 .boss-name {
