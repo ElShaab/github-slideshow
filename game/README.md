@@ -162,7 +162,16 @@ shipped to the player until it has been proven beatable.**
    of them survives, the candidate is rejected and a new one is generated.
 
 A rejected candidate also tunes the next attempt (too hard → gentler, no threat
-at all → sharper), so generation converges instead of spinning. If everything
+at all → sharper), so generation converges instead of spinning.
+
+This has a consequence worth knowing before tuning pacing: **the number of
+fights a stage can hold is capped, and the cap is per gate row.** Each fight
+ratchets the backward requirement up, and only a gate row — which the player
+can walk through to gain soldiers — brings it back down. Adding waves between
+two gates therefore does not make the stage denser, it makes every candidate
+breach the difficulty bound and get rejected. Adding *gate rows* is what buys
+more action. The cost is paid in validation: every candidate enumerates
+3^sections paths. If everything
 else somehow fails, a deliberately gentle fallback stage is built — and it is
 validated too.
 

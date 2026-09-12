@@ -128,11 +128,22 @@ export const CONFIG = {
 
   /* ------------------------------------------------------------ generation */
   generation: {
-    targetStageSeconds: 150,     // ~2.5 minutes
+    // ~2 minutes. The number of fights a stage can hold is capped by the
+    // solvability guarantee (every extra fight compounds the backward
+    // requirement chain, and only a gate row breaks it), so the way to cut
+    // dead running is to fit the same fights into less road rather than to
+    // add more of them.
+    targetStageSeconds: 122,
     minStageSeconds: 110,
     maxStageSeconds: 195,
-    sectionsMin: 4,              // gate rows (decision points) before the boss
-    sectionsMax: 5,
+    // Gate rows (decision points) before the boss.  This is the lever that
+    // governs pacing: the solvability guarantee caps how many FIGHTS can sit
+    // between two gates, because each fight compounds the backward
+    // requirement chain and only a gate row breaks it.  More gate rows
+    // therefore buy more action, not just more decisions -- at the cost of
+    // enumerating 3^sections paths when validating each candidate.
+    sectionsMin: 6,
+    sectionsMax: 7,
     // Waves per section.  Decisions stay few enough to enumerate every path,
     // while the action stays dense between them.
     wavesPerSectionMin: 2,
