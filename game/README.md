@@ -7,6 +7,11 @@ fight through waves and bosses — the run never resets until you die.
 **Play it:** open `game/index.html` from a local server (see *Running* below), or
 visit the GitHub Pages URL for this repository under `/game/`.
 
+On a phone, open that URL in Safari or Chrome and use **Share → Add to Home
+Screen**: the game ships a web app manifest, so it then launches full-screen
+with no browser chrome — which matters here, because a collapsing URL bar
+otherwise resizes the viewport mid-run.
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  ⬅  swipe / arrow keys  ➡                                    │
