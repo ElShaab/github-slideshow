@@ -10,7 +10,8 @@
     "backgroundColor": "#05070C",
     "splash": {
       "backgroundColor": "#05070C",
-      "resizeMode": "contain"
+      "resizeMode": "contain",
+      "image": "./assets/splash.png"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -28,7 +29,8 @@
     "android": {
       "package": "com.getfit.app",
       "adaptiveIcon": {
-        "backgroundColor": "#05070C"
+        "backgroundColor": "#05070C",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "permissions": [
         "CAMERA",
@@ -44,10 +46,20 @@
           "cameraPermission": "GetFit uses your camera to take the body photo used for your private body analysis."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-iap",
+        {
+          "paymentProvider": "Play Store"
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "http://localhost:4000"
+    },
+    "icon": "./assets/icon.png",
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }
