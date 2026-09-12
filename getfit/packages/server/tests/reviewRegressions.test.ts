@@ -14,7 +14,6 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
-process.env.MOCK_AI_MODE = 'true';
 process.env.MOCK_BILLING = 'true';
 process.env.DEV_MODE = 'true';
 process.env.LOG_LEVEL = 'error';
@@ -349,49 +348,102 @@ describe('rest days and stale schedules (#8)', () => {
   });
 });
 
+/** Boots src/config/env in a child process and returns what happened. */
+async function bootEnv(overrides: Record<string, string | undefined>) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const run = promisify(execFile);
+
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries({ ...process.env, ...overrides })) {
+    if (value !== undefined) env[key] = value;
+  }
+
+  try {
+    await run(process.execPath, ['-e', "require('tsx/cjs'); require('./src/config/env');"], {
+      cwd: path.resolve(__dirname, '..'),
+      env,
+    });
+    return { started: true, stderr: '' };
+  } catch (error) {
+    return { started: false, stderr: (error as Error & { stderr?: string }).stderr ?? '' };
+  }
+}
+
+/** A production configuration with nothing wrong with it. */
+const SAFE_PRODUCTION_ENV = {
+  NODE_ENV: 'production',
+  JWT_SECRET: randomBytes(48).toString('base64'),
+  MOCK_BILLING: 'false',
+  DEV_MODE: 'false',
+  CORS_ORIGINS: 'https://app.getfit.example',
+  STORAGE_DRIVER: 's3',
+  STORAGE_S3_BUCKET: 'getfit-photos',
+  STORAGE_S3_REGION: 'us-east-1',
+  APPLE_SHARED_SECRET: 's',
+  GOOGLE_SERVICE_ACCOUNT_JSON: '{}',
+  DATABASE_SSL: 'false',
+  DATABASE_SSL_INSECURE: 'false',
+  // Explicitly unset, so a variable left over in the shell cannot mask a
+  // regression here.
+  MOCK_AI_MODE: undefined,
+  AI_PROVIDER: undefined,
+  AI_BASE_URL: undefined,
+  AI_API_KEY: undefined,
+  DATABASE_CA_CERT: undefined,
+};
+
 describe('database TLS (#7)', () => {
   test('production refuses to start without certificate verification', async () => {
-    const { execFile } = await import('node:child_process');
-    const { promisify } = await import('node:util');
-    const run = promisify(execFile);
+    // Encrypting without verifying the server stops a passive eavesdropper but
+    // not an active one, and every row here is personal health data.
+    const result = await bootEnv({
+      ...SAFE_PRODUCTION_ENV,
+      DATABASE_SSL: 'true',
+      DATABASE_SSL_INSECURE: 'true',
+    });
 
-    const productionEnv = {
-      ...process.env,
-      NODE_ENV: 'production',
-      JWT_SECRET: randomBytes(48).toString('base64'),
-      MOCK_BILLING: 'false',
-      DEV_MODE: 'false',
-      MOCK_AI_MODE: 'false',
+    assert.equal(result.started, false, 'production started with certificate verification disabled');
+    assert.match(result.stderr, /DATABASE_SSL_INSECURE must be false/);
+  });
+});
+
+describe('body analysis needs no AI provider', () => {
+  test('production starts with no AI configuration at all', async () => {
+    // Body composition is computed locally from tape measurements, so there is
+    // nothing to configure and nothing to pay for.
+    const result = await bootEnv(SAFE_PRODUCTION_ENV);
+
+    assert.equal(
+      result.started,
+      true,
+      `production refused to start without an AI provider:\n${result.stderr}`,
+    );
+  });
+
+  test('a half-configured provider is refused rather than failing per request', async () => {
+    // A named provider with no endpoint or key would return 502 on every
+    // assessment. Better to never start than to look healthy and serve errors.
+    for (const missing of [
+      { AI_PROVIDER: 'openai', AI_BASE_URL: 'https://ai.example' },
+      { AI_PROVIDER: 'openai', AI_API_KEY: 'k' },
+      { AI_PROVIDER: 'openai' },
+    ]) {
+      const result = await bootEnv({ ...SAFE_PRODUCTION_ENV, ...missing });
+      assert.equal(result.started, false, `started with ${JSON.stringify(missing)}`);
+      assert.match(result.stderr, /AI_BASE_URL and AI_API_KEY are required/);
+    }
+  });
+
+  test('a fully configured provider still starts', async () => {
+    const result = await bootEnv({
+      ...SAFE_PRODUCTION_ENV,
       AI_PROVIDER: 'openai',
       AI_BASE_URL: 'https://ai.example',
       AI_API_KEY: 'k',
-      CORS_ORIGINS: 'https://app.getfit.example',
-      STORAGE_DRIVER: 's3',
-      STORAGE_S3_BUCKET: 'getfit-photos',
-      STORAGE_S3_REGION: 'us-east-1',
-      APPLE_SHARED_SECRET: 's',
-      GOOGLE_SERVICE_ACCOUNT_JSON: '{}',
-      DATABASE_SSL: 'true',
-      DATABASE_SSL_INSECURE: 'true',
-    };
+    });
 
-    // Encrypting without verifying the server stops a passive eavesdropper but
-    // not an active one, and every row here is personal health data.
-    await assert.rejects(
-      () =>
-        run(process.execPath, ['-e', "require('tsx/cjs'); require('./src/config/env');"], {
-          cwd: path.resolve(__dirname, '..'),
-          env: productionEnv,
-        }),
-      (error: Error & { stderr?: string }) => {
-        assert.match(
-          error.stderr ?? '',
-          /DATABASE_SSL_INSECURE must be false/,
-          'production started with certificate verification disabled',
-        );
-        return true;
-      },
-    );
+    assert.equal(result.started, true, `a complete AI configuration was refused:\n${result.stderr}`);
   });
 });
 

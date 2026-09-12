@@ -17,10 +17,18 @@ have over it.
 
 ## What we collect
 
-### Photos you take for body analysis
+### Your measurements
 
-When you run a body analysis, the photo you take or choose is uploaded to our
-server, analysed, and stored.
+Your body-fat estimate is calculated on our server from the measurements you
+enter — waist, neck, height, weight and, for women, hips — using published
+anthropometric formulas. **No third party is involved in this calculation, and
+your measurements are never sent to any AI or analysis service.**
+
+### Progress photos (optional)
+
+You can attach a photo to an assessment. It is entirely optional, the app works
+fully without it, and **it is never analysed** — it exists only so you have a
+genuine before-and-after to look back on.
 
 - Photos are **private**. They are never public, never shared with other users,
   and never used for advertising or to train any model.
@@ -35,14 +43,14 @@ server, analysed, and stored.
 
 ### Body and health information
 
-Derived from your photo and the details you enter: estimated body fat
-percentage, estimated muscle mass, waist-to-height ratio, a symmetry score,
-height, weight, age and sex.
+Calculated from the details you enter: estimated body fat percentage, estimated
+muscle mass, waist-to-height ratio, a left/right balance score, your tape
+measurements, height, weight, age and sex.
 
 This is **health-related personal data**. Where GDPR applies it is a special
 category of data under Article 9, processed on the basis of your explicit
-consent, which you give by choosing to run an analysis. You can withdraw that
-consent at any time by deleting your account.
+consent, which you give by entering your measurements and running an analysis.
+You can withdraw that consent at any time by deleting your account.
 
 ### Training data
 
@@ -71,7 +79,8 @@ does not track you across other apps or websites.
 
 | Purpose | Data used | Legal basis (GDPR) |
 | --- | --- | --- |
-| Estimating your body composition | Photo, height, weight, age, sex | Explicit consent (Art. 9(2)(a)) |
+| Estimating your body composition | Measurements, height, weight, age, sex | Explicit consent (Art. 9(2)(a)) |
+| Keeping your optional progress photo | Photo | Explicit consent (Art. 9(2)(a)) |
 | Building and progressing your program | Body metrics, training history, goals | Contract |
 | Running your membership | Email, subscription record | Contract |
 | Keeping the service secure and working | Technical data | Legitimate interests |
@@ -86,16 +95,14 @@ We use these subprocessors, and nothing else:
 | --- | --- |
 | **[HOSTING PROVIDER]** | Runs the API and database |
 | **[OBJECT STORAGE PROVIDER]** | Stores photos, encrypted at rest, in a private bucket |
-| **[AI PROVIDER]** | Receives a photo to produce a body-composition estimate |
 | **Apple** / **Google** | Process payments and confirm subscription status |
+
+There is **no AI or image-analysis subprocessor**. Body composition is computed
+on our own server from your measurements, and your photos are never sent
+anywhere for analysis.
 
 We do **not** sell your personal information, and we do not share it for
 cross-context behavioural advertising.
-
-> **[AI PROVIDER]** must be named explicitly, along with whether photos are
-> retained by them and whether they are used for model training. If your
-> provider's terms allow training on submitted content, say so plainly here —
-> or choose a provider whose terms forbid it.
 
 ---
 

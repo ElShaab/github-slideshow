@@ -20,8 +20,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.getfit.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "GetFit uses your camera to take the body photo used for your private body analysis.",
-        "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo for your private body analysis.",
+        "NSCameraUsageDescription": "GetFit uses your camera to take an optional progress photo, stored privately for your own before-and-after comparison.",
+        "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo to keep as a private progress photo.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "buildNumber": "1"
@@ -42,8 +42,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "GetFit lets you choose an existing photo for your private body analysis.",
-          "cameraPermission": "GetFit uses your camera to take the body photo used for your private body analysis."
+          "photosPermission": "GetFit lets you choose an existing photo to keep as a private progress photo.",
+          "cameraPermission": "GetFit uses your camera to take an optional progress photo, stored privately for your own before-and-after comparison."
         }
       ],
       "expo-secure-store",

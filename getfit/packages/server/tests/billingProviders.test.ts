@@ -135,80 +135,70 @@ describe('Google Play purchase mapping', () => {
 });
 
 describe('hologram seeding (#13)', () => {
-  test('the stored seed is the one the geometry was built from', async () => {
-    const { RemoteBodyAnalysisProvider } = await import('../src/ai/remoteBodyAnalysisProvider');
-    const { makeRandom, buildHologramData } = await import('../src/ai/mockBodyAnalysisProvider');
+  const profile = { age: 30, sex: 'male' as const, heightCm: 180, weightKg: 82 };
+  const measurements = { waistCm: 85, neckCm: 38, leftArmCm: 36, rightArmCm: 38 };
 
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          bodyFatPercent: 22,
-          muscleMassKg: 35,
-          waistBodyRatio: 0.5,
-          symmetryPercent: 88,
-          confidence: 0.8,
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      )) as typeof fetch;
+  test('the stored seed reproduces the stored geometry', async () => {
+    const { MeasurementBodyAnalysisProvider } = await import(
+      '../src/ai/measurementBodyAnalysisProvider'
+    );
+    const { buildHologramData } = await import('../src/ai/hologram');
 
-    const provider = new RemoteBodyAnalysisProvider('https://ai.test', 'key');
-    const profile = { age: 30, sex: 'male' as const, heightCm: 180, weightKg: 82 };
-    const photo = Buffer.alloc(120_000, 3);
+    const result = await new MeasurementBodyAnalysisProvider().analyze({ measurements, profile });
 
-    const result = await provider.analyze({ photo, contentType: 'image/jpeg', profile, previous: undefined });
-
-    // Rebuilding from the persisted seed must reproduce the stored geometry.
+    // Geometry is a pure function of the figures it draws, so rebuilding from
+    // the persisted assessment must produce byte-identical geometry, seed
+    // included. There is no hidden randomness left to diverge.
     const rebuilt = buildHologramData({
-      bodyFatPercent: 22,
-      muscleMassKg: 35,
-      waistBodyRatio: 0.5,
-      symmetryPercent: 88,
-      heightCm: 180,
-      weightKg: 82,
-      sex: 'male',
-      seed: result.hologramData.seed,
-      rand: makeRandom(result.hologramData.seed),
+      bodyFatPercent: result.bodyFatPercent,
+      muscleMassKg: result.estimatedMuscleMassKg,
+      waistBodyRatio: result.waistBodyRatio,
+      heightCm: profile.heightCm,
+      sex: profile.sex,
+      measurements,
     });
 
-    assert.deepEqual(
-      rebuilt.segments,
-      result.hologramData.segments,
-      'the stored seed does not reproduce the stored geometry',
-    );
+    assert.deepEqual(rebuilt, result.hologramData, 'the stored assessment does not rebuild');
+    assert.equal(rebuilt.seed, result.hologramData.seed);
   });
 
-  test('two users with the same readings get different geometry', async () => {
+  test('different bodies get different seeds, and the same body is stable', async () => {
+    const { MeasurementBodyAnalysisProvider } = await import(
+      '../src/ai/measurementBodyAnalysisProvider'
+    );
+    const provider = new MeasurementBodyAnalysisProvider();
+
+    const [a, b, again] = await Promise.all([
+      provider.analyze({ measurements, profile }),
+      provider.analyze({ measurements: { ...measurements, waistCm: 96 }, profile }),
+      provider.analyze({ measurements: { ...measurements }, profile }),
+    ]);
+
+    assert.notEqual(a.hologramData.seed, b.hologramData.seed, 'the seed ignored the measurements');
+    assert.equal(again.hologramData.seed, a.hologramData.seed, 'the same body produced a new seed');
+  });
+
+  test('the remote provider derives geometry locally too', async () => {
     const { RemoteBodyAnalysisProvider } = await import('../src/ai/remoteBodyAnalysisProvider');
 
     globalThis.fetch = (async () =>
       new Response(
-        JSON.stringify({
-          bodyFatPercent: 22,
-          muscleMassKg: 35,
-          waistBodyRatio: 0.5,
-          symmetryPercent: 88,
-          confidence: 0.8,
-        }),
+        JSON.stringify({ bodyFatPercent: 22, muscleMassKg: 35, confidence: 0.8 }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       )) as typeof fetch;
 
     const provider = new RemoteBodyAnalysisProvider('https://ai.test', 'key');
-    const profile = { age: 30, sex: 'male' as const, heightCm: 180, weightKg: 82 };
-
-    const [a, b] = await Promise.all([
-      provider.analyze({ photo: Buffer.alloc(120_000, 3), contentType: 'image/jpeg', profile, previous: undefined }),
-      provider.analyze({ photo: Buffer.alloc(120_000, 9), contentType: 'image/jpeg', profile, previous: undefined }),
-    ]);
-
-    assert.notEqual(a.hologramData.seed, b.hologramData.seed, 'the seed ignored the photo');
-
-    // And the same photo is stable.
-    const again = await provider.analyze({
+    const result = await provider.analyze({
+      measurements,
+      profile,
       photo: Buffer.alloc(120_000, 3),
       contentType: 'image/jpeg',
-      profile,
-      previous: undefined,
     });
-    assert.equal(again.hologramData.seed, a.hologramData.seed, 'the same photo produced a new seed');
+
+    assert.equal(result.method, 'vision', 'a photo reading must not claim the measured method');
+    // The user's own tape reading wins over anything the endpoint says about it.
+    assert.equal(result.waistBodyRatio, 0.472);
+    assert.equal(result.hologramData.version, 1);
+    assert.equal(result.hologramData.segments.length, 8);
   });
 });

@@ -185,7 +185,11 @@ function AssessmentEntry({
               />
               <MetricCard
                 label="Symmetry"
-                value={`${Math.round(assessment.symmetryPercent)}%`}
+                value={
+                  assessment.symmetryPercent === null
+                    ? 'Not measured'
+                    : `${Math.round(assessment.symmetryPercent)}%`
+                }
                 style={styles.metricHalf}
               />
             </View>

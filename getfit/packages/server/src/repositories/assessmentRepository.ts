@@ -1,4 +1,9 @@
-import type { BodyAnalysisResult, BodyAssessment, TrendPoint } from '@getfit/shared';
+import type {
+  BodyAnalysisResult,
+  BodyAssessment,
+  BodyMeasurements,
+  TrendPoint,
+} from '@getfit/shared';
 import { query, transaction } from '../db/pool';
 
 export const assessmentRepository = {
@@ -6,6 +11,7 @@ export const assessmentRepository = {
     userId: string;
     weightKg: number;
     analysis: BodyAnalysisResult;
+    measurements: BodyMeasurements;
     sourcePhotoId: string | null;
   }): Promise<BodyAssessment> {
     return transaction(async (client) => {
@@ -18,8 +24,9 @@ export const assessmentRepository = {
       const inserted = await client.query(
         `INSERT INTO body_assessments (
            user_id, assessment_number, weight_kg, body_fat_percent, muscle_mass_kg,
-           waist_body_ratio, symmetry_percent, confidence, provider, hologram_data, source_photo_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+           waist_body_ratio, symmetry_percent, method, confidence, provider,
+           hologram_data, measurements, source_photo_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
         [
           args.userId,
           assessmentNumber,
@@ -28,21 +35,28 @@ export const assessmentRepository = {
           args.analysis.estimatedMuscleMassKg,
           args.analysis.waistBodyRatio,
           args.analysis.symmetryPercent,
+          args.analysis.method,
           args.analysis.confidence,
           args.analysis.provider,
           JSON.stringify(args.analysis.hologramData),
+          JSON.stringify(args.measurements),
           args.sourcePhotoId,
         ],
       );
       const row = inserted.rows[0];
 
+      // A symmetry reading only exists when a limb pair was measured. An
+      // unmeasured week is left out of the trend rather than charted as a
+      // number nobody produced.
       const metrics: Array<[string, number, string]> = [
         ['weight_kg', args.weightKg, 'kg'],
         ['body_fat_percent', args.analysis.bodyFatPercent, '%'],
         ['muscle_mass_kg', args.analysis.estimatedMuscleMassKg, 'kg'],
         ['waist_body_ratio', args.analysis.waistBodyRatio, 'ratio'],
-        ['symmetry_percent', args.analysis.symmetryPercent, '%'],
       ];
+      if (args.analysis.symmetryPercent !== null) {
+        metrics.push(['symmetry_percent', args.analysis.symmetryPercent, '%']);
+      }
       for (const [key, value, unit] of metrics) {
         await client.query(
           `INSERT INTO body_metrics (user_id, assessment_id, metric_key, metric_value, unit, recorded_at)
@@ -123,10 +137,12 @@ export function mapAssessment(row: Record<string, unknown>): BodyAssessment {
     bodyFatPercent: Number(row.body_fat_percent),
     estimatedMuscleMassKg: Number(row.muscle_mass_kg),
     waistBodyRatio: Number(row.waist_body_ratio),
-    symmetryPercent: Number(row.symmetry_percent),
+    symmetryPercent: row.symmetry_percent === null ? null : Number(row.symmetry_percent),
+    method: (row.method as BodyAssessment['method']) ?? 'bmi',
     confidence: Number(row.confidence),
     provider: row.provider as string,
     hologramData: row.hologram_data as BodyAssessment['hologramData'],
+    measurements: (row.measurements as BodyMeasurements) ?? {},
     sourcePhotoId: (row.source_photo_id as string) ?? null,
   };
 }

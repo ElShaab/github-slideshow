@@ -14,7 +14,6 @@ import { randomBytes } from 'node:crypto';
 import * as jwt from 'jsonwebtoken';
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
-process.env.MOCK_AI_MODE = 'true';
 process.env.MOCK_BILLING = 'true';
 process.env.DEV_MODE = 'true';
 process.env.LOG_LEVEL = 'error';
@@ -87,6 +86,7 @@ function jpegFixture(seed: string): Blob {
 interface Account {
   token: string;
   userId: string;
+  assessmentId: string;
   photoId: string;
   workoutDayId: string;
   scheduledWorkoutId: string;
@@ -117,7 +117,7 @@ async function buildAccount(seed: string): Promise<Account> {
 
   const form = new FormData();
   form.append('photo', jpegFixture(seed), 'body.jpg');
-  const assessment = await api<{ assessment: { sourcePhotoId: string } }>(
+  const assessment = await api<{ assessment: { id: string; sourcePhotoId: string } }>(
     'POST',
     '/api/assessments/initial',
     { token, form },
@@ -180,6 +180,7 @@ async function buildAccount(seed: string): Promise<Account> {
   return {
     token,
     userId,
+    assessmentId: assessment.body.assessment.id,
     photoId: assessment.body.assessment.sourcePhotoId,
     workoutDayId: day.id,
     scheduledWorkoutId: schedule.body.upcoming[0]?.id ?? '',
@@ -415,5 +416,123 @@ describe('authentication hardening', () => {
     assert.equal(response.status, 200);
     assert.match(response.headers.get('cache-control') ?? '', /no-store/);
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  });
+});
+
+/**
+ * Measurements are numbers a user types, and they feed a formula whose output
+ * is presented as a health figure. Everything that reaches it has to be
+ * validated at the boundary, and nobody's readings may leak to anyone else.
+ */
+describe('measurement input', () => {
+  /** Runs an initial assessment on a fresh account with these form fields. */
+  async function analyze(fields: Record<string, string>) {
+    const guest = await api<{ accessToken: string }>('POST', '/api/auth/guest');
+    const token = guest.body.accessToken;
+    await api('POST', '/api/onboarding', {
+      token,
+      body: {
+        age: 30, sex: 'male', heightCm: 180, weightKg: 82,
+        trainingLevel: 'intermediate', trainingLocation: 'gym',
+        trainingDays: 4, sessionDurationMinutes: 60,
+        goals: ['muscle_gain'], equipment: [],
+      },
+    });
+
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    return api<{
+      assessment: { bodyFatPercent: number; method: string; measurements: Record<string, number> };
+      error: { code: string };
+    }>('POST', '/api/assessments/initial', { token, form });
+  }
+
+  test('rejects readings outside the plausible human range', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    // A slipped decimal point would otherwise drive the logarithm somewhere
+    // absurd and put a fabricated number in front of the user.
+    const invalid: Array<Record<string, string>> = [
+      { waistCm: '8.5', neckCm: '38' },
+      { waistCm: '850', neckCm: '38' },
+      { waistCm: '85', neckCm: '2' },
+      { waistCm: '-85', neckCm: '38' },
+      { waistCm: '85', neckCm: '38', leftArmCm: '500' },
+    ];
+
+    for (const fields of invalid) {
+      const response = await analyze(fields);
+      assert.equal(response.status, 422, `accepted ${JSON.stringify(fields)}`);
+      assert.equal(response.body.error.code, 'invalid_input');
+    }
+  });
+
+  test('rejects non-numeric and non-finite input', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    for (const waistCm of ['NaN', 'Infinity', '-Infinity', 'abc', "85'; DROP TABLE users;--", '1e400']) {
+      const response = await analyze({ waistCm, neckCm: '38' });
+      assert.equal(response.status, 422, `accepted waistCm=${waistCm}`);
+    }
+
+    // And the table is still there.
+    const { pool } = await import('../src/db/pool');
+    const users = await pool.query('SELECT count(*) AS count FROM users');
+    assert.ok(Number(users.rows[0].count) > 0, 'the users table did not survive');
+  });
+
+  test('an empty field is treated as unmeasured, not as zero', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await analyze({ waistCm: '', neckCm: '' });
+    assert.equal(response.status, 201);
+    assert.equal(response.body.assessment.method, 'bmi');
+    assert.deepEqual(response.body.assessment.measurements, {});
+    assert.ok(response.body.assessment.bodyFatPercent > 0);
+  });
+
+  test('unknown fields cannot be smuggled into the stored measurements', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await analyze({
+      waistCm: '85',
+      neckCm: '38',
+      bodyFatPercent: '3',
+      confidence: '1',
+      provider: 'spoofed',
+      __proto__: 'polluted',
+    });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(
+      response.body.assessment.measurements,
+      { waistCm: 85, neckCm: 38 },
+      'an unexpected field was stored as a measurement',
+    );
+    // The body-fat figure came from the formula, not from the request.
+    assert.ok(Math.abs(response.body.assessment.bodyFatPercent - 16.2) < 0.5);
+    assert.equal(({} as Record<string, unknown>).polluted, undefined);
+  });
+
+  test("one user's measurements never reach another", async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const alice = await buildAccount('m1');
+    const bob = await buildAccount('m2');
+
+    const asBob = await api<{ assessment: { id: string } | null }>('GET', '/api/assessments/latest', {
+      token: bob.token,
+    });
+    assert.notEqual(asBob.body.assessment?.id, alice.assessmentId);
+
+    const history = await api<{ assessments: Array<{ userId: string }> }>(
+      'GET',
+      '/api/assessments/history',
+      { token: bob.token },
+    );
+    assert.equal(history.status, 200);
+    for (const assessment of history.body.assessments) {
+      assert.equal(assessment.userId, bob.userId, "another user's assessment was returned");
+    }
   });
 });

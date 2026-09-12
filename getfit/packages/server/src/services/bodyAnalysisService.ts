@@ -4,12 +4,12 @@ import {
   type AssessmentAvailability,
   type BodyAnalysisResult,
   type BodyAssessment,
+  type BodyMeasurements,
   type UserProfile,
 } from '@getfit/shared';
 import { getBodyAnalysisProvider } from '../ai/remoteBodyAnalysisProvider';
 import { assessmentRepository } from '../repositories/assessmentRepository';
 import { progressRepository } from '../repositories/progressRepository';
-import { workoutRepository } from '../repositories/workoutRepository';
 import { errors } from '../utils/errors';
 import { logger } from '../utils/logger';
 import { photoStorageService } from './photoStorageService';
@@ -17,8 +17,14 @@ import { photoStorageService } from './photoStorageService';
 export interface AnalyzeArgs {
   userId: string;
   profile: UserProfile;
-  photo: Buffer;
-  contentType: string;
+  /** Tape readings the analysis is computed from. All fields are optional. */
+  measurements: BodyMeasurements;
+  /**
+   * An optional progress photo. It is stored privately for the user's own
+   * before/after comparison; the default analyser never looks at it.
+   */
+  photo?: Buffer;
+  contentType?: string;
   /** Weight at the time of the assessment; defaults to the profile weight. */
   weightKg?: number;
   /** The first analysis happens before any subscription and ignores the lock. */
@@ -28,12 +34,13 @@ export interface AnalyzeArgs {
 /**
  * BodyAnalysisService
  *
- * Orchestrates a body assessment: enforces the seven-day lock, stores the photo
- * privately, runs the configured AI provider, and persists the assessment, its
- * metrics and its hologram geometry.
+ * Orchestrates a body assessment: enforces the seven-day lock, stores the
+ * optional progress photo privately, runs the analyser, and persists the
+ * assessment, its metrics and its hologram geometry.
  *
- * Imperfect framing is never a blocker. A usable-but-imperfect photo lowers the
- * confidence score and the analysis proceeds.
+ * The analyser is local and formula-based by default, so an assessment needs no
+ * photo and no external service. A photo is kept only for the user to compare
+ * against later.
  */
 export class BodyAnalysisService {
   /**
@@ -81,20 +88,23 @@ export class BodyAnalysisService {
       }
     }
 
-    const { photo } = await photoStorageService.store({
-      userId: args.userId,
-      buffer: args.photo,
-      contentType: args.contentType,
-      purpose: 'assessment',
-    });
+    let sourcePhotoId: string | null = null;
+    if (args.photo) {
+      const { photo } = await photoStorageService.store({
+        userId: args.userId,
+        buffer: args.photo,
+        contentType: args.contentType ?? 'image/jpeg',
+        purpose: 'assessment',
+      });
+      sourcePhotoId = photo.id;
+    }
 
-    const previous = await assessmentRepository.latest(args.userId);
-    const adherence = await this.trainingAdherence(args.userId);
     const weightKg = args.weightKg ?? args.profile.weightKg;
 
     let analysis: BodyAnalysisResult;
     try {
       analysis = await getBodyAnalysisProvider().analyze({
+        measurements: args.measurements,
         photo: args.photo,
         contentType: args.contentType,
         profile: {
@@ -103,19 +113,6 @@ export class BodyAnalysisService {
           heightCm: args.profile.heightCm,
           weightKg,
         },
-        previous: previous
-          ? {
-              bodyFatPercent: previous.bodyFatPercent,
-              muscleMassKg: previous.estimatedMuscleMassKg,
-              symmetryPercent: previous.symmetryPercent,
-              waistBodyRatio: previous.waistBodyRatio,
-              daysSince: Math.max(
-                1,
-                Math.round((now.getTime() - new Date(previous.createdAt).getTime()) / 86_400_000),
-              ),
-            }
-          : undefined,
-        trainingAdherence: adherence,
       });
     } catch (error) {
       logger.error('Body analysis failed', error);
@@ -126,7 +123,8 @@ export class BodyAnalysisService {
       userId: args.userId,
       weightKg,
       analysis,
-      sourcePhotoId: photo.id,
+      measurements: args.measurements,
+      sourcePhotoId,
     });
 
     const recordDate = assessment.createdAt.slice(0, 10);
@@ -156,13 +154,6 @@ export class BodyAnalysisService {
     }
 
     return assessment;
-  }
-
-  /** Fraction of scheduled sessions the user actually completed. */
-  private async trainingAdherence(userId: string): Promise<number> {
-    const counts = await workoutRepository.countSchedule(userId);
-    if (counts.total === 0) return 0.5;
-    return Math.max(0, Math.min(1, counts.completed / counts.total));
   }
 }
 

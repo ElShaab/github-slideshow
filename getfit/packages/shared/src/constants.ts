@@ -1,4 +1,5 @@
 import type {
+  BodyFatMethod,
   GoalType,
   SessionDuration,
   SubscriptionPlan,
@@ -118,3 +119,31 @@ export const WEEKLY_PHOTO_INSTRUCTIONS: string[] = [
   'Facing forward.',
   'Relaxed, natural position.',
 ];
+
+/**
+ * How each body-fat method is described to the user. GetFit always says which
+ * one produced the number on screen, so an estimate is never mistaken for a
+ * measurement.
+ */
+export const BODY_FAT_METHOD_COPY: Record<
+  BodyFatMethod,
+  { label: string; short: string; detail: string }
+> = {
+  navy: {
+    label: 'Measured',
+    short: 'From your tape measurements',
+    detail:
+      'Calculated from your waist, neck and height with the US Navy circumference method, which validates to within about 3-4% of a DEXA scan.',
+  },
+  bmi: {
+    label: 'Estimated',
+    short: 'From your height, weight and age',
+    detail:
+      'Estimated from your height, weight, age and sex. This cannot tell muscle from fat, so it reads high if you are muscular and low if you are not. Add a waist and neck measurement for a much sharper number.',
+  },
+  vision: {
+    label: 'From your photo',
+    short: 'From your photo',
+    detail: 'Estimated from your photo by the analysis provider configured for this deployment.',
+  },
+};

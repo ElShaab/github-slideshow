@@ -6,6 +6,7 @@ import type {
   TrainingLevel,
   TrainingLocation,
 } from '@getfit/shared';
+import { EMPTY_MEASUREMENTS, type MeasurementsDraft } from '../utils/measurements';
 
 export interface OnboardingDraft {
   age: string;
@@ -18,6 +19,9 @@ export interface OnboardingDraft {
   goals: GoalType[];
   heightCm: string;
   weightKg: string;
+  /** Tape readings, held as text until they are submitted. */
+  measurements: MeasurementsDraft;
+  /** Optional progress photo. Never analysed. */
   photoUri: string | null;
 }
 
@@ -32,12 +36,14 @@ const EMPTY_DRAFT: OnboardingDraft = {
   goals: [],
   heightCm: '',
   weightKg: '',
+  measurements: EMPTY_MEASUREMENTS,
   photoUri: null,
 };
 
 interface DraftContextValue {
   draft: OnboardingDraft;
   update: (patch: Partial<OnboardingDraft>) => void;
+  updateMeasurements: (patch: Partial<MeasurementsDraft>) => void;
   reset: () => void;
   toggleGoal: (goal: GoalType) => void;
   toggleEquipment: (item: EquipmentId) => void;
@@ -55,6 +61,10 @@ export function OnboardingDraftProvider({
 
   const update = useCallback((patch: Partial<OnboardingDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
+  }, []);
+
+  const updateMeasurements = useCallback((patch: Partial<MeasurementsDraft>) => {
+    setDraft((current) => ({ ...current, measurements: { ...current.measurements, ...patch } }));
   }, []);
 
   const toggleGoal = useCallback((goal: GoalType) => {
@@ -76,8 +86,15 @@ export function OnboardingDraftProvider({
   }, []);
 
   const value = useMemo<DraftContextValue>(
-    () => ({ draft, update, reset: () => setDraft(EMPTY_DRAFT), toggleGoal, toggleEquipment }),
-    [draft, toggleEquipment, toggleGoal, update],
+    () => ({
+      draft,
+      update,
+      updateMeasurements,
+      reset: () => setDraft(EMPTY_DRAFT),
+      toggleGoal,
+      toggleEquipment,
+    }),
+    [draft, toggleEquipment, toggleGoal, update, updateMeasurements],
   );
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;

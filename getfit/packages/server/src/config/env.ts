@@ -49,12 +49,12 @@ export const env = {
   jwtExpiresIn: str('JWT_EXPIRES_IN', '30d'),
 
   /**
-   * When true every AI call is served by the deterministic mock provider.
-   * Defaults off in production: shipping fabricated body analysis to a paying
-   * user because an env var was forgotten is worse than failing to start.
+   * Body analysis runs on tape measurements and published anthropometric
+   * formulas by default, with no external service. Naming a provider here
+   * swaps in a remote vision endpoint instead; leaving it empty — the default,
+   * in production as well — keeps the built-in measurement analyser.
    */
-  mockAiMode: bool('MOCK_AI_MODE', !isProduction),
-  aiProvider: str('AI_PROVIDER', isProduction ? '' : 'mock'),
+  aiProvider: str('AI_PROVIDER', ''),
   aiApiKey: process.env.AI_API_KEY ?? '',
   aiBaseUrl: process.env.AI_BASE_URL ?? '',
 
@@ -98,11 +98,11 @@ if (env.isProduction) {
   if (env.devMode) {
     failures.push('DEV_MODE must be false.');
   }
-  if (env.mockAiMode || env.aiProvider === 'mock' || env.aiProvider === '') {
-    failures.push('AI_PROVIDER must name a real provider and MOCK_AI_MODE must be false.');
-  }
-  if (env.aiProvider !== 'mock' && (!env.aiBaseUrl || !env.aiApiKey)) {
-    failures.push('AI_BASE_URL and AI_API_KEY are required for a real AI provider.');
+  // No AI provider is required: the default analyser is local and deterministic.
+  // But a half-configured one is a silent 502 on every assessment, so if a
+  // provider is named it must be complete.
+  if (env.aiProvider && (!env.aiBaseUrl || !env.aiApiKey)) {
+    failures.push('AI_BASE_URL and AI_API_KEY are required when AI_PROVIDER is set.');
   }
   if (env.corsOrigins.includes('*')) {
     failures.push('CORS_ORIGINS must list explicit origins rather than "*".');

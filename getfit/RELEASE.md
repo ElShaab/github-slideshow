@@ -19,19 +19,19 @@ fly postgres create --name getfit-db
 fly postgres attach getfit-db       # sets DATABASE_URL
 ```
 
-Set the secrets. The server **refuses to boot** if any of these is missing or
-unsafe, which is deliberate — a misconfigured production deploy fails loudly
-instead of quietly serving fabricated body analysis or free memberships:
+There is **no AI provider to configure**. Body composition is calculated on the
+server from the user's tape measurements using published anthropometric
+formulas, so there is no vision endpoint, no API key and no per-analysis cost.
+
+Set the remaining secrets. The server **refuses to boot** if any of these is
+missing or unsafe, which is deliberate — a misconfigured production deploy
+fails loudly instead of quietly handing out free memberships:
 
 ```bash
 fly secrets set \
   JWT_SECRET="$(openssl rand -base64 48)" \
   MOCK_BILLING=false \
   DEV_MODE=false \
-  MOCK_AI_MODE=false \
-  AI_PROVIDER=[your-provider] \
-  AI_BASE_URL=https://[your-ai-endpoint] \
-  AI_API_KEY=[key] \
   CORS_ORIGINS=https://[your-domain] \
   STORAGE_S3_BUCKET=[bucket] \
   STORAGE_S3_REGION=[region] \
@@ -97,12 +97,12 @@ Answer these to match what the app does:
 | Question | Answer |
 | --- | --- |
 | Health & Fitness data collected | **Yes** — linked to identity, app functionality |
-| Photos collected | **Yes** — linked to identity, app functionality |
+| Photos collected | **Yes** — linked to identity, app functionality (optional progress photos) |
 | Contact info (email) | **Yes** — linked to identity, app functionality |
 | Purchases | **Yes** — linked to identity |
 | Used for tracking | **No** |
 | Used for third-party advertising | **No** |
-| Data used to train models | Answer from your AI provider's terms |
+| Data used to train models | **No** — nothing is sent to any model |
 
 ---
 
@@ -127,6 +127,9 @@ eas build --platform ios --profile preview     # [you] internal distribution
 - [ ] **Restore purchase** works on a second device with the same Apple ID
 - [ ] The transaction is **finished** — it must not reappear on relaunch
 - [ ] An expired membership blocks the app and shows the renewal screen
+- [ ] An assessment completes with **measurements only and no photo**
+- [ ] An assessment with no tape reading is labelled **Estimated**, not Measured
+- [ ] Symmetry reads **Not measured** when no limb pair was entered
 - [ ] Camera and photo-library permission prompts appear with our wording
 - [ ] Account deletion removes everything and signs you out
 
@@ -152,19 +155,26 @@ eas submit --platform ios --profile production   # [you] Apple credentials + 2FA
 
 ### Reviewer notes (paste into App Review Information)
 
-> GetFit estimates body composition from a photo and builds a training program
-> around it.
+> GetFit calculates body composition from tape measurements and builds a
+> training program around it.
 >
-> To review the full flow: complete onboarding, take or choose any full-body
-> photo (framing does not matter — an imperfect photo lowers the confidence
-> score but still analyses), then view the analysis. The analysis is shown
-> **before** any payment is requested. A membership is then required to
-> generate a training program.
+> To review the full flow: complete onboarding and enter any plausible waist
+> and neck measurement (for example 85 cm and 38 cm) on the measurements
+> screen, then view the analysis. The analysis is shown **before** any payment
+> is requested. A membership is then required to generate a training program.
 >
-> Photos are private, are never shown to other users, and are never displayed
-> in the app's Progress or History screens — past assessments are shown as
-> numbers and a generated figure. Account deletion is available in
-> Settings → Privacy & data and removes all photos and data immediately.
+> The measurements are optional — continuing without them produces a
+> height-and-weight estimate that the app labels "Estimated" rather than
+> "Measured". The body-fat figure comes from the published US Navy
+> circumference formula computed on our own server; **no third-party service,
+> AI or otherwise, receives any user data.**
+>
+> The progress photo is entirely optional and is **never analysed**. It is
+> stored privately so the user has a before/after reference, is never shown to
+> other users, and is never displayed in the app's Progress or History screens.
+> You can complete the whole review without taking one. Account deletion is
+> available in Settings → Privacy & data and removes all photos and data
+> immediately.
 >
 > There is no free trial. Pricing is $4.99/month or $19.99/year.
 
@@ -178,7 +188,8 @@ Honest list of what has **not** been verified, so nothing is assumed:
   and type-checked but never exercised against StoreKit or Play Billing.
 - **The S3 photo driver has never run against a real bucket.** Its key scoping
   and encryption settings are implemented but untested.
-- **No real AI provider has been connected.** Only the deterministic mock
-  provider has ever produced an analysis.
+- **The optional remote vision provider has never been connected.** It is not
+  needed — the built-in measurement analyser is the default — but its request
+  and response handling has only been exercised against a stub.
 - The app has not been run on a physical device or simulator — it is verified
   by an automated test suite, type checking and a clean production bundle.

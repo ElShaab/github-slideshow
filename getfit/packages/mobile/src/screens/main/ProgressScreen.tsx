@@ -120,7 +120,11 @@ export function ProgressScreen(): React.ReactElement {
                 />
                 <MetricCard
                   label="Symmetry"
-                  value={`${Math.round(latestAssessment.symmetryPercent)}%`}
+                  value={
+                    latestAssessment.symmetryPercent === null
+                      ? 'Not measured'
+                      : `${Math.round(latestAssessment.symmetryPercent)}%`
+                  }
                   style={styles.metricHalf}
                 />
               </View>
@@ -136,7 +140,15 @@ export function ProgressScreen(): React.ReactElement {
           <Trend title="Body fat" points={trends.bodyFatPercent} unit="%" lowerIsBetter />
           <Trend title="Muscle mass" points={trends.muscleMassKg} unit=" kg" />
           <Trend title="Waist / body" points={trends.waistBodyRatio} unit="" precision={2} lowerIsBetter />
-          <Trend title="Symmetry" points={trends.symmetryPercent} unit="%" precision={0} />
+          {/* Symmetry is only recorded for weeks where both sides were
+              measured, so say what is actually missing. */}
+          <Trend
+            title="Symmetry"
+            points={trends.symmetryPercent}
+            unit="%"
+            precision={0}
+            emptyMessage="No balance readings yet — measure both arms or both thighs at your next assessment."
+          />
 
           <SecondaryButton
             label="View full history"
@@ -267,12 +279,14 @@ function Trend({
   unit,
   precision = 1,
   lowerIsBetter = false,
+  emptyMessage,
 }: {
   title: string;
   points: Array<{ date: string; value: number }>;
   unit: string;
   precision?: number;
   lowerIsBetter?: boolean;
+  emptyMessage?: string;
 }): React.ReactElement {
   const { spacing } = useTheme();
   return (
@@ -286,6 +300,7 @@ function Trend({
         unit={unit}
         precision={precision}
         lowerIsBetter={lowerIsBetter}
+        emptyMessage={emptyMessage}
         style={{ marginTop: spacing.sm }}
       />
     </GlassCard>

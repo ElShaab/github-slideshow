@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   const server = app.listen(env.port, () => {
     logger.info(`GetFit API listening on port ${env.port}`, {
       nodeEnv: env.nodeEnv,
-      mockAiMode: env.mockAiMode,
+      bodyAnalysis: env.aiProvider || 'measurement',
       devMode: env.devMode,
     });
   });

@@ -182,12 +182,44 @@ export interface HologramData {
   accentPalette: string[];
 }
 
+/**
+ * Tape measurements, in centimetres.
+ *
+ * Waist and neck drive the body-fat reading (plus hips for women, which the
+ * circumference formula requires). The limb pairs are optional and only power
+ * the left/right balance score.
+ */
+export interface BodyMeasurements {
+  waistCm?: number;
+  neckCm?: number;
+  hipCm?: number;
+  leftArmCm?: number;
+  rightArmCm?: number;
+  leftThighCm?: number;
+  rightThighCm?: number;
+  /** Around the widest part of the shoulders. Optional; sharpens the figure. */
+  shoulderCm?: number;
+}
+
+/**
+ * How a body-fat figure was produced, so the app can say so plainly:
+ * `navy` from tape measurements, `bmi` from height and weight alone, and
+ * `vision` from a photo when an optional AI provider is configured.
+ */
+export type BodyFatMethod = 'navy' | 'bmi' | 'vision';
+
 export interface BodyAnalysisResult {
   bodyFatPercent: number;
   estimatedMuscleMassKg: number;
   waistBodyRatio: number;
-  symmetryPercent: number;
-  /** 0..1 model confidence. Internal — surfaced subtly, never as a medical claim. */
+  /**
+   * Left/right balance. Null when neither limb pair was measured — an
+   * unmeasured body is not a symmetrical one.
+   */
+  symmetryPercent: number | null;
+  /** How the body-fat figure was derived. */
+  method: BodyFatMethod;
+  /** 0..1 confidence in the reading. Never presented as a medical claim. */
   confidence: number;
   hologramData: HologramData;
   provider: string;
@@ -199,7 +231,10 @@ export interface BodyAssessment extends BodyAnalysisResult {
   createdAt: string;
   weightKg: number;
   assessmentNumber: number;
+  /** An optional progress photo. It is stored privately and never analysed. */
   sourcePhotoId: string | null;
+  /** The tape readings this assessment was computed from. */
+  measurements: BodyMeasurements;
 }
 
 export interface AssessmentAvailability {

@@ -3,4 +3,5 @@ export * from './muscles';
 export * from './constants';
 export * from './exercises';
 export * from './volume';
+export * from './bodyComposition';
 export * from './format';

@@ -3,6 +3,7 @@ import type {
   AssessmentAvailability,
   AuthTokens,
   BodyAssessment,
+  BodyMeasurements,
   CardioPrescription,
   CompletedWorkout,
   EquipmentId,
@@ -110,31 +111,54 @@ export const onboardingApi = {
 
 /* --------------------------- assessments -------------------------- */
 
-function photoForm(uri: string, extra: Record<string, string> = {}): FormData {
+/**
+ * Builds an assessment submission.
+ *
+ * The measurements are what the analysis is computed from. The photo is
+ * optional and is only kept as a private progress photo, so a submission with
+ * no photo is perfectly valid.
+ */
+function assessmentForm(input: AssessmentSubmission): FormData {
   const form = new FormData();
-  const name = uri.split('/').pop() ?? 'body.jpg';
-  const extension = name.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const type = extension === 'png' ? 'image/png' : extension === 'heic' ? 'image/heic' : 'image/jpeg';
 
-  // React Native's FormData accepts this file descriptor shape.
-  form.append('photo', { uri, name, type } as unknown as Blob);
-  for (const [key, value] of Object.entries(extra)) form.append(key, value);
+  for (const [key, value] of Object.entries(input.measurements)) {
+    if (typeof value === 'number' && Number.isFinite(value)) form.append(key, String(value));
+  }
+  if (input.weightKg !== undefined) form.append('weightKg', String(input.weightKg));
+
+  if (input.photoUri) {
+    const name = input.photoUri.split('/').pop() ?? 'body.jpg';
+    const extension = name.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const type =
+      extension === 'png' ? 'image/png' : extension === 'heic' ? 'image/heic' : 'image/jpeg';
+
+    // React Native's FormData accepts this file descriptor shape.
+    form.append('photo', { uri: input.photoUri, name, type } as unknown as Blob);
+  }
+
   return form;
 }
 
+export interface AssessmentSubmission {
+  measurements: BodyMeasurements;
+  /** Optional progress photo. Stored privately; never analysed. */
+  photoUri?: string | null;
+  weightKg?: number;
+}
+
 export const assessmentApi = {
-  runInitial(photoUri: string): Promise<{ assessment: BodyAssessment; repeated: boolean }> {
+  runInitial(input: AssessmentSubmission): Promise<{ assessment: BodyAssessment; repeated: boolean }> {
     return request('/api/assessments/initial', {
       method: 'POST',
-      form: photoForm(photoUri),
+      form: assessmentForm(input),
       timeoutMs: 60_000,
     });
   },
 
-  runWeekly(photoUri: string, weightKg?: number): Promise<{ assessment: BodyAssessment }> {
+  runWeekly(input: AssessmentSubmission): Promise<{ assessment: BodyAssessment }> {
     return request('/api/assessments/weekly', {
       method: 'POST',
-      form: photoForm(photoUri, weightKg !== undefined ? { weightKg: String(weightKg) } : {}),
+      form: assessmentForm(input),
       timeoutMs: 60_000,
     });
   },

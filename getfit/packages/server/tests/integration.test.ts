@@ -13,7 +13,6 @@ import { randomBytes } from 'node:crypto';
 import { ASSESSMENT_INTERVAL_DAYS, MAX_EXERCISES_PER_MUSCLE } from '@getfit/shared';
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
-process.env.MOCK_AI_MODE = 'true';
 process.env.MOCK_BILLING = 'true';
 process.env.DEV_MODE = 'true';
 process.env.LOG_LEVEL = 'error';
@@ -171,6 +170,12 @@ describe('GetFit end-to-end journey', () => {
     if (!databaseAvailable) return t.skip('No database available');
 
     const form = new FormData();
+    // Tape measurements drive the analysis. The photo is an optional progress
+    // photo, kept privately for the user and never analysed.
+    form.append('waistCm', '85');
+    form.append('neckCm', '38');
+    form.append('leftArmCm', '36');
+    form.append('rightArmCm', '36');
     form.append('photo', jpegFixture('x'), 'body.jpg');
 
     const response = await api<{
@@ -179,7 +184,9 @@ describe('GetFit end-to-end journey', () => {
         bodyFatPercent: number;
         estimatedMuscleMassKg: number;
         waistBodyRatio: number;
-        symmetryPercent: number;
+        symmetryPercent: number | null;
+        method: string;
+        measurements: { waistCm?: number };
         hologramData: { segments: unknown[]; sex: string };
         sourcePhotoId: string;
       };
@@ -187,10 +194,16 @@ describe('GetFit end-to-end journey', () => {
 
     assert.equal(response.status, 201);
     const assessment = response.body.assessment;
-    assert.ok(assessment.bodyFatPercent > 0 && assessment.bodyFatPercent < 60);
+    // 181 cm with an 85 cm waist and a 38 cm neck is a ~16% Navy reading.
+    assert.ok(
+      Math.abs(assessment.bodyFatPercent - 16.1) < 1,
+      `expected a measured ~16% reading, got ${assessment.bodyFatPercent}%`,
+    );
+    assert.equal(assessment.method, 'navy');
+    assert.equal(assessment.measurements.waistCm, 85);
     assert.ok(assessment.estimatedMuscleMassKg > 0);
-    assert.ok(assessment.waistBodyRatio > 0);
-    assert.ok(assessment.symmetryPercent > 0);
+    assert.ok(Math.abs(assessment.waistBodyRatio - 85 / 181) < 0.002, 'the waist ratio is measured');
+    assert.equal(assessment.symmetryPercent, 100, 'evenly measured arms read as balanced');
     assert.equal(assessment.hologramData.segments.length, 8);
     assert.ok(assessment.sourcePhotoId, 'the photo should be stored privately');
     state.photoId = assessment.sourcePhotoId;
@@ -561,7 +574,8 @@ describe('GetFit end-to-end journey', () => {
     if (!databaseAvailable) return t.skip('No database available');
 
     const form = new FormData();
-    form.append('photo', jpegFixture('y'), 'body.jpg');
+    form.append('waistCm', '84');
+    form.append('neckCm', '38');
 
     const response = await api<{ error: { code: string; message: string } }>(
       'POST',
@@ -583,18 +597,34 @@ describe('GetFit end-to-end journey', () => {
     });
     assert.equal(availability.body.available, true);
 
+    // No photo this week — measurements alone are enough to reassess.
     const form = new FormData();
-    form.append('photo', jpegFixture('z'), 'body.jpg');
+    form.append('waistCm', '83');
+    form.append('neckCm', '38');
     form.append('weightKg', '83.2');
 
-    const response = await api<{ assessment: { assessmentNumber: number; weightKg: number } }>(
-      'POST',
-      '/api/assessments/weekly',
-      { token: state.token, form },
-    );
+    const response = await api<{
+      assessment: {
+        assessmentNumber: number;
+        weightKg: number;
+        bodyFatPercent: number;
+        method: string;
+        symmetryPercent: number | null;
+        sourcePhotoId: string | null;
+      };
+    }>('POST', '/api/assessments/weekly', { token: state.token, form });
     assert.equal(response.status, 201);
     assert.equal(response.body.assessment.assessmentNumber, 2);
     assert.equal(response.body.assessment.weightKg, 83.2);
+    assert.equal(response.body.assessment.method, 'navy', 'the tape reading should still drive it');
+    assert.equal(response.body.assessment.sourcePhotoId, null, 'a photo must not be required');
+    // A 2 cm smaller waist at the same neck reads leaner than week one.
+    assert.ok(response.body.assessment.bodyFatPercent < 16, 'a smaller waist should read leaner');
+    assert.equal(
+      response.body.assessment.symmetryPercent,
+      null,
+      'unmeasured arms this week must not carry last week\'s balance forward',
+    );
 
     // And it locks again immediately.
     const relocked = await api<{ available: boolean; daysRemaining: number }>(

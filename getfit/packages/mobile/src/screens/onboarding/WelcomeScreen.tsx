@@ -60,7 +60,8 @@ export function WelcomeScreen({ navigation }: Props): React.ReactElement {
         />
         <SecondaryButton label="I already have an account" onPress={() => navigation.navigate('SignIn')} />
         <Text variant="caption" color="muted" align="center" style={{ marginTop: spacing.sm }}>
-          Your photos stay private and are never shared.
+          Your analysis runs on your own measurements. Photos are optional, private
+          and never shared.
         </Text>
       </View>
     </Screen>

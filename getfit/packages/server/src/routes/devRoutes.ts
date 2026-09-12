@@ -26,9 +26,8 @@ devRoutes.use(requireAuth);
 devRoutes.get('/config', (_req, res) => {
   res.json({
     devMode: env.devMode,
-    mockAiMode: env.mockAiMode,
     mockBilling: env.mockBilling,
-    aiProvider: env.aiProvider,
+    aiProvider: env.aiProvider || 'measurement',
     storageDriver: env.storageDriver,
     scenarios: [
       'mock-success',

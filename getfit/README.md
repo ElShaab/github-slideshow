@@ -1,13 +1,15 @@
 # GetFit
 
-An AI-powered fitness application for iOS and Android. GetFit estimates your
-body composition from a photo, builds a training program around it, guides you
-through every workout, progresses your training from what you actually lift,
-and reassesses your body every seven days.
+A fitness application for iOS and Android. GetFit calculates your body
+composition from your own tape measurements, builds a training program around
+it, guides you through every workout, progresses your training from what you
+actually lift, and reassesses your body every seven days.
 
-The AI is a structured personal trainer, not a chatbot. Every decision it
-makes — split, exercise selection, sets, reps, load, rest, warm-ups, cardio and
-progression — is rule-driven, inspectable and testable.
+It is a structured personal trainer, not a chatbot. Every decision it makes —
+split, exercise selection, sets, reps, load, rest, warm-ups, cardio and
+progression — is rule-driven, inspectable and testable, and so is the body
+analysis: published anthropometric formulas evaluated on numbers you measured,
+with no external service in the loop.
 
 ---
 
@@ -23,7 +25,7 @@ progression — is rule-driven, inspectable and testable.
 - [Mobile builds](#mobile-builds)
 - [Apple subscription configuration](#apple-subscription-configuration)
 - [Google subscription configuration](#google-subscription-configuration)
-- [AI provider configuration](#ai-provider-configuration)
+- [Body analysis](#body-analysis)
 - [Photo storage configuration](#photo-storage-configuration)
 - [Development mode](#development-mode)
 - [Security model](#security-model)
@@ -224,10 +226,9 @@ Every variable lives in `.env.example`. Copy it to `.env` and fill it in.
 | `DATABASE_POOL_MAX` | `10` | Connection pool size |
 | `JWT_SECRET` | dev placeholder | **Required in production.** `openssl rand -base64 48` |
 | `JWT_EXPIRES_IN` | `30d` | Access-token lifetime |
-| `MOCK_AI_MODE` | `true` | Serve body analysis from the deterministic mock |
-| `AI_PROVIDER` | `mock` | `mock`, or a name for your production provider |
-| `AI_BASE_URL` | — | Vision endpoint base URL |
-| `AI_API_KEY` | — | Vision endpoint bearer token |
+| `AI_PROVIDER` | — | Empty uses the built-in measurement analyser; set it to opt into a vision endpoint |
+| `AI_BASE_URL` | — | Vision endpoint base URL (required with `AI_PROVIDER`) |
+| `AI_API_KEY` | — | Vision endpoint bearer token (required with `AI_PROVIDER`) |
 | `DEV_MODE` | `true` outside production | Exposes `/api/dev` test helpers |
 | `MOCK_BILLING` | `true` outside production | Enables the mock store |
 | `STORAGE_DRIVER` | `local` | `local` or `s3` |
@@ -410,7 +411,33 @@ token, and reads the purchase from the Android Publisher API server-side.
 
 ---
 
-## AI provider configuration
+## Body analysis
+
+**No AI service is required, and none is configured by default.** Body
+composition is computed from the user's own tape measurements using published
+anthropometric formulas, on the server, with no network call:
+
+| Figure | How it is produced |
+| --- | --- |
+| Body fat | US Navy circumference method — waist, neck, height (plus hips for women). Validates to roughly ±3-4% against DEXA. |
+| Body fat, fallback | Deurenberg BMI formula, when there is no tape reading. Reported as `method: 'bmi'` with markedly lower confidence. |
+| Muscle mass | Skeletal muscle as a share of fat-free mass, which follows exactly from body fat and weight. |
+| Waist-to-height | The measured waist over the measured height. |
+| Symmetry | The difference between the measured left and right limbs — **null** when neither pair was measured, never a default 100%. |
+
+The same inputs always produce the same reading, and a user can check the
+arithmetic. The photo is optional: it is stored privately as the user's own
+before/after reference and is never analysed.
+
+> This replaced a provider that took a Deurenberg BMI estimate and added
+> `(hash(photo) - 0.5) * 7` to it — up to 3.5 percentage points of movement
+> driven by nothing but file bytes, with a fully random symmetry score. A tape
+> measure beats that comfortably, and costs nothing to run.
+
+The formulas live in `packages/shared/src/bodyComposition.ts` as pure
+functions, so the client and the server agree and both are directly testable.
+
+### Optional vision provider
 
 Body analysis sits behind one interface:
 
@@ -421,16 +448,10 @@ interface BodyAnalysisProvider {
 }
 ```
 
-**Mock provider** (`MOCK_AI_MODE=true`, the default). Derives a plausible
-estimate from the profile using published anthropometric relationships, then
-perturbs it with a hash of the actual photo bytes. Results differ for every
-user and every photo, stay stable for the same photo, and remain coherent week
-to week. It is not a vision model — it exists so the entire product can be
-built and tested without AI credentials.
-
-**Remote provider.** Set `MOCK_AI_MODE=false`, `AI_PROVIDER` to your provider's
-name, and `AI_BASE_URL` / `AI_API_KEY`. The server posts the photo and profile
-to `POST {AI_BASE_URL}/body-analysis` and expects:
+Setting `AI_PROVIDER` (plus `AI_BASE_URL` and `AI_API_KEY` — production refuses
+to boot with only some of the three) swaps in a remote vision endpoint. The
+server posts the photo, profile and measurements to
+`POST {AI_BASE_URL}/body-analysis` and expects:
 
 ```json
 {
@@ -442,8 +463,11 @@ to `POST {AI_BASE_URL}/body-analysis` and expects:
 }
 ```
 
-Hologram geometry is derived locally from those metrics, so the rendering
-contract is identical whichever provider is configured.
+Only `bodyFatPercent` is required; anything omitted is filled in from the
+measurements. A figure read off a photo is reported as `method: 'vision'`, so
+the app never presents it as a tape measurement. Hologram geometry is always
+derived locally, so the rendering contract is identical whichever provider is
+configured.
 
 To add a provider, implement the interface in `packages/server/src/ai/` and
 return it from `getBodyAnalysisProvider()`.

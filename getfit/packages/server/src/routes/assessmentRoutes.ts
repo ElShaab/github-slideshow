@@ -8,6 +8,7 @@ import { assessmentRepository } from '../repositories/assessmentRepository';
 import { userRepository } from '../repositories/userRepository';
 import { bodyAnalysisService } from '../services/bodyAnalysisService';
 import { errors } from '../utils/errors';
+import { assessmentSubmissionSchema } from './schemas';
 
 export const assessmentRoutes = Router();
 
@@ -16,6 +17,25 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: env.maxPhotoBytes, files: 1 },
 });
+
+/**
+ * Parses the tape measurements and weight off a multipart submission.
+ *
+ * Every field is optional: with a waist and neck reading the analysis uses the
+ * circumference formula, and without them it falls back to a BMI estimate and
+ * labels itself as one. A photo is optional too, and is only ever kept as a
+ * progress photo for the user.
+ */
+function parseSubmission(body: unknown) {
+  const parsed = assessmentSubmissionSchema.safeParse(body ?? {});
+  if (!parsed.success) {
+    throw errors.invalidInput(
+      parsed.error.issues[0]?.message ?? 'Check your measurements and try again.',
+    );
+  }
+  const { weightKg, ...measurements } = parsed.data;
+  return { weightKg, measurements };
+}
 
 /**
  * The first assessment runs before payment — that is the whole point of the
@@ -36,13 +56,14 @@ assessmentRoutes.post(
       return;
     }
 
-    if (!req.file) throw errors.uploadFailed('Add a photo to run your analysis.');
+    const { measurements } = parseSubmission(req.body);
 
     const assessment = await bodyAnalysisService.analyze({
       userId: req.userId,
       profile,
-      photo: req.file.buffer,
-      contentType: req.file.mimetype,
+      measurements,
+      photo: req.file?.buffer,
+      contentType: req.file?.mimetype,
       enforceInterval: false,
     });
 
@@ -59,19 +80,15 @@ assessmentRoutes.post(
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     const profile = await userRepository.getProfile(req.userId);
     if (!profile) throw errors.invalidInput('Complete onboarding before your analysis.');
-    if (!req.file) throw errors.uploadFailed('Add a photo to run your analysis.');
 
-    const weightRaw = (req.body as { weightKg?: string })?.weightKg;
-    const weightKg = weightRaw === undefined ? undefined : Number(weightRaw);
-    if (weightKg !== undefined && (!Number.isFinite(weightKg) || weightKg < 30 || weightKg > 300)) {
-      throw errors.invalidInput('Enter a weight between 30 and 300 kg.');
-    }
+    const { weightKg, measurements } = parseSubmission(req.body);
 
     const assessment = await bodyAnalysisService.analyze({
       userId: req.userId,
       profile,
-      photo: req.file.buffer,
-      contentType: req.file.mimetype,
+      measurements,
+      photo: req.file?.buffer,
+      contentType: req.file?.mimetype,
       weightKg,
       enforceInterval: true,
     });

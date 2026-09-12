@@ -118,3 +118,32 @@ export const settingsSchema = z.object({
 export const assessmentWeightSchema = z.object({
   weightKg: z.coerce.number().min(30).max(300).optional(),
 });
+
+/**
+ * Tape measurements, in centimetres.
+ *
+ * Every field is optional — the analysis degrades to a BMI estimate rather than
+ * refusing — but anything supplied has to be a plausible human measurement, so
+ * a slipped decimal point cannot drive the body-fat formula somewhere absurd.
+ * Arriving over multipart form data, values are strings, hence the coercion.
+ */
+const cm = (min: number, max: number) =>
+  z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.coerce.number().min(min).max(max).optional(),
+  );
+
+export const bodyMeasurementsSchema = z.object({
+  waistCm: cm(40, 200),
+  neckCm: cm(20, 70),
+  hipCm: cm(50, 200),
+  shoulderCm: cm(60, 200),
+  leftArmCm: cm(15, 70),
+  rightArmCm: cm(15, 70),
+  leftThighCm: cm(25, 110),
+  rightThighCm: cm(25, 110),
+});
+
+export const assessmentSubmissionSchema = bodyMeasurementsSchema.extend({
+  weightKg: z.coerce.number().min(30).max(300).optional(),
+});

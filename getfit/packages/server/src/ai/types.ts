@@ -1,25 +1,21 @@
-import type { BodyAnalysisResult, Sex } from '@getfit/shared';
+import type { BodyAnalysisResult, BodyMeasurements, Sex } from '@getfit/shared';
 
 export interface BodyAnalysisInput {
-  /** Raw photo bytes. Never persisted by the provider itself. */
-  photo: Buffer;
-  contentType: string;
+  /** The tape readings the analysis is computed from. */
+  measurements: BodyMeasurements;
   profile: {
     age: number;
     sex: Sex;
     heightCm: number;
     weightKg: number;
   };
-  /** Previous assessment, when one exists, so estimates stay coherent over time. */
-  previous?: {
-    bodyFatPercent: number;
-    muscleMassKg: number;
-    symmetryPercent: number;
-    waistBodyRatio: number;
-    daysSince: number;
-  };
-  /** 0..1 how much of the prescribed training the user actually completed. */
-  trainingAdherence?: number;
+  /**
+   * An optional progress photo. The default analyser never reads it — it is
+   * kept for the user's own before/after comparison — and it is only passed to
+   * a provider that has been explicitly configured to look at one.
+   */
+  photo?: Buffer;
+  contentType?: string;
 }
 
 export interface BodyAnalysisProvider {

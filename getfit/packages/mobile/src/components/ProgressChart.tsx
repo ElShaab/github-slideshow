@@ -15,6 +15,8 @@ export interface ProgressChartProps {
   lowerIsBetter?: boolean;
   style?: StyleProp<ViewStyle>;
   label: string;
+  /** Shown instead of the default when there is nothing to plot. */
+  emptyMessage?: string;
 }
 
 /**
@@ -29,6 +31,7 @@ export const ProgressChart = memo(function ProgressChart({
   lowerIsBetter = false,
   style,
   label,
+  emptyMessage,
 }: ProgressChartProps): React.ReactElement {
   const { colors, spacing } = useTheme();
 
@@ -65,7 +68,7 @@ export const ProgressChart = memo(function ProgressChart({
     return (
       <View style={[{ height, justifyContent: 'center' }, style]}>
         <Text variant="caption" color="muted">
-          Not enough data yet — complete an assessment to start this trend.
+          {emptyMessage ?? 'Not enough data yet — complete an assessment to start this trend.'}
         </Text>
       </View>
     );

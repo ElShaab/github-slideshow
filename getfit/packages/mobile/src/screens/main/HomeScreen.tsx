@@ -96,7 +96,11 @@ export function HomeScreen(): React.ReactElement {
               />
               <MetricCard
                 label="Symmetry"
-                value={`${Math.round(assessment.symmetryPercent)}%`}
+                value={
+                  assessment.symmetryPercent === null
+                    ? 'Not measured'
+                    : `${Math.round(assessment.symmetryPercent)}%`
+                }
               />
             </View>
           </View>

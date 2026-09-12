@@ -22,11 +22,12 @@ import { stepNumber, totalSteps } from './types';
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Photo'>;
 
 /**
- * Screen 8 — the initial photo.
+ * Screen 8 — an optional starting photo.
  *
- * Guidance is shown clearly, but an imperfect photo is never rejected: if the
- * user picked an image, onboarding continues and the analysis simply reports
- * lower confidence.
+ * The analysis is computed from the measurements on the previous screen, not
+ * from this photo. It is kept only so the user has a genuine before shot to
+ * compare against later, stored privately and never shown in the app's history.
+ * Skipping it changes nothing about the result.
  */
 export function PhotoScreen({ navigation }: Props): React.ReactElement {
   const { spacing, colors } = useTheme();
@@ -76,7 +77,6 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
 
   /** Submits onboarding, then hands off to the analysis flow. */
   const submit = useCallback(async () => {
-    if (!draft.photoUri) return;
     setBusy(true);
     setError(null);
 
@@ -128,9 +128,8 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
             </Text>
           ) : null}
           <PrimaryButton
-            label={draft.photoUri ? 'Analyze my body' : 'Add a photo to continue'}
+            label="Analyze my body"
             onPress={() => void submit()}
-            disabled={!draft.photoUri}
             loading={busy}
           />
         </View>
@@ -138,7 +137,7 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
     >
       <OnboardingHeader
         title="Your starting photo"
-        subtitle="One full-body photo is all the AI needs to estimate your composition."
+        subtitle="Optional. Your analysis comes from your measurements — this is just your before shot."
         step={stepNumber('photo', isHome)}
         total={totalSteps(isHome)}
         onBack={navigation.goBack}
@@ -146,7 +145,7 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
 
       <GlassCard style={{ marginTop: spacing.xxl }} accented={Boolean(draft.photoUri)}>
         <Text variant="micro" color="accent" uppercase>
-          For the best result
+          For a comparable before shot
         </Text>
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           {PHOTO_INSTRUCTIONS.map((instruction) => (
@@ -159,7 +158,8 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
           ))}
         </View>
         <Text variant="caption" color="muted" style={{ marginTop: spacing.lg }}>
-          Not perfect? That is fine — GetFit works with the photo you have.
+          Your photo is never analysed and never leaves your account. It is stored
+          privately so you can compare against it in a few months.
         </Text>
       </GlassCard>
 
@@ -188,6 +188,9 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
           label={draft.photoUri ? 'Choose a different photo' : 'Upload photo'}
           onPress={() => void pick('library')}
         />
+        {draft.photoUri ? (
+          <SecondaryButton label="Remove photo" onPress={() => update({ photoUri: null })} />
+        ) : null}
       </View>
     </Screen>
   );

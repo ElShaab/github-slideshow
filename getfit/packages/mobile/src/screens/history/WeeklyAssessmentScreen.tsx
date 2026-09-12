@@ -1,23 +1,31 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { BodyAssessment } from '@getfit/shared';
+import type { BodyAssessment, BodyMeasurements } from '@getfit/shared';
 import {
   ErrorState,
   GlassCard,
   LoadingScreen,
-  NumberField,
   Screen,
   Text,
+  draftFromMeasurements,
+  toMeasurements,
+  type MeasurementsDraft,
 } from '../../components';
 import { assessmentApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
+import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 import { AnalyzingScreen } from '../analysis/AnalyzingScreen';
+import { AssessmentInputScreen } from '../analysis/AssessmentInputScreen';
 import { BodyResultScreen } from '../analysis/BodyResultScreen';
-import { PhotoCaptureScreen } from '../analysis/PhotoCaptureScreen';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyAssessment'>;
+
+interface Submission {
+  measurements: BodyMeasurements;
+  photoUri: string | null;
+}
 
 /**
  * The weekly reassessment.
@@ -27,16 +35,38 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyAssessment'>;
  */
 export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElement {
   const { spacing } = useTheme();
+  const { profile } = useSession();
   const availability = useAsync(() => assessmentApi.availability(), []);
   const latest = useAsync(() => assessmentApi.latest(), []);
 
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [draft, setDraft] = useState<MeasurementsDraft | null>(null);
   const [weight, setWeight] = useState('');
+  const [submission, setSubmission] = useState<Submission | null>(null);
   const [result, setResult] = useState<BodyAssessment | null>(null);
 
-  const handleComplete = useCallback((assessment: BodyAssessment) => {
-    setResult(assessment);
-  }, []);
+  // Last week's readings are pre-filled, so the user adjusts what changed
+  // rather than re-typing everything — and a forgotten field is last week's
+  // number, not a blank that silently drops the measurement.
+  const previous = latest.data?.assessment ?? null;
+  const startingDraft = useMemo(
+    () => draftFromMeasurements(previous?.measurements),
+    [previous?.measurements],
+  );
+  const current = draft ?? startingDraft;
+
+  const handleChange = useCallback(
+    (patch: Partial<MeasurementsDraft>) => setDraft({ ...current, ...patch }),
+    [current],
+  );
+
+  const handleSubmit = useCallback(
+    (photoUri: string | null) => {
+      setSubmission({ measurements: toMeasurements(current), photoUri });
+    },
+    [current],
+  );
+
+  const weightKg = Number.parseFloat(weight);
 
   if (availability.loading) return <LoadingScreen message="Checking your assessment…" />;
   if (!availability.data) {
@@ -47,7 +77,7 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
     return (
       <BodyResultScreen
         assessment={result}
-        previous={latest.data?.assessment ?? null}
+        previous={previous}
         title="This week"
         continueLabel="Back to home"
         onContinue={() => navigation.navigate('Main', { screen: 'Home' })}
@@ -76,34 +106,30 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
     );
   }
 
-  if (photoUri) {
+  if (submission) {
     return (
       <AnalyzingScreen
-        photoUri={photoUri}
+        measurements={submission.measurements}
+        photoUri={submission.photoUri}
         mode="weekly"
-        weightKg={Number.parseFloat(weight) || undefined}
-        onComplete={handleComplete}
-        onCancel={() => setPhotoUri(null)}
+        weightKg={Number.isFinite(weightKg) ? weightKg : undefined}
+        onComplete={setResult}
+        onCancel={() => setSubmission(null)}
       />
     );
   }
 
   return (
-    <PhotoCaptureScreen mode="weekly" onCaptured={setPhotoUri} onCancel={navigation.goBack}>
-      <GlassCard style={{ marginTop: spacing.xl }}>
-        <NumberField
-          label="Current weight"
-          value={weight}
-          onChange={setWeight}
-          unit="kg"
-          min={30}
-          max={300}
-          step={0.5}
-          decimal
-          placeholder={latest.data?.assessment ? String(latest.data.assessment.weightKg) : '80'}
-          hint="Optional — leave blank to keep your last recorded weight."
-        />
-      </GlassCard>
-    </PhotoCaptureScreen>
+    <AssessmentInputScreen
+      mode="weekly"
+      sex={profile?.sex ?? null}
+      draft={current}
+      onChange={handleChange}
+      weight={weight}
+      onWeightChange={setWeight}
+      weightPlaceholder={previous ? String(previous.weightKg) : '80'}
+      onSubmit={handleSubmit}
+      onCancel={navigation.goBack}
+    />
   );
 }

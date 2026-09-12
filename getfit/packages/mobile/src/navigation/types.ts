@@ -13,12 +13,6 @@ export type OnboardingStackParamList = {
   Photo: undefined;
 };
 
-export type AnalysisStackParamList = {
-  PhotoGuidance: undefined;
-  Analyzing: { photoUri: string };
-  BodyResult: { assessmentId: string };
-};
-
 export type MainTabParamList = {
   Home: undefined;
   Workouts: undefined;
@@ -27,7 +21,8 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
-  Analysis: NavigatorScreenParams<AnalysisStackParamList>;
+  /** The analysis leg is one self-contained flow, not a nested stack. */
+  Analysis: undefined;
   Paywall: undefined;
   CreateAccount: undefined;
   ExercisePreferences: { fromSettings?: boolean } | undefined;

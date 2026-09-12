@@ -1,23 +1,31 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Line, RadialGradient, Rect, Stop } from 'react-native-svg';
-import type { BodyAssessment } from '@getfit/shared';
+import type { BodyAssessment, BodyMeasurements } from '@getfit/shared';
 import { ErrorState, Screen, Text } from '../../components';
 import { ApiError } from '../../api/client';
 import { assessmentApi } from '../../api/endpoints';
 import { useTheme } from '../../theme';
 
-/** The analysis narration. Deliberately short — no artificial delay is added. */
+/**
+ * What the analysis is actually doing, named honestly. The work is a handful of
+ * formulas and finishes in milliseconds; the sequence is a transition, not a
+ * simulation of effort, so it is kept short.
+ */
 const PHASES = [
-  'Scanning proportions',
-  'Analyzing symmetry',
-  'Estimating composition',
-  'Mapping muscle distribution',
-  'Preparing your GetFit profile',
+  'Checking your measurements',
+  'Calculating body composition',
+  'Building your figure',
 ];
 
+/** How long the transition plays for, at most, once the request has returned. */
+const PHASE_MS = 520;
+
 export interface AnalyzingScreenProps {
-  photoUri: string;
+  /** The tape readings the analysis is computed from. */
+  measurements: BodyMeasurements;
+  /** Optional progress photo. Stored privately; never analysed. */
+  photoUri?: string | null;
   /** Weight override for a weekly reassessment. */
   weightKg?: number;
   mode: 'initial' | 'weekly';
@@ -33,6 +41,7 @@ export interface AnalyzingScreenProps {
  * finished — so the wait is never padded beyond what the work takes.
  */
 export function AnalyzingScreen({
+  measurements,
   photoUri,
   weightKg,
   mode,
@@ -80,7 +89,7 @@ export function AnalyzingScreen({
   useEffect(() => {
     const interval = setInterval(() => {
       setPhase((current) => Math.min(current + 1, PHASES.length - 1));
-    }, 900);
+    }, PHASE_MS);
     return () => clearInterval(interval);
   }, [attempt]);
 
@@ -100,14 +109,15 @@ export function AnalyzingScreen({
     const run = async (): Promise<void> => {
       const startedAt = Date.now();
       try {
+        const submission = { measurements, photoUri, weightKg };
         const response =
           mode === 'initial'
-            ? await assessmentApi.runInitial(photoUri)
-            : await assessmentApi.runWeekly(photoUri, weightKg);
+            ? await assessmentApi.runInitial(submission)
+            : await assessmentApi.runWeekly(submission);
 
         // Let the sequence play out to at least the final phase, but no longer.
         const elapsed = Date.now() - startedAt;
-        const minimum = PHASES.length * 900;
+        const minimum = PHASES.length * PHASE_MS;
         if (elapsed < minimum) {
           await new Promise((resolve) => setTimeout(resolve, minimum - elapsed));
         }
@@ -123,7 +133,7 @@ export function AnalyzingScreen({
     return () => {
       cancelled = true;
     };
-  }, [attempt, mode, onComplete, photoUri, weightKg]);
+  }, [attempt, measurements, mode, onComplete, photoUri, weightKg]);
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
 
@@ -136,7 +146,7 @@ export function AnalyzingScreen({
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>
-      <View style={styles.stage} accessible accessibilityLabel="Analyzing your body">
+      <View style={styles.stage} accessible accessibilityLabel="Calculating your body composition">
         <Animated.View style={{ opacity: glow }}>
           <Svg width={260} height={300} viewBox="0 0 260 300">
             <Defs>
@@ -200,7 +210,7 @@ export function AnalyzingScreen({
 
       <View style={styles.copy}>
         <Text variant="micro" color="accent" uppercase>
-          Analyzing your body
+          Calculating
         </Text>
         <Animated.View style={{ opacity: fade, marginTop: spacing.lg }}>
           <Text variant="heading" align="center" accessibilityLiveRegion="polite">
