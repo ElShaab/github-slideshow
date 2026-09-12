@@ -156,7 +156,11 @@ export class SubscriptionService {
           platform: input.platform,
           productId,
           priceUsd: SUBSCRIPTION_PRICE_USD,
-          originalTransactionId: verified.originalTransactionId,
+          // Never bind a receipt that did not verify. Recording it here let
+          // someone present a stranger's refunded receipt, claim its permanent
+          // transaction id onto their own row, and lock the rightful owner out
+          // of ever subscribing. null preserves any binding already held.
+          originalTransactionId: null,
           currentPeriodStart: verified.periodStart,
           currentPeriodEnd: verified.revoked ? new Date() : null,
           cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
@@ -179,7 +183,6 @@ export class SubscriptionService {
     // granted the membership.
     if (verified.originalTransactionId && input.platform !== 'mock') {
       const boundTo = await subscriptionRepository.findByTransaction(
-        input.platform,
         verified.originalTransactionId,
       );
       if (boundTo && boundTo.userId !== input.userId) {
@@ -206,17 +209,32 @@ export class SubscriptionService {
         : 'active'
       : 'expired';
 
-    const subscription = await subscriptionRepository.upsert({
-      userId: input.userId,
-      status,
-      platform: input.platform,
-      productId: verified.productId,
-      priceUsd: SUBSCRIPTION_PRICE_USD,
-      originalTransactionId: verified.originalTransactionId,
-      currentPeriodStart: verified.periodStart,
-      currentPeriodEnd: verified.periodEnd,
-      cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
-    });
+    let subscription: Subscription;
+    try {
+      subscription = await subscriptionRepository.upsert({
+        userId: input.userId,
+        status,
+        platform: input.platform,
+        productId: verified.productId,
+        priceUsd: SUBSCRIPTION_PRICE_USD,
+        originalTransactionId: verified.originalTransactionId,
+        currentPeriodStart: verified.periodStart,
+        currentPeriodEnd: verified.periodEnd,
+        cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
+      });
+    } catch (error) {
+      // The check above is read-then-write, so two accounts redeeming the same
+      // receipt at once can both pass it. The unique index is the real
+      // guarantee; translate its violation into the same answer rather than
+      // letting a constraint error surface as a 500.
+      if ((error as { code?: string }).code === '23505') {
+        logger.warn('Concurrent redemption of the same receipt', { platform: input.platform });
+        throw errors.paymentFailed(
+          'That purchase is already linked to another GetFit account. Sign in with that account to use it.',
+        );
+      }
+      throw error;
+    }
 
     await subscriptionRepository.recordEvent({
       userId: input.userId,

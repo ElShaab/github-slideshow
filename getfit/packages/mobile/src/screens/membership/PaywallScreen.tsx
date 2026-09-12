@@ -12,7 +12,13 @@ import {
 } from '../../components';
 import { ApiError } from '../../api/client';
 import { subscriptionApi } from '../../api/endpoints';
-import { createStoreProvider, StorePurchaseCancelled, StoreUnavailable } from '../../state/billing';
+import {
+  createStoreProvider,
+  StorePurchaseCancelled,
+  StoreUnavailable,
+  type StoreProvider,
+  type StorePurchase,
+} from '../../state/billing';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
@@ -20,6 +26,19 @@ import { useTheme } from '../../theme';
 export interface PaywallScreenProps {
   /** Renewal shows the expired framing; paywall is the first-time offer. */
   variant?: 'paywall' | 'renewal';
+}
+
+/**
+ * Acknowledges a purchase without letting a store hiccup surface as a failed
+ * payment. Entitlement is already granted at this point; an unacknowledged
+ * transaction is simply redelivered by the store on the next launch.
+ */
+async function finishQuietly(store: StoreProvider, purchase: StorePurchase): Promise<void> {
+  try {
+    await store.finishPurchase(purchase);
+  } catch {
+    // Intentionally swallowed — the store retries.
+  }
 }
 
 /**
@@ -56,8 +75,10 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
 
       // Entitlement is granted, so tell the store the purchase was delivered.
       // Left unacknowledged, Google refunds it after three days and StoreKit
-      // replays the transaction on every launch.
-      await store.finishPurchase(purchase);
+      // replays the transaction on every launch. A failure here must not read
+      // as a failed purchase — the membership is already active — so it is
+      // logged and the store retries on the next launch.
+      await finishQuietly(store, purchase);
       await refresh();
     } catch (caught) {
       if (caught instanceof StorePurchaseCancelled) {
@@ -88,7 +109,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         receipt: purchase.receipt,
         productId: purchase.productId,
       });
-      await store.finishPurchase(purchase);
+      await finishQuietly(store, purchase);
       await refresh();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');

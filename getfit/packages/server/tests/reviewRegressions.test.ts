@@ -256,6 +256,39 @@ describe('receipt binding (#5)', () => {
   });
 });
 
+describe('receipt binding cannot be poisoned', () => {
+  test('a receipt that fails verification is never bound to the submitter', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    // Introduced while fixing #5: the invalid-receipt branch wrote the
+    // transaction id before the binding check ran. Anyone could submit a
+    // stranger's refunded receipt, claim its permanent id onto their own row,
+    // and lock the rightful owner out of ever subscribing.
+    const attacker = await paidAccount('t11');
+    const { query } = await import('../src/db/pool');
+
+    await query(`UPDATE subscriptions SET original_transaction_id = NULL WHERE user_id = $1`, [
+      attacker.userId,
+    ]);
+
+    const rejected = await api('POST', '/api/subscription/purchase', {
+      token: attacker.token,
+      body: { platform: 'mock', receipt: 'mock-revoked' },
+    });
+    assert.notEqual(rejected.status, 201);
+
+    const row = await query<{ original_transaction_id: string | null }>(
+      `SELECT original_transaction_id FROM subscriptions WHERE user_id = $1`,
+      [attacker.userId],
+    );
+    assert.equal(
+      row.rows[0]?.original_transaction_id ?? null,
+      null,
+      'a receipt that failed verification was bound to the account that submitted it',
+    );
+  });
+});
+
 describe('rest days and stale schedules (#8)', () => {
   test('no workout is offered on a rest day', async (t) => {
     if (!databaseAvailable) return t.skip('No database available');

@@ -64,8 +64,10 @@ export class GoogleBillingProvider implements BillingProvider {
       periodEnd: new Date(expiry || Date.now()),
       // userCancellationTimeMillis only means auto-renew was switched off; the
       // user keeps what they paid for until the period ends, exactly as Apple
-      // is handled. Only a developer-initiated cancellation (cancelReason 3,
-      // typically a refund) voids the entitlement outright.
+      // is handled. cancelReason 3 is a developer-initiated cancellation, which
+      // does void the entitlement. Refunds are not reported here at all — they
+      // come from the voidedpurchases API, which nothing consumes yet, so a
+      // refunded-but-unexpired purchase still reads as valid until it lapses.
       cancelAtPeriodEnd: payload.autoRenewing === false || Boolean(payload.userCancellationTimeMillis),
       revoked: payload.cancelReason === 3,
       environment: payload.purchaseType === 0 ? 'sandbox' : 'production',

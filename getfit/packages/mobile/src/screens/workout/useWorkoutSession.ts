@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { EXERCISE_BY_ID, type Exercise, type ProgramDay } from '@getfit/shared';
+import { EXERCISE_BY_ID, MAX_CARDIO_MINUTES, type Exercise, type ProgramDay } from '@getfit/shared';
 import type { CompleteWorkoutPayload } from '../../api/endpoints';
 
 export interface LoggedSet {
@@ -32,7 +32,18 @@ export function useWorkoutSession(day: ProgramDay) {
   const [position, setPosition] = useState<SessionPosition>({ exerciseIndex: 0, setIndex: 0 });
   const [phase, setPhase] = useState<SessionPhase>('set');
   const [logged, setLogged] = useState<Record<number, LoggedSet[]>>({});
-  const [cardioMinutes, setCardioMinutes] = useState(day.cardio?.minutes ?? 0);
+  const [cardioMinutes, setCardioMinutesState] = useState(day.cardio?.minutes ?? 0);
+
+  /**
+   * Cardio minutes are held inside the range the API accepts. Relying on the
+   * input to clamp on blur was not enough: finishing straight from the keyboard
+   * skips the blur, and one out-of-range value fails validation for the whole
+   * request — losing every set logged in the session with it.
+   */
+  const setCardioMinutes = useCallback((minutes: number) => {
+    const safe = Number.isFinite(minutes) ? minutes : 0;
+    setCardioMinutesState(Math.round(Math.min(MAX_CARDIO_MINUTES, Math.max(0, safe))));
+  }, []);
 
   const exercises = day.exercises;
   const currentProgramExercise = exercises[position.exerciseIndex];

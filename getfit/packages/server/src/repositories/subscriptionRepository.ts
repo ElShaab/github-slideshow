@@ -7,16 +7,18 @@ export const subscriptionRepository = {
     return result.rows[0] ? mapSubscription(result.rows[0]) : null;
   },
 
-  /** Finds the account a store transaction is already bound to, if any. */
-  async findByTransaction(
-    platform: BillingPlatform,
-    originalTransactionId: string,
-  ): Promise<Subscription | null> {
+  /**
+   * Finds the account a store transaction is already bound to, if any. The
+   * scope deliberately matches the unique index exactly — searching a narrower
+   * set than the constraint enforces would let a row pass this check and then
+   * fail on insert.
+   */
+  async findByTransaction(originalTransactionId: string): Promise<Subscription | null> {
     const result = await query(
       `SELECT * FROM subscriptions
-       WHERE platform = $1 AND original_transaction_id = $2
+       WHERE original_transaction_id = $1 AND platform IN ('apple','google')
        LIMIT 1`,
-      [platform, originalTransactionId],
+      [originalTransactionId],
     );
     return result.rows[0] ? mapSubscription(result.rows[0]) : null;
   },
