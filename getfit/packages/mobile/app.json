@@ -12,7 +12,9 @@
       "backgroundColor": "#05070C",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.getfit.app",
@@ -20,14 +22,19 @@
         "NSCameraUsageDescription": "GetFit uses your camera to take the body photo used for your private body analysis.",
         "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo for your private body analysis.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.getfit.app",
       "adaptiveIcon": {
         "backgroundColor": "#05070C"
       },
-      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"]
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
+      "versionCode": 1
     },
     "plugins": [
       [
