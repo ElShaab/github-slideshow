@@ -125,7 +125,9 @@ export class Profile {
     try {
       const data = JSON.parse(raw);
       if (!data || data.version !== SAVE_VERSION) return false;
-      this.gems = Number.isFinite(data.gems) ? data.gems : this.gems;
+      // Clamped like every other saved number: a negative or fractional
+      // balance would persist and lock the player out of continues forever.
+      this.gems = Number.isFinite(data.gems) ? Math.max(0, Math.trunc(data.gems)) : this.gems;
       this.soldierPoints = Math.max(0, Math.trunc(data.soldierPoints || 0));
       this.lifetimeSoldiersLost = Math.max(0, Math.trunc(data.lifetimeSoldiersLost || 0));
       this.unlockedSkins = Array.isArray(data.unlockedSkins) && data.unlockedSkins.length

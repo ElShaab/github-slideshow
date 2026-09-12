@@ -55,11 +55,24 @@ export class RunState {
     return loss;
   }
 
-  /** Sets the squad directly (gate maths, continue restoration, debug tools). */
+  /** Sets the squad directly (gate maths, debug tools). */
   setSquad (value) {
     const next = Math.max(0, Math.trunc(value));
     if (next > this.squad) this.addSoldiers(next - this.squad);
     else this.removeSoldiers(this.squad - next);
+    return this.squad;
+  }
+
+  /**
+   * Puts soldiers back after a paid continue.
+   *
+   * These are NOT newly acquired soldiers, so they must not award lifetime
+   * Soldier Points (spec 30): counting them would let a player mint the skin
+   * currency by dying with a big squad and paying one gem, over and over.
+   */
+  restoreSoldiers (value) {
+    this.squad = Math.max(0, Math.trunc(value));
+    this.alive = this.squad > 0;
     return this.squad;
   }
 

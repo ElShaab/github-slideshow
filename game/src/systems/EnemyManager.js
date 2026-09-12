@@ -25,7 +25,7 @@ export class EnemyManager {
     this.config = config;
 
     /** @type {Array<Array<object>>} live enemies per lane, nearest first */
-    this.laneQueues = [[], [], []];
+    this.laneQueues = Array.from({ length: config.lanes.count }, () => []);
     /** enemies playing their death animation */
     this.dying = [];
     this.pool = [];
@@ -46,7 +46,9 @@ export class EnemyManager {
   }
 
   get totalAlive () {
-    return this.laneQueues[0].length + this.laneQueues[1].length + this.laneQueues[2].length;
+    let total = 0;
+    for (const queue of this.laneQueues) total += queue.length;
+    return total;
   }
 
   _acquire () {

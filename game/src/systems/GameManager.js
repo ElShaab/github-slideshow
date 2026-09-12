@@ -41,6 +41,7 @@ export const GameState = Object.freeze({
 });
 
 const MAX_FRAME_DELTA = 1 / 20;   // never simulate more than this in one frame
+const LANE_MARKER_COLORS = [0xff5555, 0x55ff55, 0x5599ff, 0xffdd55, 0xcc66ff];
 
 export class GameManager {
   constructor (canvas, config = CONFIG) {
@@ -255,8 +256,10 @@ export class GameManager {
 
     this.run.continues += 1;
     const restored = this._plannedRestoration();
-    this.run.setSquad(restored);
-    this.run.alive = true;
+    // Reinforcements are not "acquired" soldiers: restoring through
+    // setSquad would credit lifetime Soldier Points and turn continues into a
+    // currency printer.
+    this.run.restoreSoldiers(restored);
 
     // Clear whatever was about to hit, and push the squad clear of the fight.
     this.enemies.clear();
@@ -502,7 +505,7 @@ export class GameManager {
     for (let lane = 0; lane < this.config.lanes.count; lane++) {
       const marker = new THREE.Mesh(
         new THREE.BoxGeometry(0.6, 0.6, 0.6),
-        new THREE.MeshBasicMaterial({ color: [0xff5555, 0x55ff55, 0x5599ff][lane] })
+        new THREE.MeshBasicMaterial({ color: LANE_MARKER_COLORS[lane % LANE_MARKER_COLORS.length] })
       );
       marker.position.set(this.lanes.laneX(lane), 3.2, 0);
       group.add(marker);

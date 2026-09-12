@@ -10,6 +10,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { CONFIG } from '../core/Config.js';
 import { buildBoss } from '../art/CharacterFactory.js';
+import { escortLaneSpawns } from '../core/CombatModel.js';
 
 /** Bosses are drawn larger than their archetype scale so they loom. */
 const BOSS_SCALE_DIVISOR = 1.9;
@@ -70,10 +71,15 @@ export class BossManager {
 
     if (boss.escort && boss.escort.count > 0) {
       this.phase = BossPhase.ESCORT;
-      const perLane = Math.ceil(boss.escort.count / this.config.lanes.count);
-      for (let lane = 0; lane < this.config.lanes.count; lane++) {
+      // The model resolves the escort as `count` enemies in whichever lane the
+      // squad stands in, so EVERY lane carries the full count.  Splitting the
+      // escort across the lanes instead would make the live fight far easier
+      // than the stage was certified for -- the escort is meant to be the one
+      // part of a boss that cannot be dodged.
+      const spawns = escortLaneSpawns(boss, this.config.lanes.count);
+      spawns.forEach((count, lane) => {
         this.enemies.spawnLane(lane, {
-          count: perLane,
+          count,
           hp: boss.escort.hp,
           speed: boss.escort.speed,
           spacing: boss.escort.spacing,
@@ -81,7 +87,7 @@ export class BossManager {
           lead: 46,
           scale: 1.1
         });
-      }
+      });
     } else {
       this.phase = BossPhase.FIGHT;
     }
@@ -96,8 +102,12 @@ export class BossManager {
     this.time += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
 
-    // While the escort is alive the boss hangs back out of reach.
-    if (this.phase === BossPhase.ESCORT) {
+    // The boss hangs back while ANY enemies are still on the road -- its own
+    // escort, or the tail of the last wave of the stage.  The squad's damage
+    // output is a single pool: if the boss took damage at the same time as a
+    // wave, the squad would effectively fire twice, and the encounter would be
+    // easier than the stage the simulator certified.
+    if (this.phase === BossPhase.ESCORT || this.enemies.totalAlive > 0) {
       this.z = Math.max(squadZ + 40, this.z - this.boss.speed * dt * 0.2);
       if (this.enemies.totalAlive === 0) this.phase = BossPhase.FIGHT;
       this._pose(squadZ);

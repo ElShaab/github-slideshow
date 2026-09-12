@@ -38,10 +38,19 @@ export class GateManager {
     row.group.traverse((child) => {
       if (child.isMesh) {
         child.geometry.dispose();
-        if (child.material.map) child.material.map.dispose();
+        // The label texture belongs to `_labelCache` and is shared by every
+        // row showing the same value -- disposing it here would throw away a
+        // texture that is about to be used again, defeating the cache.
         child.material.dispose();
       }
     });
+  }
+
+  /** Releases the cached label textures. Only for tearing the game down. */
+  dispose () {
+    this.clear();
+    for (const texture of this._labelCache.values()) texture.dispose();
+    this._labelCache.clear();
   }
 
   _labelTexture (text, color) {
@@ -118,8 +127,13 @@ export class GateManager {
       row.time += dt;
 
       const distance = row.worldZ - squadZ;
+      // Use the lane the squad is VISIBLY in, not the one the last swipe aimed
+      // at: a swipe registers instantly but the formation takes ~0.3s to slide
+      // across, and awarding a gate the squad never ran through reads as the
+      // game cheating.
+      const visibleLane = this.lanes.laneAt(this.lanes.x);
       for (const panel of row.panels) {
-        const highlighted = panel.lane === this.lanes.lane && distance < 42;
+        const highlighted = panel.lane === visibleLane && distance < 42;
         const pulse = 0.24 + (highlighted ? 0.22 + Math.sin(row.time * 7) * 0.08 : 0);
         panel.curtain.material.opacity = pulse;
         panel.sprite.scale.setScalar(highlighted ? 1.12 : 1);
@@ -127,9 +141,9 @@ export class GateManager {
 
       if (!row.triggered && distance <= 0) {
         row.triggered = true;
-        const panel = row.panels[this.lanes.lane];
+        const panel = row.panels[visibleLane];
         this.vfx.addBurst(this.lanes.x, 1.4, row.worldZ, 1.6, panel.color);
-        applied = { gate: panel.gate, lane: this.lanes.lane, row };
+        applied = { gate: panel.gate, lane: visibleLane, row };
         if (onCross) onCross(applied);
       }
 

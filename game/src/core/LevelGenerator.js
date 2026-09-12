@@ -195,6 +195,7 @@ export class LevelGenerator {
       // decisions, while the number of DECISIONS (gate rows) stays small
       // enough for the simulator to enumerate every path exhaustively.
       const laneCount = cfg.lanes.count;
+      const laneIndices = Array.from({ length: laneCount }, (_, index) => index);
       const maxWaves = rng.int(gen.wavesPerSectionMin, gen.wavesPerSectionMax);
       const waves = [];
       // Waves are laid out by the ground they actually occupy.  A stream of
@@ -233,7 +234,7 @@ export class LevelGenerator {
         // can read from the road ahead rather than a hidden coin flip.
         const lanes = new Array(laneCount).fill(0);
         const spacings = new Array(laneCount).fill(cfg.enemies.spacing);
-        const occupiedLanes = rng.shuffle([0, 1, 2]).slice(0, occupancy);
+        const occupiedLanes = rng.shuffle(laneIndices).slice(0, occupancy);
         const engagedLane = occupiedLanes[0];
         const streamLength = engagedCount * cfg.enemies.spacing;
         for (const lane of occupiedLanes) {
@@ -578,11 +579,12 @@ export class LevelGenerator {
    * positioning keeps mattering (spec 10).
    */
   _laneOccupancy (rng, index, sectionCount, waveIndex = 0) {
-    if (index === sectionCount - 1 && waveIndex > 0) return 3;
+    const laneCount = this.config.lanes.count;
+    if (index === sectionCount - 1 && waveIndex > 0) return laneCount;
     const roll = rng.next();
     if (roll < 0.18) return 1;
-    if (roll < 0.48) return 2;
-    return 3;
+    if (roll < 0.48) return Math.min(2, laneCount);
+    return laneCount;
   }
 
   /* -------------------------------------------------------------- fallback */

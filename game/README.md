@@ -159,6 +159,13 @@ maths:
 The simulator additionally applies a conservative efficiency factor, so it can
 only ever *under*-promise.
 
+Where the live game has to *stage* a fight the model prices — spawning a boss
+escort, for instance — the spawn plan lives in `CombatModel` next to the
+function that resolves it (`escortLaneSpawns`), so the two cannot quietly drift
+apart. The boss also holds back until the road is clear: the squad's firepower
+is a single pool, and letting a boss and a wave draw on it in the same frame
+would spend it twice.
+
 ## Debug tools
 
 Development builds (localhost, or any URL with `?debug=1`) get an overlay on

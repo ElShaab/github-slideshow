@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Original cartoon 3D mobile army-runner game (three.js).",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.mjs",
     "test:stress": "node tests/stress-levels.test.mjs",
     "serve": "npx --yes http-server .. -p 8080 -c-1"
   },

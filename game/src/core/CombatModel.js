@@ -293,6 +293,20 @@ export function resolveBossEncounter (params) {
   };
 }
 
+/**
+ * The live spawn plan for a boss escort, expressed as enemies per lane.
+ *
+ * `resolveBossEncounter` resolves the escort as `count` enemies in whichever
+ * lane the squad occupies, so the game must put the FULL count in every lane.
+ * Splitting the escort across the lanes would hand the player an escort a
+ * third of the size the stage was certified against, which is why this plan
+ * lives here, next to the model it has to agree with.
+ */
+export function escortLaneSpawns (boss, laneCount) {
+  if (!boss || !boss.escort || boss.escort.count <= 0) return [];
+  return new Array(laneCount).fill(boss.escort.count);
+}
+
 /** Smallest squad size that clears a full boss encounter (escort included). */
 export function minimumSquadForEncounter (params, upperBound = 20000) {
   const test = (size) => {
