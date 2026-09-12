@@ -182,6 +182,12 @@ export const CONFIG = {
     continueRestoreBias: 0.65,   // 0 = bare minimum, 1 = full previous squad
     continueRestoreCap: 0.85,    // never exceed this fraction of previous squad
     continueMinSquad: 5,
+    // Soldier Points earned per soldier acquired. The skin ladder runs from
+    // 10,000 to 1,000,000, while a strong 40-stage run (~100 minutes) earns
+    // about 5,250 points at a rate of 1 -- so the top skin is roughly 320
+    // hours of play. Raise this to shorten the chase: at 8 the cheapest
+    // prestige skin lands in ~3 hours and the top one in ~40.
+    soldierPointRate: 1,
     gemPacks: [
       { id: 'pack_small', gems: 10, priceLabel: '$0.99' },
       { id: 'pack_mid', gems: 50, priceLabel: '$3.99' },

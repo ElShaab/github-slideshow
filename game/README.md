@@ -42,7 +42,11 @@ otherwise resizes the viewport mid-run.
   upgrades carry straight into the next one. Only death ends a run.
 * **Guaranteed-solvable levels.** Every stage is generated *backwards* from its
   boss and then proven beatable by a simulator before you ever see it.
-* **Continues, gems, lifetime Soldier Points and cosmetic skins**, all persisted.
+* **Continues, gems, lifetime Soldier Points and 27 cosmetic skins**, all
+  persisted. The skin ladder runs from a free starter up to a 1,000,000-point
+  capstone; palettes are spread around the colour wheel and a test enforces
+  that a skin costing 4x more than another must actually look different from
+  it.
 
 ## Running
 

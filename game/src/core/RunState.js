@@ -42,7 +42,12 @@ export class RunState {
     if (gain === 0) return 0;
     this.squad += gain;
     this.soldiersGainedThisRun += gain;
-    if (this.profile) this.profile.addSoldierPoints(gain);
+    if (this.profile) {
+      // The squad grows by whole soldiers; the points they are worth is a
+      // separate, tunable rate so the skin ladder can be balanced without
+      // touching gate maths.
+      this.profile.addSoldierPoints(Math.round(gain * this.config.economy.soldierPointRate));
+    }
     return gain;
   }
 
