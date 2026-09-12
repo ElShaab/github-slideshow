@@ -53,6 +53,11 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         receipt: purchase.receipt,
         productId: purchase.productId,
       });
+
+      // Entitlement is granted, so tell the store the purchase was delivered.
+      // Left unacknowledged, Google refunds it after three days and StoreKit
+      // replays the transaction on every launch.
+      await store.finishPurchase(purchase);
       await refresh();
     } catch (caught) {
       if (caught instanceof StorePurchaseCancelled) {
@@ -83,6 +88,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         receipt: purchase.receipt,
         productId: purchase.productId,
       });
+      await store.finishPurchase(purchase);
       await refresh();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');

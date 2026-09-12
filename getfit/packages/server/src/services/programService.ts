@@ -157,6 +157,13 @@ export class ProgramService {
       });
     }
 
+    // Anything older than the window above was never reachable by the
+    // reorganisation, so retire it rather than let it sit "scheduled" forever.
+    await workoutRepository.markStaleAsMissed(
+      userId,
+      new Date(now.getTime() - 7 * 86_400_000).toISOString().slice(0, 10),
+    );
+
     const upcoming = await workoutRepository.listUpcoming(userId, 1);
     if (upcoming.length === 0) {
       await this.scheduleWeek(userId, program, weekStart);

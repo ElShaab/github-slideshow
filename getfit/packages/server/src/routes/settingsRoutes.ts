@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
+import { requireSubscription } from '../middleware/subscriptionGate';
 import { asyncHandler, validateBody } from '../middleware/validate';
 import { userRepository } from '../repositories/userRepository';
 import { subscriptionService } from '../services/subscriptionService';
@@ -27,8 +28,11 @@ settingsRoutes.get(
   }),
 );
 
+// Changing any of these rebuilds the training program, which is the paid
+// feature. Gating only /program/generate left this as an open side door.
 settingsRoutes.patch(
   '/profile',
+  requireSubscription,
   validateBody(profilePatchSchema),
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     res.json(await userService.updateProfile(req.userId, req.body as never));
@@ -37,6 +41,7 @@ settingsRoutes.patch(
 
 settingsRoutes.put(
   '/goals',
+  requireSubscription,
   validateBody(goalsSchema),
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     const body = req.body as typeof goalsSchema._output;
@@ -55,6 +60,7 @@ settingsRoutes.put(
 
 settingsRoutes.put(
   '/equipment',
+  requireSubscription,
   validateBody(equipmentSchema),
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     const body = req.body as typeof equipmentSchema._output;

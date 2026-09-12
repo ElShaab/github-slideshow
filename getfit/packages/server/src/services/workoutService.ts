@@ -98,9 +98,16 @@ export class WorkoutService {
       ),
     }));
 
+    // Link the record back to the program it came from, so history can still
+    // be attributed after the program is regenerated or archived.
+    const programId = await programRepository.getProgramIdForDay(
+      request.userId,
+      request.workoutDayId,
+    );
+
     const completed = await workoutRepository.completeWorkout({
       userId: request.userId,
-      programId: null,
+      programId,
       workoutDayId: request.workoutDayId,
       dayNumber: day.dayNumber,
       focus: day.focus,

@@ -106,42 +106,62 @@ export class SubscriptionService {
       const reason = error instanceof BillingVerificationError ? error.reason : 'unknown';
       logger.warn('Purchase verification failed', { reason, platform: input.platform });
 
-      await subscriptionRepository.upsert({
-        userId: input.userId,
-        status: 'failed',
-        platform: input.platform,
-        productId,
-        priceUsd: SUBSCRIPTION_PRICE_USD,
-        originalTransactionId: existing?.id ? null : null,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
-      });
+      // A failed verification must never take away time the user already paid
+      // for. An App Store outage during "Restore purchase" would otherwise
+      // cancel a live membership, so the stored period is only rewritten when
+      // there is no active entitlement left to protect.
+      const entitlement = await this.getEntitlement(input.userId);
+      if (!entitlement.active) {
+        await subscriptionRepository.upsert({
+          userId: input.userId,
+          status: 'failed',
+          platform: input.platform,
+          productId,
+          priceUsd: SUBSCRIPTION_PRICE_USD,
+          // null preserves whatever receipt is already bound to this account.
+          originalTransactionId: null,
+          currentPeriodStart: existing?.currentPeriodStart
+            ? new Date(existing.currentPeriodStart)
+            : null,
+          currentPeriodEnd: existing?.currentPeriodEnd ? new Date(existing.currentPeriodEnd) : null,
+          cancelAtPeriodEnd: existing?.cancelAtPeriodEnd ?? false,
+        });
+      }
+
       await subscriptionRepository.recordEvent({
         userId: input.userId,
         subscriptionId: existing?.id ?? null,
         eventType: 'purchase_failed',
         fromStatus: existing?.status ?? null,
-        toStatus: 'failed',
+        toStatus: entitlement.active ? entitlement.status : 'failed',
         platform: input.platform,
-        payload: { reason },
+        payload: { reason, preservedActivePeriod: entitlement.active },
       });
 
       throw errors.paymentFailed();
     }
 
     if (!verified.valid || verified.revoked) {
-      await subscriptionRepository.upsert({
-        userId: input.userId,
-        status: verified.revoked ? 'cancelled' : 'failed',
-        platform: input.platform,
-        productId,
-        priceUsd: SUBSCRIPTION_PRICE_USD,
-        originalTransactionId: verified.originalTransactionId,
-        currentPeriodStart: verified.periodStart,
-        currentPeriodEnd: verified.revoked ? new Date() : null,
-        cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
-      });
+      // A revocation is the store voiding the entitlement — that ends access
+      // now. A merely invalid receipt is not: the user may hold a live period
+      // from a different purchase, and presenting a stale receipt must not
+      // cancel it.
+      const entitlement = verified.revoked ? null : await this.getEntitlement(input.userId);
+      const protectActivePeriod = entitlement?.active === true;
+
+      if (!protectActivePeriod) {
+        await subscriptionRepository.upsert({
+          userId: input.userId,
+          status: verified.revoked ? 'cancelled' : 'failed',
+          platform: input.platform,
+          productId,
+          priceUsd: SUBSCRIPTION_PRICE_USD,
+          originalTransactionId: verified.originalTransactionId,
+          currentPeriodStart: verified.periodStart,
+          currentPeriodEnd: verified.revoked ? new Date() : null,
+          cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
+        });
+      }
       await subscriptionRepository.recordEvent({
         userId: input.userId,
         subscriptionId: existing?.id ?? null,
@@ -152,6 +172,31 @@ export class SubscriptionService {
         payload: verified.raw,
       });
       throw errors.paymentFailed('That purchase is no longer valid.');
+    }
+
+    // One purchase entitles one account. Without this the same receipt could be
+    // presented by any number of accounts and every one of them would be
+    // granted the membership.
+    if (verified.originalTransactionId && input.platform !== 'mock') {
+      const boundTo = await subscriptionRepository.findByTransaction(
+        input.platform,
+        verified.originalTransactionId,
+      );
+      if (boundTo && boundTo.userId !== input.userId) {
+        logger.warn('Purchase already bound to another account', { platform: input.platform });
+        await subscriptionRepository.recordEvent({
+          userId: input.userId,
+          subscriptionId: existing?.id ?? null,
+          eventType: 'purchase_rejected',
+          fromStatus: existing?.status ?? null,
+          toStatus: existing?.status ?? null,
+          platform: input.platform,
+          payload: { reason: 'receipt_bound_to_other_account' },
+        });
+        throw errors.paymentFailed(
+          'That purchase is already linked to another GetFit account. Sign in with that account to use it.',
+        );
+      }
     }
 
     const active = verified.periodEnd.getTime() > Date.now();

@@ -7,6 +7,7 @@ import {
   MUSCLE_GROUPS,
 } from '@getfit/shared';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
+import { requireSubscription } from '../middleware/subscriptionGate';
 import { asyncHandler, validateBody } from '../middleware/validate';
 import { userRepository } from '../repositories/userRepository';
 import { ExerciseSelectionService } from '../services/exerciseSelectionService';
@@ -71,6 +72,7 @@ exerciseRoutes.get(
 exerciseRoutes.post(
   '/preferences/generate',
   requireAuth,
+  requireSubscription,
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     const profile = await userRepository.getProfile(req.userId);
     if (!profile) throw errors.invalidInput('Complete onboarding first.');
@@ -99,6 +101,7 @@ exerciseRoutes.post(
 exerciseRoutes.put(
   '/preferences',
   requireAuth,
+  requireSubscription,
   validateBody(preferencesSchema),
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     const profile = await userRepository.getProfile(req.userId);
@@ -133,6 +136,7 @@ exerciseRoutes.put(
 exerciseRoutes.put(
   '/preferences/apply',
   requireAuth,
+  requireSubscription,
   validateBody(preferencesSchema),
   asyncHandler<AuthenticatedRequest>(async (req, res) => {
     const profile = await userRepository.getProfile(req.userId);

@@ -68,28 +68,57 @@ export const workoutRepository = {
     return result.rows.map(mapScheduled);
   },
 
+  /**
+   * Sessions still to come. Anything already in the past is excluded, so a
+   * long-abandoned schedule cannot masquerade as upcoming work and stop a new
+   * week from being laid out.
+   */
   async listUpcoming(userId: string, limit = 14): Promise<ScheduledWorkout[]> {
     const result = await query(
       `SELECT sw.*, wd.day_number, wd.focus, wd.duration_minutes
        FROM scheduled_workouts sw
        JOIN workout_days wd ON wd.id = sw.workout_day_id
        WHERE sw.user_id = $1 AND sw.status IN ('scheduled','rescheduled')
+         AND sw.scheduled_date >= CURRENT_DATE
        ORDER BY sw.scheduled_date ASC LIMIT $2`,
       [userId, limit],
     );
     return result.rows.map(mapScheduled);
   },
 
+  /**
+   * Today's session, or one still owed from an earlier day. Without the date
+   * bound this returned whatever came next, so the rest days the week layout
+   * deliberately leaves empty were never shown and the user was prompted to
+   * train every single day.
+   */
   async findTodaysWorkout(userId: string): Promise<ScheduledWorkout | null> {
     const result = await query(
       `SELECT sw.*, wd.day_number, wd.focus, wd.duration_minutes
        FROM scheduled_workouts sw
        JOIN workout_days wd ON wd.id = sw.workout_day_id
        WHERE sw.user_id = $1 AND sw.status IN ('scheduled','rescheduled')
+         AND sw.scheduled_date <= CURRENT_DATE
        ORDER BY sw.scheduled_date ASC LIMIT 1`,
       [userId],
     );
     return result.rows[0] ? mapScheduled(result.rows[0]) : null;
+  },
+
+  /**
+   * Marks sessions older than the reorganisation window as missed. They are
+   * never deleted — the history stays honest — but they stop blocking a fresh
+   * week from being scheduled after a long break.
+   */
+  async markStaleAsMissed(userId: string, before: string): Promise<number> {
+    const result = await query(
+      `UPDATE scheduled_workouts
+       SET status = 'missed'
+       WHERE user_id = $1 AND status IN ('scheduled','rescheduled')
+         AND scheduled_date < $2`,
+      [userId, before],
+    );
+    return result.rowCount ?? 0;
   },
 
   /** Returns false when the row does not exist or belongs to another user. */

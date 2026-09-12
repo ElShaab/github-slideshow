@@ -239,7 +239,8 @@ function hashToUnit(buffer: Buffer): number {
   return digest.readUInt32BE(0) / 0xffffffff;
 }
 
-function seedInt(buffer: Buffer): number {
+/** Stable 32-bit seed derived from the photo bytes. */
+export function seedInt(buffer: Buffer): number {
   const digest = createHash('sha256').update(buffer).digest();
   return digest.readUInt32BE(4);
 }

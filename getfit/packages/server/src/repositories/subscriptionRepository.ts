@@ -7,6 +7,20 @@ export const subscriptionRepository = {
     return result.rows[0] ? mapSubscription(result.rows[0]) : null;
   },
 
+  /** Finds the account a store transaction is already bound to, if any. */
+  async findByTransaction(
+    platform: BillingPlatform,
+    originalTransactionId: string,
+  ): Promise<Subscription | null> {
+    const result = await query(
+      `SELECT * FROM subscriptions
+       WHERE platform = $1 AND original_transaction_id = $2
+       LIMIT 1`,
+      [platform, originalTransactionId],
+    );
+    return result.rows[0] ? mapSubscription(result.rows[0]) : null;
+  },
+
   async upsert(args: {
     userId: string;
     status: SubscriptionStatus;
@@ -28,7 +42,12 @@ export const subscriptionRepository = {
          platform = EXCLUDED.platform,
          product_id = EXCLUDED.product_id,
          price_usd = EXCLUDED.price_usd,
-         original_transaction_id = EXCLUDED.original_transaction_id,
+         -- Passing null leaves the stored receipt binding intact; a failed
+         -- verification must not unbind a purchase that is still valid.
+         original_transaction_id = COALESCE(
+           EXCLUDED.original_transaction_id,
+           subscriptions.original_transaction_id
+         ),
          current_period_start = EXCLUDED.current_period_start,
          current_period_end = EXCLUDED.current_period_end,
          cancel_at_period_end = EXCLUDED.cancel_at_period_end

@@ -50,14 +50,24 @@ export class GoogleBillingProvider implements BillingProvider {
     const expiry = Number(payload.expiryTimeMillis ?? 0);
     const start = Number(payload.startTimeMillis ?? 0);
 
+    // paymentState: 0 pending, 1 received, 2 free trial, 3 deferred change.
+    // A pending payment must not unlock the product, so 0 is never valid no
+    // matter what the expiry says. An absent paymentState (Play omits it for
+    // already-cancelled subscriptions) leaves the expiry to decide.
+    const paymentPending = payload.paymentState === 0;
+
     return {
-      valid: payload.paymentState === 1 || payload.paymentState === 2 || expiry > Date.now(),
+      valid: !paymentPending && expiry > Date.now(),
       productId: request.productId,
       originalTransactionId: payload.orderId ?? request.receipt.slice(0, 48),
       periodStart: new Date(start || Date.now()),
       periodEnd: new Date(expiry || Date.now()),
-      cancelAtPeriodEnd: payload.autoRenewing === false,
-      revoked: Boolean(payload.cancelReason === 1 || payload.userCancellationTimeMillis),
+      // userCancellationTimeMillis only means auto-renew was switched off; the
+      // user keeps what they paid for until the period ends, exactly as Apple
+      // is handled. Only a developer-initiated cancellation (cancelReason 3,
+      // typically a refund) voids the entitlement outright.
+      cancelAtPeriodEnd: payload.autoRenewing === false || Boolean(payload.userCancellationTimeMillis),
+      revoked: payload.cancelReason === 3,
       environment: payload.purchaseType === 0 ? 'sandbox' : 'production',
       raw: { paymentState: payload.paymentState, expiryTimeMillis: payload.expiryTimeMillis },
     };

@@ -2,7 +2,7 @@ import type { BodyAnalysisResult } from '@getfit/shared';
 import { env } from '../config/env';
 import { AppError } from '../utils/errors';
 import { logger } from '../utils/logger';
-import { MockBodyAnalysisProvider, buildHologramData, makeRandom } from './mockBodyAnalysisProvider';
+import { MockBodyAnalysisProvider, buildHologramData, makeRandom, seedInt } from './mockBodyAnalysisProvider';
 import type { BodyAnalysisInput, BodyAnalysisProvider } from './types';
 
 /**
@@ -59,6 +59,8 @@ export class RemoteBodyAnalysisProvider implements BodyAnalysisProvider {
     const waistBodyRatio = requireNumber(payload.waistBodyRatio, 'waistBodyRatio');
     const symmetryPercent = requireNumber(payload.symmetryPercent, 'symmetryPercent');
 
+    const photoSeed = seedInt(input.photo);
+
     return {
       bodyFatPercent: round1(bodyFatPercent),
       estimatedMuscleMassKg: round1(muscleMassKg),
@@ -74,8 +76,12 @@ export class RemoteBodyAnalysisProvider implements BodyAnalysisProvider {
         heightCm: input.profile.heightCm,
         weightKg: input.profile.weightKg,
         sex: input.profile.sex,
-        seed: Math.floor(Math.random() * 0xffffffff),
-        rand: makeRandom(Math.floor(bodyFatPercent * 1000 + symmetryPercent)),
+        // One seed drives the RNG and is the seed that gets stored, so the
+        // saved geometry can actually be reproduced from it. It is derived
+        // from the photo rather than the estimate, so two users who happen to
+        // share a body-fat and symmetry reading do not get identical figures.
+        seed: photoSeed,
+        rand: makeRandom(photoSeed),
       }),
     };
   }

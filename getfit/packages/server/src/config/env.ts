@@ -37,6 +37,10 @@ export const env = {
 
   databaseUrl: str('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/getfit'),
   databaseSsl: bool('DATABASE_SSL', false),
+  /** PEM bundle for a self-signed database certificate. */
+  databaseCaCert: process.env.DATABASE_CA_CERT ?? '',
+  /** Skips certificate verification. Development only; blocked in production. */
+  databaseSslInsecure: bool('DATABASE_SSL_INSECURE', false),
   databasePoolMax: int('DATABASE_POOL_MAX', 10),
 
   // A development default keeps `npm run dev` working out of the box; production
@@ -102,6 +106,9 @@ if (env.isProduction) {
   }
   if (env.corsOrigins.includes('*')) {
     failures.push('CORS_ORIGINS must list explicit origins rather than "*".');
+  }
+  if (env.databaseSslInsecure) {
+    failures.push('DATABASE_SSL_INSECURE must be false — set DATABASE_CA_CERT instead.');
   }
   if (env.storageDriver === 'local') {
     failures.push('STORAGE_DRIVER=local stores photos on ephemeral disk; use s3.');

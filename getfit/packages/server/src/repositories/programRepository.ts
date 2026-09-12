@@ -132,6 +132,15 @@ export const programRepository = {
     });
   },
 
+  /** The program a day belongs to, scoped to its owner. */
+  async getProgramIdForDay(userId: string, workoutDayId: string): Promise<string | null> {
+    const result = await query<{ program_id: string }>(
+      `SELECT program_id FROM workout_days WHERE id = $1 AND user_id = $2`,
+      [workoutDayId, userId],
+    );
+    return result.rows[0]?.program_id ?? null;
+  },
+
   async getActive(userId: string): Promise<WorkoutProgram | null> {
     const programResult = await query(
       `SELECT * FROM workout_programs WHERE user_id = $1 AND is_active LIMIT 1`,

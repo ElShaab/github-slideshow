@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
 import { formatDuration } from '@getfit/shared';
 import { useTheme } from '../theme';
+import { extendRestEnd } from '../utils/numeric';
 import { GlassButton, SecondaryButton } from './Buttons';
 import { Text } from './Text';
 
@@ -28,16 +29,20 @@ export const RestTimer = memo(function RestTimer({
 }: RestTimerProps): React.ReactElement {
   const { colors, spacing, reduceMotion } = useTheme();
   const [remaining, setRemaining] = useState(seconds);
-  const [extra, setExtra] = useState(0);
+  // Tracks the full length of the current rest, extensions included, so the
+  // progress ring stays proportional after "+30s".
+  const [total, setTotal] = useState(seconds);
   const endsAt = useRef(Date.now() + seconds * 1000);
   const finished = useRef(false);
   const pulse = useRef(new Animated.Value(0)).current;
 
+  // Only a genuinely new rest period restarts the clock.
   useEffect(() => {
-    endsAt.current = Date.now() + (seconds + extra) * 1000;
+    endsAt.current = Date.now() + seconds * 1000;
     finished.current = false;
-    setRemaining(seconds + extra);
-  }, [extra, seconds]);
+    setRemaining(seconds);
+    setTotal(seconds);
+  }, [seconds]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -64,7 +69,6 @@ export const RestTimer = memo(function RestTimer({
     return () => animation.stop();
   }, [pulse, reduceMotion]);
 
-  const total = seconds + extra;
   const progress = total > 0 ? 1 - remaining / total : 1;
 
   const ring = useMemo(() => {
@@ -76,7 +80,10 @@ export const RestTimer = memo(function RestTimer({
   }, []);
 
   const addTime = useCallback(() => {
-    setExtra((current) => current + 30);
+    endsAt.current = extendRestEnd(endsAt.current, Date.now(), 30);
+    finished.current = false;
+    setRemaining(Math.max(0, Math.round((endsAt.current - Date.now()) / 1000)));
+    setTotal((current) => current + 30);
   }, []);
 
   const glow = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });

@@ -2,7 +2,7 @@
   "name": "getfit",
   "private": true,
   "version": "1.0.0",
-  "description": "GetFit — AI-powered fitness application (iOS + Android)",
+  "description": "GetFit \u2014 AI-powered fitness application (iOS + Android)",
   "workspaces": [
     "packages/shared",
     "packages/server",
@@ -20,7 +20,7 @@
     "lint": "eslint packages",
     "lint:fix": "eslint packages --fix",
     "verify": "npm run lint && npm run typecheck && npm test",
-    "test": "npm run build:shared && npm run test --workspace @getfit/server",
+    "test": "npm run build:shared && npm run test --workspace @getfit/server && npm run test --workspace @getfit/mobile",
     "typecheck": "npm run typecheck --workspace @getfit/shared && npm run typecheck --workspace @getfit/server && npm run typecheck --workspace @getfit/mobile",
     "mobile": "npm run start --workspace @getfit/mobile",
     "mobile:ios": "npm run ios --workspace @getfit/mobile",

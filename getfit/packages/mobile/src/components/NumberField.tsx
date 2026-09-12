@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle 
 import { useTheme } from '../theme';
 import { MIN_TOUCH_TARGET } from '../theme/tokens';
 import { Text } from './Text';
+import { clampNumericInput } from '../utils/numeric';
 
 export interface NumberFieldProps {
   label: string;
@@ -52,6 +53,11 @@ export const NumberField = memo(function NumberField({
     [decimal, onChange],
   );
 
+  const clampOnBlur = useCallback(() => {
+    const clamped = clampNumericInput(value, min, max, decimal);
+    if (clamped !== value) onChange(clamped);
+  }, [decimal, max, min, onChange, value]);
+
   return (
     <View style={style}>
       <Text variant="micro" color="muted" uppercase>
@@ -75,6 +81,7 @@ export const NumberField = memo(function NumberField({
           <TextInput
             value={value}
             onChangeText={sanitise}
+            onBlur={clampOnBlur}
             keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
             placeholder={placeholder}
             placeholderTextColor={colors.textMuted}

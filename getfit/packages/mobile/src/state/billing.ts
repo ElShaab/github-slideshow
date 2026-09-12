@@ -8,6 +8,8 @@ export interface StorePurchase {
   /** Apple: the app receipt. Google: the purchase token. Mock: a scenario key. */
   receipt: string;
   productId: string;
+  /** Opaque native transaction, carried so the purchase can be acknowledged. */
+  handle?: unknown;
 }
 
 export interface StoreProvider {
@@ -15,6 +17,13 @@ export interface StoreProvider {
   readonly available: boolean;
   purchase(productId: string): Promise<StorePurchase>;
   restore(): Promise<StorePurchase | null>;
+  /**
+   * Tells the store the purchase has been delivered. This is not optional
+   * bookkeeping: Google automatically refunds a purchase that is not
+   * acknowledged within three days, and StoreKit redelivers an unfinished
+   * transaction on every launch forever.
+   */
+  finishPurchase(purchase: StorePurchase): Promise<void>;
 }
 
 export class StorePurchaseCancelled extends Error {
@@ -81,9 +90,9 @@ export class NativeStoreProvider implements StoreProvider {
         Platform.OS === 'ios' ? purchase.transactionReceipt : purchase.purchaseToken ?? '';
       if (!receipt) throw new StoreUnavailable('That purchase could not be verified.');
 
-      // The purchase is only finished once the server has granted entitlement,
-      // so acknowledgement happens after verification in the caller.
-      return { platform: this.platform, receipt, productId };
+      // Finished only once the server has granted entitlement, so a purchase
+      // we could not verify is never acknowledged.
+      return { platform: this.platform, receipt, productId, handle: purchase };
     } finally {
       await billing.disconnectAsync().catch(() => undefined);
     }
@@ -101,7 +110,20 @@ export class NativeStoreProvider implements StoreProvider {
       const receipt =
         Platform.OS === 'ios' ? purchase.transactionReceipt : purchase.purchaseToken ?? '';
       if (!receipt) return null;
-      return { platform: this.platform, receipt, productId: purchase.productId };
+      return { platform: this.platform, receipt, productId: purchase.productId, handle: purchase };
+    } finally {
+      await billing.disconnectAsync().catch(() => undefined);
+    }
+  }
+
+  async finishPurchase(purchase: StorePurchase): Promise<void> {
+    const billing = this.loadModule();
+    if (!billing || purchase.handle === undefined) return;
+
+    await billing.connectAsync();
+    try {
+      // A subscription is never consumed, so consumeItem is false.
+      await billing.finishTransactionAsync(purchase.handle, false);
     } finally {
       await billing.disconnectAsync().catch(() => undefined);
     }
@@ -129,6 +151,9 @@ export class MockStoreProvider implements StoreProvider {
     await new Promise((resolve) => setTimeout(resolve, 400));
     return { platform: 'mock', receipt: 'mock-success', productId: SUBSCRIPTION_PRODUCT_ID };
   }
+
+  /** Nothing to acknowledge — no real transaction was opened. */
+  async finishPurchase(): Promise<void> {}
 }
 
 export function createStoreProvider(options: {
@@ -153,5 +178,6 @@ interface NativeBillingModule {
   getPurchaseHistoryAsync(): Promise<{
     results?: Array<{ transactionReceipt: string; purchaseToken?: string; productId: string }>;
   }>;
+  finishTransactionAsync(purchase: unknown, consumeItem: boolean): Promise<void>;
   IAPResponseCode: { OK: number; USER_CANCELED: number };
 }

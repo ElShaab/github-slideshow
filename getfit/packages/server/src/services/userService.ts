@@ -80,6 +80,16 @@ export class UserService {
    * the assessment taken before signup stays attached to the same person.
    */
   async completeAccount(userId: string, email: string, password: string): Promise<void> {
+    // This route only ever upgrades a guest. Letting it run against an account
+    // that already has credentials would turn any leaked token into a takeover:
+    // the holder could rewrite the email and password without proving they know
+    // the current one, locking the real owner out permanently.
+    const user = await userRepository.findById(userId);
+    if (!user) throw errors.unauthorized();
+    if (!user.is_guest || user.password_hash) {
+      throw errors.conflict('This account is already set up. Sign in instead.');
+    }
+
     const normalised = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalised)) {
       throw errors.invalidInput('Enter a valid email address.');
