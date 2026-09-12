@@ -1,4 +1,4 @@
-import { SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
+import { SUBSCRIPTION_PRODUCT_ID, planForProduct } from '@getfit/shared';
 import {
   BillingVerificationError,
   type BillingProvider,
@@ -12,7 +12,7 @@ import {
  * The receipt string doubles as a scenario selector so every subscription state
  * can be exercised end to end without a real store account:
  *
- *   mock-success            → a fresh 30-day period
+ *   mock-success            → a fresh period, sized to the plan
  *   mock-expired            → a period that ended yesterday
  *   mock-cancelled          → active but set to cancel at period end
  *   mock-failed             → the store rejects the purchase
@@ -27,6 +27,9 @@ export class MockBillingProvider implements BillingProvider {
     const now = new Date();
     const productId = request.productId || SUBSCRIPTION_PRODUCT_ID;
     const originalTransactionId = `mock_${hash(scenario + productId)}`;
+    // The granted period follows the plan, so a yearly purchase is exercised
+    // as a year rather than silently behaving like the monthly one.
+    const periodDays = planForProduct(productId)?.period === 'year' ? 365 : 30;
 
     if (scenario === 'mock-failed') {
       throw new BillingVerificationError('The payment was declined.', 'declined');
@@ -37,7 +40,7 @@ export class MockBillingProvider implements BillingProvider {
         valid: true,
         productId,
         originalTransactionId,
-        periodStart: daysFrom(now, -31),
+        periodStart: daysFrom(now, -(periodDays + 1)),
         periodEnd: daysFrom(now, -1),
         cancelAtPeriodEnd: false,
         revoked: false,
@@ -81,7 +84,7 @@ export class MockBillingProvider implements BillingProvider {
       productId,
       originalTransactionId,
       periodStart: now,
-      periodEnd: daysFrom(now, 30),
+      periodEnd: daysFrom(now, periodDays),
       cancelAtPeriodEnd: scenario === 'mock-cancelled',
       revoked: false,
       environment: 'mock',

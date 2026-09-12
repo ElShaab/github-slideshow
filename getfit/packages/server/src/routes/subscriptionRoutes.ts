@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { SUBSCRIPTION_PRICE_USD, SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
+import {
+  SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_PRICE_USD,
+  SUBSCRIPTION_PRODUCT_ID,
+} from '@getfit/shared';
 import { env } from '../config/env';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { asyncHandler, validateBody } from '../middleware/validate';
@@ -12,10 +16,13 @@ export const subscriptionRoutes = Router();
 
 subscriptionRoutes.get('/plan', (_req, res) => {
   res.json({
+    // The monthly plan stays at the top level so an older client that predates
+    // the yearly option keeps working against this endpoint unchanged.
     productId: SUBSCRIPTION_PRODUCT_ID,
     priceUsd: SUBSCRIPTION_PRICE_USD,
     period: 'month',
     freeTrial: false,
+    plans: SUBSCRIPTION_PLANS,
     features: [
       'Personalized workouts',
       'AI progression',

@@ -1,6 +1,6 @@
 import {
-  SUBSCRIPTION_PRICE_USD,
   SUBSCRIPTION_PRODUCT_ID,
+  planForProduct,
   type BillingPlatform,
   type Entitlement,
   type Subscription,
@@ -81,6 +81,16 @@ export class SubscriptionService {
   /** Verifies a store purchase and, if valid, grants the membership. */
   async purchase(input: PurchaseInput): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
     const productId = input.productId ?? SUBSCRIPTION_PRODUCT_ID;
+
+    // The client picks the plan, so the catalogue is what bounds that choice.
+    // An unrecognised product would otherwise be priced as if it were the
+    // monthly plan and granted whatever period the receipt happened to carry.
+    const plan = planForProduct(productId);
+    if (!plan) {
+      logger.warn('Purchase named a product we do not sell', { productId });
+      throw errors.invalidInput('That membership is not available.');
+    }
+
     const existing = await subscriptionRepository.get(input.userId);
 
     await subscriptionRepository.recordEvent({
@@ -117,7 +127,7 @@ export class SubscriptionService {
           status: 'failed',
           platform: input.platform,
           productId,
-          priceUsd: SUBSCRIPTION_PRICE_USD,
+          priceUsd: plan.priceUsd,
           // null preserves whatever receipt is already bound to this account.
           originalTransactionId: null,
           currentPeriodStart: existing?.currentPeriodStart
@@ -155,7 +165,7 @@ export class SubscriptionService {
           status: verified.revoked ? 'cancelled' : 'failed',
           platform: input.platform,
           productId,
-          priceUsd: SUBSCRIPTION_PRICE_USD,
+          priceUsd: plan.priceUsd,
           // Never bind a receipt that did not verify. Recording it here let
           // someone present a stranger's refunded receipt, claim its permanent
           // transaction id onto their own row, and lock the rightful owner out
@@ -216,7 +226,7 @@ export class SubscriptionService {
         status,
         platform: input.platform,
         productId: verified.productId,
-        priceUsd: SUBSCRIPTION_PRICE_USD,
+        priceUsd: plan.priceUsd,
         originalTransactionId: verified.originalTransactionId,
         currentPeriodStart: verified.periodStart,
         currentPeriodEnd: verified.periodEnd,

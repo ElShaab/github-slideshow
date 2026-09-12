@@ -40,7 +40,7 @@ Open GetFit
                 schedule, goals, measurements, photo)
   → Body analysis                       ← no account needed yet
   → Body composition + 3D hologram
-  → $5/month membership                 ← results always come before payment
+  → membership: $5/month or $20/year    ← results always come before payment
   → Payment (Apple IAP / Google Play Billing)
   → Account created                     ← the guest is upgraded in place
   → Exercise preferences (4 choices per muscle, pick up to 3,
@@ -368,10 +368,16 @@ real purchases. Without it, the mock store is used when the server allows it.
 
 ## Apple subscription configuration
 
-1. In **App Store Connect → Your App → Subscriptions**, create a subscription
-   group and an auto-renewable subscription with product ID
-   `getfit_membership_monthly` at **$4.99/month** (the $5 tier).
-2. Do **not** configure an introductory offer — GetFit has no free trial.
+1. In **App Store Connect → Your App → Subscriptions**, create one subscription
+   group containing both auto-renewable subscriptions:
+   - `getfit_membership_monthly` at **$4.99/month** (the $5 tier)
+   - `getfit_membership_yearly` at **$19.99/year** (the $20 tier)
+
+   Put them in the same group so members can move between them, and rank the
+   yearly plan higher so an upgrade takes effect immediately.
+2. Do **not** configure an introductory offer — GetFit has no free trial. The
+   yearly plan's "was $40" is presented as a limited-time discount on our own
+   price, not as a store introductory offer.
 3. Under **App Information → App-Specific Shared Secret**, generate a secret
    and set it as `APPLE_SHARED_SECRET`.
 4. Set `APPLE_BUNDLE_ID` to your bundle identifier (default `com.getfit.app`).
@@ -387,9 +393,10 @@ response. The client's claim about its own subscription is never trusted.
 
 ## Google subscription configuration
 
-1. In the **Google Play Console → Monetise → Subscriptions**, create a
-   subscription with product ID `getfit_membership_monthly` and a monthly base
-   plan at the $5 price point.
+1. In the **Google Play Console → Monetise → Subscriptions**, create two
+   subscriptions:
+   - `getfit_membership_monthly` with a monthly base plan at the $5 price point
+   - `getfit_membership_yearly` with a yearly base plan at the $20 price point
 2. Do **not** add a free trial offer.
 3. In Google Cloud, enable the **Google Play Android Developer API** and create
    a service account with the *Financial data* and *Manage orders* permissions.

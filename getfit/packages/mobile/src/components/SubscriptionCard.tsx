@@ -1,14 +1,19 @@
 import React, { memo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { SUBSCRIPTION_PRICE_USD } from '@getfit/shared';
 import { useTheme } from '../theme';
 import { GlassCard } from './GlassCard';
 import { Text } from './Text';
 
-/** The membership offer shown on the paywall and the renewal screen. */
+/**
+ * What the membership includes, shown on the paywall and the renewal screen.
+ *
+ * The price is optional: when plans are listed separately the card carries only
+ * the feature list, so a headline price cannot contradict the plan the user
+ * actually has selected.
+ */
 export const SubscriptionCard = memo(function SubscriptionCard({
   features,
-  priceUsd = SUBSCRIPTION_PRICE_USD,
+  priceUsd,
   style,
 }: {
   features: string[];
@@ -23,14 +28,20 @@ export const SubscriptionCard = memo(function SubscriptionCard({
         GetFit Membership
       </Text>
 
-      <View style={[styles.priceRow, { marginTop: spacing.md }]}>
-        <Text variant="display" tabular>
-          ${priceUsd}
-        </Text>
-        <Text variant="subheading" color="muted" style={{ marginLeft: spacing.sm, marginBottom: 7 }}>
-          / month
-        </Text>
-      </View>
+      {priceUsd !== undefined ? (
+        <View style={[styles.priceRow, { marginTop: spacing.md }]}>
+          <Text variant="display" tabular>
+            ${priceUsd}
+          </Text>
+          <Text
+            variant="subheading"
+            color="muted"
+            style={{ marginLeft: spacing.sm, marginBottom: 7 }}
+          >
+            / month
+          </Text>
+        </View>
+      ) : null}
 
       <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
         {features.map((feature) => (

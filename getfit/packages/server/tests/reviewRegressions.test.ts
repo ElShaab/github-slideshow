@@ -445,3 +445,93 @@ describe('completed workouts link to their program (#11)', () => {
     assert.ok(row.rows[0].program_id, 'the completed workout was not linked to its program');
   });
 });
+
+describe('yearly membership', () => {
+  test('the plan endpoint offers monthly and a badged yearly deal', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const response = await api<{
+      priceUsd: number;
+      freeTrial: boolean;
+      plans: Array<{
+        productId: string;
+        period: string;
+        priceUsd: number;
+        listPriceUsd: number | null;
+        badge: string | null;
+        limitedTime: boolean;
+      }>;
+    }>('GET', '/api/subscription/plan');
+
+    assert.equal(response.status, 200);
+    // The flat monthly fields stay for clients that predate the catalogue.
+    assert.equal(response.body.priceUsd, 5);
+    assert.equal(response.body.freeTrial, false);
+
+    const monthly = response.body.plans.find((p) => p.period === 'month');
+    const yearly = response.body.plans.find((p) => p.period === 'year');
+
+    assert.ok(monthly, 'the monthly plan disappeared');
+    assert.equal(monthly.priceUsd, 5);
+    assert.equal(monthly.listPriceUsd, null, 'the monthly plan should carry no offer');
+
+    assert.ok(yearly, 'no yearly plan was offered');
+    assert.equal(yearly.priceUsd, 20);
+    assert.equal(yearly.listPriceUsd, 40, '$40 must be shown struck through');
+    assert.equal(yearly.badge, 'BEST DEAL');
+    assert.equal(yearly.limitedTime, true);
+  });
+
+  test('buying the yearly plan grants a year and stores its price', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const guest = await api<{ accessToken: string; userId: string }>('POST', '/api/auth/guest');
+    const token = guest.body.accessToken;
+
+    const purchase = await api<{ entitlement: { active: boolean; expiresAt: string } }>(
+      'POST',
+      '/api/subscription/purchase',
+      {
+        token,
+        body: {
+          platform: 'mock',
+          receipt: 'mock-success',
+          productId: 'getfit_membership_yearly',
+        },
+      },
+    );
+
+    assert.equal(purchase.status, 201);
+    assert.equal(purchase.body.entitlement.active, true);
+
+    // A year, not the monthly period the mock used to hand out regardless.
+    const days =
+      (new Date(purchase.body.entitlement.expiresAt).getTime() - Date.now()) / 86_400_000;
+    assert.ok(days > 300, `yearly purchase granted only ${Math.round(days)} days`);
+
+    const { query } = await import('../src/db/pool');
+    const row = await query<{ price_usd: string; product_id: string }>(
+      `SELECT price_usd, product_id FROM subscriptions WHERE user_id = $1`,
+      [guest.body.userId],
+    );
+    assert.equal(Number(row.rows[0].price_usd), 20, 'the yearly plan was priced as monthly');
+    assert.equal(row.rows[0].product_id, 'getfit_membership_yearly');
+  });
+
+  test('a product we do not sell is refused', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const guest = await api<{ accessToken: string }>('POST', '/api/auth/guest');
+    const response = await api<{ error: { code: string } }>('POST', '/api/subscription/purchase', {
+      token: guest.body.accessToken,
+      body: {
+        platform: 'mock',
+        receipt: 'mock-success',
+        productId: 'getfit_membership_lifetime_free',
+      },
+    });
+
+    assert.equal(response.status, 422, 'an unknown product id was accepted');
+    assert.equal(response.body.error.code, 'invalid_input');
+  });
+});

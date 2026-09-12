@@ -161,11 +161,24 @@ export const assessmentApi = {
 
 /* -------------------------- subscription -------------------------- */
 
+export interface SubscriptionPlanOption {
+  productId: string;
+  period: 'month' | 'year';
+  priceUsd: number;
+  /** Undiscounted price, struck through beside the real one. */
+  listPriceUsd: number | null;
+  badge: string | null;
+  limitedTime: boolean;
+}
+
 export interface SubscriptionPlan {
+  /** The monthly plan, kept flat for older clients. */
   productId: string;
   priceUsd: number;
   period: string;
   freeTrial: boolean;
+  /** Every plan on offer. Absent when talking to an older server. */
+  plans?: SubscriptionPlanOption[];
   features: string[];
   mockBillingAvailable: boolean;
 }

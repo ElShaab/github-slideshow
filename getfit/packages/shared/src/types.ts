@@ -372,6 +372,23 @@ export type SubscriptionStatus =
 
 export type BillingPlatform = 'apple' | 'google' | 'mock';
 
+export type BillingPeriod = 'month' | 'year';
+
+/** One membership the app sells. See SUBSCRIPTION_PLANS for the catalogue. */
+export interface SubscriptionPlan {
+  /** Store product id, identical in App Store Connect and Play Console. */
+  productId: string;
+  period: BillingPeriod;
+  /** What the member is charged for one period, in USD. */
+  priceUsd: number;
+  /** Undiscounted price, struck through beside the real one. Null if no offer. */
+  listPriceUsd: number | null;
+  /** Marketing badge, e.g. "BEST DEAL". */
+  badge: string | null;
+  /** True while the discount is a limited-time offer. */
+  limitedTime: boolean;
+}
+
 export interface Subscription {
   id: string;
   userId: string;

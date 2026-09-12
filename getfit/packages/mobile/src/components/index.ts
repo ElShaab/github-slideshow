@@ -13,6 +13,7 @@ export { OnboardingHeader, OnboardingProgress } from './OnboardingChrome';
 export { Choice, ChoicePill } from './Choice';
 export { Screen, LoadingScreen, ErrorState, EmptyState, SectionHeader } from './Screen';
 export { SettingsRow, SettingsGroup } from './SettingsRow';
+export { PlanOptionCard } from './PlanOptionCard';
 export { SubscriptionCard } from './SubscriptionCard';
 export { WorkoutSummaryCard } from './WorkoutSummaryCard';
 export { NumberField } from './NumberField';

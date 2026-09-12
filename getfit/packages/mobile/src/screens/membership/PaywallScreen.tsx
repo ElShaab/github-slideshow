@@ -1,17 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, View } from 'react-native';
-import { SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
+import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
 import {
   ErrorState,
   GlassButton,
   LoadingScreen,
+  PlanOptionCard,
   PrimaryButton,
   Screen,
   SubscriptionCard,
   Text,
 } from '../../components';
 import { ApiError } from '../../api/client';
-import { subscriptionApi } from '../../api/endpoints';
+import { subscriptionApi, type SubscriptionPlanOption } from '../../api/endpoints';
 import {
   createStoreProvider,
   StorePurchaseCancelled,
@@ -54,6 +55,23 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
   const plan = useAsync(() => subscriptionApi.plan(), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  // An older server answers without the catalogue, so fall back to the plans
+  // compiled into the app rather than showing nothing to buy.
+  const options: SubscriptionPlanOption[] = useMemo(
+    () => (plan.data?.plans?.length ? plan.data.plans : SUBSCRIPTION_PLANS),
+    [plan.data?.plans],
+  );
+
+  // Default to the best offer, which is what the badge is pointing at.
+  const selected = useMemo(
+    () =>
+      options.find((option) => option.productId === selectedProductId) ??
+      options.find((option) => option.badge) ??
+      options[0],
+    [options, selectedProductId],
+  );
 
   const store = useMemo(
     () => createStoreProvider({ mockAvailable: plan.data?.mockBillingAvailable ?? false }),
@@ -64,7 +82,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     setBusy(true);
     setError(null);
     try {
-      const purchase = await store.purchase(plan.data?.productId ?? SUBSCRIPTION_PRODUCT_ID);
+      const purchase = await store.purchase(selected?.productId ?? SUBSCRIPTION_PRODUCT_ID);
       // The store receipt proves nothing on its own — the server verifies it
       // and decides whether the membership is active.
       await subscriptionApi.purchase({
@@ -93,7 +111,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     } finally {
       setBusy(false);
     }
-  }, [plan.data?.productId, refresh, store]);
+  }, [refresh, selected?.productId, store]);
 
   const restore = useCallback(async () => {
     setBusy(true);
@@ -136,7 +154,11 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
             label={isRenewal ? 'Renew membership' : 'Start membership'}
             onPress={() => void buy()}
             loading={busy}
-            accessibilityHint={`Subscribes at $${plan.data.priceUsd} per month`}
+            accessibilityHint={
+              selected
+                ? `Subscribes at $${selected.priceUsd} per ${selected.period}`
+                : undefined
+            }
           />
           <GlassButton label="Restore purchase" onPress={() => void restore()} fullWidth />
         </View>
@@ -154,19 +176,40 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
           : 'Your body analysis is saved. A membership unlocks the training built around it.'}
       </Text>
 
-      <SubscriptionCard
-        features={plan.data.features}
-        priceUsd={plan.data.priceUsd}
-        style={{ marginTop: spacing.xxl }}
-      />
+      <SubscriptionCard features={plan.data.features} style={{ marginTop: spacing.xxl }} />
+
+      <View
+        style={{ marginTop: spacing.xl, gap: spacing.md }}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Choose a membership"
+      >
+        {options.map((option) => (
+          <PlanOptionCard
+            key={option.productId}
+            label={option.period === 'year' ? 'Yearly' : 'Monthly'}
+            priceUsd={option.priceUsd}
+            listPriceUsd={option.listPriceUsd}
+            periodLabel={option.period === 'year' ? '/ year' : '/ month'}
+            detail={
+              option.period === 'year'
+                ? `Works out at $${(option.priceUsd / 12).toFixed(2)} a month`
+                : undefined
+            }
+            badge={option.badge}
+            limitedTime={option.limitedTime}
+            selected={selected?.productId === option.productId}
+            onPress={() => setSelectedProductId(option.productId)}
+          />
+        ))}
+      </View>
 
       <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
         <Text variant="caption" color="muted">
           No free trial. Cancel any time from Settings or your store account.
         </Text>
         <Text variant="caption" color="muted">
-          Billed monthly through {storeName()}. Your membership is verified on our
-          servers, so it works on every device you sign in to.
+          Billed {selected?.period === 'year' ? 'yearly' : 'monthly'} through {storeName()}. Your
+          membership is verified on our servers, so it works on every device you sign in to.
         </Text>
         {plan.data.mockBillingAvailable ? (
           <Text variant="caption" color="warning">

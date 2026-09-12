@@ -1,4 +1,10 @@
-import type { GoalType, SessionDuration, TrainingDays, TrainingLevel } from './types';
+import type {
+  GoalType,
+  SessionDuration,
+  SubscriptionPlan,
+  TrainingDays,
+  TrainingLevel,
+} from './types';
 
 /** Maximum exercises a user may pick per muscle group in Exercise Preferences. */
 export const MAX_EXERCISES_PER_MUSCLE = 3;
@@ -17,6 +23,49 @@ export const MAX_WARMUP_SETS = 2;
 
 export const SUBSCRIPTION_PRICE_USD = 5;
 export const SUBSCRIPTION_PRODUCT_ID = 'getfit_membership_monthly';
+export const YEARLY_PRODUCT_ID = 'getfit_membership_yearly';
+
+/**
+ * Every membership the app sells. The store product ids must match the ones
+ * configured in App Store Connect and Play Console exactly, and the server
+ * refuses any purchase naming a product that is not in this list — the client
+ * chooses which plan to buy, so the catalogue is what bounds that choice.
+ *
+ * `listPriceUsd` is the undiscounted price. It is struck through beside the
+ * price actually charged, and is null when a plan carries no offer.
+ */
+export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    productId: SUBSCRIPTION_PRODUCT_ID,
+    period: 'month',
+    priceUsd: SUBSCRIPTION_PRICE_USD,
+    listPriceUsd: null,
+    badge: null,
+    limitedTime: false,
+  },
+  {
+    productId: YEARLY_PRODUCT_ID,
+    period: 'year',
+    priceUsd: 20,
+    listPriceUsd: 40,
+    badge: 'BEST DEAL',
+    limitedTime: true,
+  },
+];
+
+export const PLAN_BY_PRODUCT_ID: Record<string, SubscriptionPlan> = Object.fromEntries(
+  SUBSCRIPTION_PLANS.map((plan) => [plan.productId, plan]),
+);
+
+/** The plan a store product id refers to, or undefined if we do not sell it. */
+export function planForProduct(productId: string | undefined | null): SubscriptionPlan | undefined {
+  return productId ? PLAN_BY_PRODUCT_ID[productId] : undefined;
+}
+
+/** Whole months covered by one billing period, used to date the paid period. */
+export function planPeriodMonths(plan: SubscriptionPlan): number {
+  return plan.period === 'year' ? 12 : 1;
+}
 
 export const SESSION_DURATIONS: SessionDuration[] = [15, 30, 45, 60];
 export const TRAINING_DAY_OPTIONS: TrainingDays[] = [1, 2, 3, 4, 5, 6, 7];
