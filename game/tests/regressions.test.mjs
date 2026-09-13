@@ -119,3 +119,28 @@ test('lane count is data: a four-lane build generates and validates cleanly', ()
       level.boss.escort ? 4 : 0);
   }
 });
+
+test('section boundaries are exactly adjacent, not a float ULP apart', () => {
+  const generator = new LevelGenerator();
+
+  // Seven sections give the arithmetic enough room to drift: startZ is
+  // i * length while the previous endZ used to be (i-1) * length + length,
+  // and those can land one ULP apart. The validator then read a 0.2 picometre
+  // difference as an overlap and threw the whole stage away -- 21% of all
+  // candidates, and a third of the generator's running time.
+  for (let seed = 1; seed < 120; seed++) {
+    const entry = { squad: 40 + (seed * 11) % 200, weapon: WeaponStats.fromLevels({ damage: seed % 3 }) };
+    const { level } = generator.generate((seed % 12) + 1, entry, seed * 613 + 7);
+
+    for (let i = 1; i < level.sections.length; i++) {
+      const previous = level.sections[i - 1];
+      const current = level.sections[i];
+      assert.equal(current.startZ, previous.endZ,
+        `section ${i} starts at ${current.startZ} but section ${i - 1} ends at ${previous.endZ}`);
+    }
+    assert.equal(validateLevel(level).ok, true);
+  }
+
+  assert.equal(generator.stats.rejectionReasons['sections-overlap'], undefined,
+    'no candidate should ever be rejected for sections overlapping');
+});

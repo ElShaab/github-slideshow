@@ -284,7 +284,10 @@ export class LevelGenerator {
       level.sections.push({
         index: i,
         startZ,
-        endZ: startZ + sectionLength,
+        // Derived the same way as the next section's startZ ((i+1) * length)
+        // so the two are bit-identical; startZ + length can land one ULP
+        // apart and read as an overlap.
+        endZ: (i + 1) * sectionLength,
         isMajor,
         gateRow: { z: gateZ, gates },
         waves,
@@ -610,7 +613,10 @@ export class LevelGenerator {
       return {
         index: i,
         startZ,
-        endZ: startZ + sectionLength,
+        // Derived the same way as the next section's startZ ((i+1) * length)
+        // so the two are bit-identical; startZ + length can land one ULP
+        // apart and read as an overlap.
+        endZ: (i + 1) * sectionLength,
         isMajor: i === 3,
         gateRow: {
           z: startZ + sectionLength * 0.28,

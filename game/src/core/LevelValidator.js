@@ -96,7 +96,10 @@ export function validateLevel (level, config = CONFIG) {
     const laneSwitchTime = config.lanes.width / config.lanes.switchSpeed;
     if (reposition < laneSwitchTime * 2.5) return fail('gate-to-wave-too-tight');
 
-    if (section.startZ < previousEnd) return fail('sections-overlap');
+    // Tolerance is a micrometre: section bounds are floating-point metres, and
+    // a boundary that lands a fraction of an ULP short is adjacent, not
+    // overlapping. Without it the validator discards perfectly good stages.
+    if (section.startZ < previousEnd - 1e-6) return fail('sections-overlap');
     previousEnd = section.endZ;
   }
 
