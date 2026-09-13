@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   EQUIPMENT,
@@ -9,6 +9,7 @@ import {
   LEVEL_LABELS,
   SESSION_DURATIONS,
   SUBSCRIPTION_PRICE_USD,
+  planForProduct,
   TRAINING_DAY_OPTIONS,
   type EquipmentId,
   type GoalType,
@@ -22,14 +23,17 @@ import {
   ChoicePill,
   ErrorState,
   GlassCard,
+  LegalLinks,
   LoadingScreen,
   NumberField,
   PrimaryButton,
   Screen,
   SecondaryButton,
   Text,
+  openExternal,
 } from '../../components';
 import { ApiError } from '../../api/client';
+import { legal } from '../../config/legal';
 import { settingsApi, subscriptionApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
@@ -453,7 +457,22 @@ export function SettingsSubscriptionScreen({
   const entitlement = useAsync(() => subscriptionApi.entitlement(), []);
   const [busy, setBusy] = useState(false);
 
-  const cancel = useCallback(() => {
+  /**
+   * Cancellation belongs to whoever takes the money.
+   *
+   * Apple and Google own the billing relationship for a store purchase, and
+   * nothing this app or its server writes stops the next charge. So the button
+   * opens the store's own subscription settings rather than pretending to
+   * cancel — the server refuses a store cancel for the same reason.
+   */
+  const manageInStore = useCallback(() => {
+    const url =
+      Platform.OS === 'ios' ? legal.manageSubscriptionUrl.ios : legal.manageSubscriptionUrl.android;
+    void openExternal(url, 'your subscription settings');
+  }, []);
+
+  /** Only reachable for the development mock store, which has no such page. */
+  const cancelDevelopmentMembership = useCallback(() => {
     Alert.alert(
       'Cancel membership?',
       'You keep full access until the end of the period you have already paid for.',
@@ -468,7 +487,12 @@ export function SettingsSubscriptionScreen({
               .cancel()
               .then(() => refresh())
               .then(() => entitlement.reload())
-              .catch(() => Alert.alert('Something went wrong.', 'Please try again.'))
+              .catch((error: unknown) =>
+                Alert.alert(
+                  'Something went wrong.',
+                  error instanceof ApiError ? error.message : 'Please try again.',
+                ),
+              )
               .finally(() => setBusy(false));
           },
         },
@@ -482,6 +506,9 @@ export function SettingsSubscriptionScreen({
   }
 
   const data = entitlement.data;
+  // Show the plan the user actually bought, not whichever one is listed first.
+  const plan = planForProduct(data.productId);
+  const storeManaged = data.platform === 'apple' || data.platform === 'google';
 
   return (
     <Screen footer={<SecondaryButton label="Back" onPress={navigation.goBack} />}>
@@ -494,10 +521,10 @@ export function SettingsSubscriptionScreen({
           GetFit Membership
         </Text>
         <Text variant="display" style={{ marginTop: spacing.sm }}>
-          ${SUBSCRIPTION_PRICE_USD}
+          ${plan?.priceUsd ?? SUBSCRIPTION_PRICE_USD}
           <Text variant="subheading" color="muted">
             {' '}
-            / month
+            / {plan?.period ?? 'month'}
           </Text>
         </Text>
 
@@ -520,13 +547,31 @@ export function SettingsSubscriptionScreen({
       </Text>
 
       {data.active && data.status !== 'cancelled' ? (
-        <SecondaryButton
-          label={busy ? 'Cancelling…' : 'Cancel membership'}
-          onPress={cancel}
-          disabled={busy}
-          style={{ marginTop: spacing.xxl }}
-        />
+        storeManaged ? (
+          <View style={{ marginTop: spacing.xxl }}>
+            <SecondaryButton
+              label={`Manage or cancel in ${storeLabel(data.platform ?? '')}`}
+              onPress={manageInStore}
+            />
+            <Text variant="caption" color="muted" style={{ marginTop: spacing.md }}>
+              {storeLabel(data.platform ?? '')} handles the billing, so cancelling happens
+              there. Your access continues until{' '}
+              {data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : 'the end of the period you paid for'}.
+            </Text>
+          </View>
+        ) : (
+          <SecondaryButton
+            label={busy ? 'Cancelling…' : 'Cancel membership'}
+            onPress={cancelDevelopmentMembership}
+            disabled={busy}
+            style={{ marginTop: spacing.xxl }}
+          />
+        )
       ) : null}
+
+      <View style={{ marginTop: spacing.xxl }}>
+        <LegalLinks includeSupport />
+      </View>
     </Screen>
   );
 }
@@ -563,13 +608,24 @@ export function SettingsPrivacyScreen({
         Your data
       </Text>
 
-      <GlassCard style={{ marginTop: spacing.xl }}>
-        <Text variant="subheading">Photos are private</Text>
+      <GlassCard accented style={{ marginTop: spacing.xl }}>
+        <Text variant="subheading">Nothing is sent to an AI service</Text>
         <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
-          Your body photos are stored in private, authenticated storage. Only your
-          account can retrieve them — there are no public links, no sharing, and no
-          community feed. Progress and History show your hologram and your numbers,
-          never the photos themselves.
+          Your body composition is calculated on our own server from the measurements
+          you enter, using published formulas. No third party receives your
+          measurements, your photos or your training data, and none of it is used to
+          train any model.
+        </Text>
+      </GlassCard>
+
+      <GlassCard style={{ marginTop: spacing.lg }}>
+        <Text variant="subheading">Progress photos are optional and private</Text>
+        <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
+          A photo is never required, and it is never analysed — it is kept only so you
+          have a before-and-after to look back on. Photos are stored in private,
+          authenticated storage that only your account can read. There are no public
+          links, no sharing and no community feed, and Progress and History show your
+          figure and your numbers rather than the photograph.
         </Text>
       </GlassCard>
 
@@ -580,7 +636,7 @@ export function SettingsPrivacyScreen({
             'Your profile, goals, equipment and exercise preferences',
             'Your program, scheduled and completed workouts',
             'Every set you log, and your personal records',
-            'Your body assessments and their hologram data',
+            'Your tape measurements and your body assessments',
             'Your subscription state',
           ].map((item) => (
             <Text key={item} variant="body" color="secondary">
@@ -597,7 +653,16 @@ export function SettingsPrivacyScreen({
           photos. It is permanent and cannot be undone. You can do it from the
           Privacy section of Settings.
         </Text>
+        <Text variant="body" color="secondary" style={{ marginTop: spacing.md }}>
+          Deleting your GetFit account does not cancel your subscription — the App
+          Store or Google Play owns that. Cancel it there first, or you will keep
+          being billed.
+        </Text>
       </GlassCard>
+
+      <View style={{ marginTop: spacing.xxl, alignItems: 'center' }}>
+        <LegalLinks includeSupport align="center" />
+      </View>
     </Screen>
   );
 }

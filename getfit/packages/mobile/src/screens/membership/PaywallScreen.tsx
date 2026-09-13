@@ -1,9 +1,14 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, View } from 'react-native';
-import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
+import {
+  SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_PRICE_USD,
+  SUBSCRIPTION_PRODUCT_ID,
+} from '@getfit/shared';
 import {
   ErrorState,
   GlassButton,
+  LegalLinks,
   LoadingScreen,
   PlanOptionCard,
   PrimaryButton,
@@ -203,14 +208,33 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         ))}
       </View>
 
+      {/*
+        Guideline 3.1.2 requires the purchase screen to state the subscription's
+        title, length and price, disclose that it renews automatically and how
+        to turn that off, and carry working links to the privacy policy and
+        terms of use. All of it lives here rather than in store metadata,
+        because the requirement is that it is in the binary.
+      */}
       <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
-        <Text variant="caption" color="muted">
-          No free trial. Cancel any time from Settings or your store account.
+        <Text variant="subheading">
+          GetFit Membership — {selected?.period === 'year' ? '1 year' : '1 month'} for $
+          {selected?.priceUsd ?? SUBSCRIPTION_PRICE_USD}
         </Text>
         <Text variant="caption" color="muted">
-          Billed {selected?.period === 'year' ? 'yearly' : 'monthly'} through {storeName()}. Your
-          membership is verified on our servers, so it works on every device you sign in to.
+          No free trial. Payment is charged to your {storeAccountName()} at confirmation of
+          purchase. The subscription renews automatically for the same price and period unless
+          auto-renewal is turned off at least 24 hours before the current period ends, and your
+          account is charged for the renewal within 24 hours of that point.
         </Text>
+        <Text variant="caption" color="muted">
+          You can manage the subscription and turn off auto-renewal in your {storeName()} account
+          settings — Settings → Membership takes you straight there. Cancelling stops the next
+          renewal; the period you have already paid for is unaffected.
+        </Text>
+        <Text variant="caption" color="muted">
+          Your membership is verified on our servers, so it works on every device you sign in to.
+        </Text>
+        <LegalLinks />
         {plan.data.mockBillingAvailable ? (
           <Text variant="caption" color="warning">
             Development build: purchases run through the mock store.
@@ -222,7 +246,11 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
 }
 
 function storeName(): string {
-  return Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
+  return Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+}
+
+function storeAccountName(): string {
+  return Platform.OS === 'ios' ? 'Apple Account' : 'Google Play account';
 }
 
 

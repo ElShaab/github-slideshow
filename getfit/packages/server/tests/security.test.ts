@@ -536,3 +536,46 @@ describe('measurement input', () => {
     }
   });
 });
+
+/**
+ * Guideline 5.1.1(v): an app that lets you create an account must let you
+ * delete it, from inside the app, without obstruction. Putting deletion behind
+ * the paywall is a guaranteed rejection and, worse, traps a user who has
+ * already stopped paying with data they cannot remove.
+ */
+describe('account deletion is always reachable', () => {
+  test('an unsubscribed user can open settings and delete everything', async (t) => {
+    if (!databaseAvailable) return t.skip('No database available');
+
+    const guest = await api<{ accessToken: string; userId: string }>('POST', '/api/auth/guest');
+    const token = guest.body.accessToken;
+    await api('POST', '/api/onboarding', {
+      token,
+      body: {
+        age: 30, sex: 'male', heightCm: 180, weightKg: 82,
+        trainingLevel: 'intermediate', trainingLocation: 'gym',
+        trainingDays: 4, sessionDurationMinutes: 60,
+        goals: ['muscle_gain'], equipment: [],
+      },
+    });
+
+    // No purchase has been made, so every paid route is closed.
+    const gated = await api<{ error: { code: string } }>('GET', '/api/program/active', { token });
+    assert.equal(gated.status, 402, 'the account under test is not actually unsubscribed');
+
+    // Settings still has to open, or there is no screen to delete from.
+    const settings = await api('GET', '/api/settings', { token });
+    assert.equal(settings.status, 200, 'settings was gated behind a subscription');
+
+    const deleted = await api('DELETE', '/api/auth/account', { token });
+    assert.ok(deleted.status === 200 || deleted.status === 204, `deletion returned ${deleted.status}`);
+
+    // And it really is gone — the token no longer identifies anyone.
+    const after = await api('GET', '/api/settings', { token });
+    assert.equal(after.status, 401, 'the account survived its own deletion');
+
+    const { pool } = await import('../src/db/pool');
+    const rows = await pool.query('SELECT 1 FROM users WHERE id = $1', [guest.body.userId]);
+    assert.equal(rows.rowCount, 0, 'the user row was left behind');
+  });
+});

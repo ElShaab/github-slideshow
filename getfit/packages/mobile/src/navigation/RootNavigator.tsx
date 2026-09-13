@@ -32,6 +32,7 @@ import {
   SettingsSubscriptionScreen,
   SettingsTrainingScreen,
 } from '../screens/settings/SettingsDetailScreens';
+import { DisclaimerScreen } from '../screens/settings/DisclaimerScreen';
 import { ExerciseDetailScreen } from '../screens/workout/ExerciseDetailScreen';
 import { GuidedWorkoutScreen } from '../screens/workout/GuidedWorkoutScreen';
 import { WorkoutCompleteScreen } from '../screens/workout/WorkoutCompleteScreen';
@@ -159,6 +160,7 @@ export function RootNavigator(): React.ReactElement {
             <RootStack.Screen name="SettingsEquipment" component={SettingsEquipmentScreen} />
             <RootStack.Screen name="SettingsSubscription" component={SettingsSubscriptionScreen} />
             <RootStack.Screen name="SettingsPrivacy" component={SettingsPrivacyScreen} />
+            <RootStack.Screen name="SettingsDisclaimer" component={DisclaimerScreen} />
             <RootStack.Screen name="ExercisePreferences" component={PreferencesFromSettings} />
           </RootStack.Group>
         )}

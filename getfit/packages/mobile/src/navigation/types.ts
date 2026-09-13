@@ -41,4 +41,5 @@ export type RootStackParamList = {
   SettingsEquipment: undefined;
   SettingsSubscription: undefined;
   SettingsPrivacy: undefined;
+  SettingsDisclaimer: undefined;
 };

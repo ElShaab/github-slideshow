@@ -11,7 +11,14 @@ export const settingsRoutes = Router();
 
 settingsRoutes.use(requireAuth);
 
-/** Everything the Settings screen renders, in one round trip. */
+/**
+ * Everything the Settings screen renders, in one round trip.
+ *
+ * Deliberately not subscription-gated. Settings is where account deletion
+ * lives, and Guideline 5.1.1(v) requires that to stay reachable — gating this
+ * would leave a lapsed user with no screen to delete themselves from. The
+ * routes below that *change* programming are gated; reading is not.
+ */
 settingsRoutes.get(
   '/',
   asyncHandler<AuthenticatedRequest>(async (req, res) => {

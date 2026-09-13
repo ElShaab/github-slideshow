@@ -1,7 +1,39 @@
 # Shipping GetFit
 
 Everything between a working checkout and an app in review. Steps marked
-**[you]** need credentials or a device and cannot be automated from CI.
+**[you]** need credentials, a hosted URL or a device, and cannot be done from
+CI or by anyone but the account holder.
+
+## Before you build
+
+Run this first. It checks what App Review checks, and names exactly what is
+missing:
+
+```bash
+cd packages/mobile
+npm run preflight -- --profile production
+```
+
+A fresh checkout fails it with six items, and every one of them is something
+only you can supply — a deployed API host, two hosted URLs, and three App Store
+Connect identifiers:
+
+| What | Where it goes | Section |
+| --- | --- | --- |
+| Your deployed API URL | `eas.json` → `build.production.env.EXPO_PUBLIC_API_URL` | 1 |
+| Your hosted privacy policy | `app.json` → `extra.legal.privacyPolicyUrl` | 3 |
+| Your support page | `app.json` → `extra.legal.supportUrl` | 3 |
+| Apple ID, `ascAppId`, team ID | `eas.json` → `submit.production.ios` | 5 |
+
+Your own terms are optional: leave `extra.legal.termsOfUseUrl` unset and the app
+links to Apple's standard EULA, which is always live. `TERMS.md` is there if you
+would rather host your own.
+
+**None of this is optional, and none of it fails loudly on its own.** A build
+with an unset API URL launches and reaches nothing, which reads to a reviewer as
+a broken app rather than an unset variable — so a release build that fails these
+checks refuses to start and says which field is missing, instead of looking
+broken.
 
 ---
 
@@ -84,11 +116,23 @@ the purchase cannot start.
 
 ---
 
-## 3. Publish the privacy policy
+## 3. Publish the privacy policy and support page
 
 **[you]** Fill in every placeholder in `PRIVACY.md`, host it at a public HTTPS
-URL, and enter that URL in both stores. It is mandatory, and this app processes
-body photos and health metrics, so expect it to be read.
+URL, and enter that URL in **three** places: App Store Connect, Play Console,
+and `app.json` under `extra.legal.privacyPolicyUrl`.
+
+That third one is not optional. Guideline 3.1.2 requires an auto-renewable
+subscription app to carry a **working link to the privacy policy inside the
+binary**, on the purchase screen. The paywall and Settings render it from that
+field; a blank field means a release build refuses to start.
+
+**[you]** You also need a support page at a public HTTPS URL — App Store Connect
+requires one. Put it in `app.json` under `extra.legal.supportUrl`. An email
+address on a plain page is enough.
+
+If you host your own terms rather than using Apple's standard EULA, fill in
+`TERMS.md` the same way and set `extra.legal.termsOfUseUrl`.
 
 ### App privacy answers (App Store Connect)
 
@@ -127,6 +171,12 @@ eas build --platform ios --profile preview     # [you] internal distribution
 - [ ] **Restore purchase** works on a second device with the same Apple ID
 - [ ] The transaction is **finished** — it must not reappear on relaunch
 - [ ] An expired membership blocks the app and shows the renewal screen
+- [ ] **Manage or cancel in App Store** opens Apple's subscription settings —
+      the app never cancels a store subscription itself
+- [ ] Settings → Membership shows the plan you actually bought, not always $5/month
+- [ ] The paywall shows the price, the period, the auto-renewal wording and
+      working **Privacy Policy** and **Terms of Use** links
+- [ ] Settings → Health disclaimer opens and reads correctly
 - [ ] An assessment completes with **measurements only and no photo**
 - [ ] An assessment with no tape reading is labelled **Estimated**, not Measured
 - [ ] Symmetry reads **Not measured** when no limb pair was entered
@@ -139,6 +189,7 @@ eas build --platform ios --profile preview     # [you] internal distribution
 
 ```bash
 cd packages/mobile
+npm run preflight -- --profile production   # must pass before you spend build minutes
 eas build --platform ios --profile production
 eas submit --platform ios --profile production   # [you] Apple credentials + 2FA
 ```
@@ -147,11 +198,16 @@ eas submit --platform ios --profile production   # [you] Apple credentials + 2FA
 
 - Apple Developer Program membership ($99/year)
 - App record, bundle ID `com.getfit.app`, and the `ascAppId` in `eas.json`
-- **Screenshots** — 6.7" and 6.5" iPhone, captured on a real device or simulator
+- **Screenshots** — 6.7" and 6.5" iPhone, captured on a real device or
+  simulator. Good six: the hologram result, the measurements screen, Home, a
+  guided workout, Progress, and the paywall
 - Description, keywords, support URL, marketing URL
-- Age rating questionnaire
-- A **sandbox account for the reviewer**, and review notes explaining that body
-  analysis requires a photo and the program unlocks after purchase
+- **Age rating: 12+.** Answer "Infrequent/Mild" to *Medical/Treatment
+  Information* — the app reports body-composition estimates — and "None" to
+  every other category
+- **Export compliance:** already answered. `ITSAppUsesNonExemptEncryption` is
+  `false` in `app.json`, because the app uses only HTTPS, which is exempt
+- A **sandbox account for the reviewer**, and the review notes below
 
 ### Reviewer notes (paste into App Review Information)
 
@@ -176,7 +232,31 @@ eas submit --platform ios --profile production   # [you] Apple credentials + 2FA
 > available in Settings → Privacy & data and removes all photos and data
 > immediately.
 >
+> Subscriptions are managed entirely by the App Store. Settings → Membership
+> opens Apple's subscription settings rather than cancelling in-app, because
+> Apple owns the billing relationship. The paywall carries the price, the
+> period, the auto-renewal terms and links to our privacy policy and terms.
+>
 > There is no free trial. Pricing is $4.99/month or $19.99/year.
+
+---
+
+## What is already handled
+
+Not a to-do list — these are done, and listed so you do not redo them:
+
+- **Privacy manifest** (`app.json` → `ios.privacyManifests`), declaring the
+  collected data types and the required-reason APIs. Apple rejects uploads
+  without one
+- **Guideline 3.1.2 disclosures** on the paywall: title, length, price,
+  auto-renewal wording, and in-binary privacy and terms links
+- **Subscription management** routed to the store, never cancelled in-app
+- **Account deletion** in Settings → Privacy & data, with a two-step
+  confirmation — Guideline 5.1.1(v)
+- **Restore purchase** on the paywall, verified server-side
+- **Health disclaimer** in Settings → About
+- **Specific permission strings** for camera and photo library
+- **Export compliance** answered in `app.json`
 
 ---
 
@@ -193,3 +273,5 @@ Honest list of what has **not** been verified, so nothing is assumed:
   and response handling has only been exercised against a stub.
 - The app has not been run on a physical device or simulator — it is verified
   by an automated test suite, type checking and a clean production bundle.
+- **No screenshots exist.** They have to be captured from a running build and
+  are a required field in App Store Connect.

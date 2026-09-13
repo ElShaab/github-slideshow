@@ -31,18 +31,32 @@ export class ApiError extends Error {
 const TOKEN_KEY = 'getfit.accessToken';
 const CACHE_PREFIX = 'getfit.cache.';
 
+/**
+ * Where the API lives.
+ *
+ * A release build must be given an https URL. The development fallbacks below
+ * are cleartext http, which App Transport Security blocks outright — shipping
+ * one would put a reviewer in front of an app that cannot reach its server,
+ * which is a Guideline 2.1 rejection. So release builds get no fallback at all;
+ * `releaseReadiness()` turns the omission into a visible, explained failure
+ * instead of a silent one.
+ */
 function resolveBaseUrl(): string {
-  const fromEnv = process.env.EXPO_PUBLIC_API_URL;
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  const configured =
+    process.env.EXPO_PUBLIC_API_URL ??
+    (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
 
-  const fromConfig = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
-  if (fromConfig) return fromConfig.replace(/\/$/, '');
+  if (configured) return configured.replace(/\/$/, '');
+  if (!__DEV__) return '';
 
   // The Android emulator reaches the host machine on 10.0.2.2.
   return Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 }
 
 export const API_BASE_URL = resolveBaseUrl();
+
+/** True when the API is reachable over TLS, as a shipped build requires. */
+export const apiBaseUrlIsSecure = /^https:\/\/[^\s/]+\.[^\s/]+/.test(API_BASE_URL);
 
 /**
  * The access token lives in the device keychain/keystore, never in plain

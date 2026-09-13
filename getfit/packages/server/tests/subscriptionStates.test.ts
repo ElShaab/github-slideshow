@@ -179,3 +179,78 @@ describe('subscription entitlement', () => {
   });
 
 });
+
+/**
+ * Cancellation belongs to whoever takes the money.
+ *
+ * Apple and Google own the billing relationship for a store purchase. Marking
+ * our own row `cancelled` does not stop the next charge, so a user told they
+ * had cancelled would be billed again — the single worst thing a subscription
+ * app can get wrong, and a rejection besides.
+ */
+describe('cancellation is the store\'s to perform', () => {
+  async function subscriberOn(platform: 'apple' | 'google' | 'mock'): Promise<string> {
+    const { userRepository } = await import('../src/repositories/userRepository');
+    const { subscriptionRepository } = await import('../src/repositories/subscriptionRepository');
+    const { SUBSCRIPTION_PRODUCT_ID } = await import('@getfit/shared');
+
+    const user = await userRepository.createGuest();
+    await subscriptionRepository.upsert({
+      userId: user.id,
+      status: 'active',
+      platform,
+      productId: SUBSCRIPTION_PRODUCT_ID,
+      priceUsd: 4.99,
+      originalTransactionId: null,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+      cancelAtPeriodEnd: false,
+    });
+    return user.id;
+  }
+
+  for (const platform of ['apple', 'google'] as const) {
+    test(`a ${platform} membership cannot be cancelled from our server`, async (t) => {
+      if (!available) return t.skip('No database available');
+      const { subscriptionService } = await import('../src/services/subscriptionService');
+      const { subscriptionRepository } = await import('../src/repositories/subscriptionRepository');
+      const { userRepository } = await import('../src/repositories/userRepository');
+
+      const id = await subscriberOn(platform);
+      try {
+        await assert.rejects(
+          () => subscriptionService.cancel(id),
+          (error: Error & { code?: string }) => {
+            // The message has to send the user somewhere that actually works.
+            assert.match(error.message, platform === 'apple' ? /Apple Account/ : /Play Store/);
+            return true;
+          },
+        );
+
+        // And nothing moved: a half-applied cancel is exactly the state that
+        // tells the user they are done paying while the store keeps charging.
+        const stored = await subscriptionRepository.get(id);
+        assert.equal(stored?.status, 'active');
+        assert.equal((await subscriptionService.getEntitlement(id)).active, true);
+      } finally {
+        await userRepository.deleteAccount(id).catch(() => undefined);
+      }
+    });
+  }
+
+  test('a development mock membership still cancels, since no store owns it', async (t) => {
+    if (!available) return t.skip('No database available');
+    const { subscriptionService } = await import('../src/services/subscriptionService');
+    const { userRepository } = await import('../src/repositories/userRepository');
+
+    const id = await subscriberOn('mock');
+    try {
+      const entitlement = await subscriptionService.cancel(id);
+      assert.equal(entitlement.status, 'cancelled');
+      // Cancelling never takes away time already paid for.
+      assert.equal(entitlement.active, true);
+    } finally {
+      await userRepository.deleteAccount(id).catch(() => undefined);
+    }
+  });
+});

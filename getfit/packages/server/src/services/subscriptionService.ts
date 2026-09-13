@@ -285,9 +285,26 @@ export class SubscriptionService {
    * Records a user-initiated cancellation. Access continues until the paid
    * period ends, which is how both stores behave.
    */
+  /**
+   * Cancels a membership that GetFit itself owns.
+   *
+   * Apple and Google own the billing relationship for a store purchase, and
+   * nothing this server writes can stop them charging the card. Flipping our
+   * own row to `cancelled` for a store subscription would tell the user they
+   * had cancelled while the renewal still went through — so it is refused, and
+   * the app sends them to the store's own subscription settings instead.
+   */
   async cancel(userId: string): Promise<Entitlement> {
     const existing = await subscriptionRepository.get(userId);
     if (!existing) throw errors.notFound('No membership found.');
+
+    if (existing.platform === 'apple' || existing.platform === 'google') {
+      throw errors.invalidInput(
+        existing.platform === 'apple'
+          ? 'Apple manages this subscription. Cancel it in your Apple Account settings — Settings → Membership takes you there.'
+          : 'Google Play manages this subscription. Cancel it in your Play Store subscriptions — Settings → Membership takes you there.',
+      );
+    }
 
     await subscriptionRepository.setStatus(userId, 'cancelled');
     await subscriptionRepository.recordEvent({

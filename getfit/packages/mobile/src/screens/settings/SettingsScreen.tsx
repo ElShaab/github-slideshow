@@ -7,9 +7,11 @@ import {
   LEVEL_LABELS,
   SUBSCRIPTION_PRICE_USD,
   formatWeight,
+  planForProduct,
 } from '@getfit/shared';
 import {
   ErrorState,
+  LegalLinks,
   LoadingScreen,
   Screen,
   SettingsGroup,
@@ -21,6 +23,7 @@ import { authApi, settingsApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
+import { appVersion } from '../../config/appInfo';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
@@ -82,6 +85,7 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
   if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
 
   const { profile, goals, equipment, preferences, entitlement } = settings.data;
+  const plan = planForProduct(entitlement.productId);
 
   const membershipLabel = {
     active: 'Active',
@@ -177,7 +181,13 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
       </SettingsGroup>
 
       <SettingsGroup title="Subscription">
-        <SettingsRow label="Membership" value={`$${SUBSCRIPTION_PRICE_USD}/month`} />
+        {/* The plan the user bought, not whichever one happens to be first. */}
+        <SettingsRow
+          label="Membership"
+          value={
+            plan ? `$${plan.priceUsd}/${plan.period}` : `$${SUBSCRIPTION_PRICE_USD}/month`
+          }
+        />
         <SettingsRow
           label="Status"
           value={membershipLabel}
@@ -231,9 +241,22 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
         />
       </SettingsGroup>
 
-      <View style={{ height: spacing.huge }} />
+      <SettingsGroup title="About">
+        <SettingsRow
+          label="Health disclaimer"
+          description="GetFit gives estimates, not medical advice."
+          onPress={() => navigation.navigate('SettingsDisclaimer')}
+          last
+        />
+      </SettingsGroup>
+
+      <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
+        <LegalLinks includeSupport align="center" />
+      </View>
+
+      <View style={{ height: spacing.xxl }} />
       <Text variant="caption" color="muted" align="center">
-        GetFit 1.0.0
+        GetFit {appVersion()}
       </Text>
     </Screen>
   );
