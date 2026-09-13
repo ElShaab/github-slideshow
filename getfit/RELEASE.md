@@ -21,9 +21,9 @@ Connect identifiers:
 | What | Where it goes | Section |
 | --- | --- | --- |
 | Your deployed API URL | `eas.json` → `build.production.env.EXPO_PUBLIC_API_URL` | 1 |
-| Your hosted privacy policy | `app.json` → `extra.legal.privacyPolicyUrl` | 3 |
-| Your support page | `app.json` → `extra.legal.supportUrl` | 3 |
-| Apple ID, `ascAppId`, team ID | `eas.json` → `submit.production.ios` | 5 |
+| Your hosted privacy policy | `app.json` → `extra.legal.privacyPolicyUrl` | 4 |
+| Your support page | `app.json` → `extra.legal.supportUrl` | 4 |
+| Apple ID, `ascAppId`, team ID | `eas.json` → `submit.production.ios` | 2 and 6 |
 
 Your own terms are optional: leave `extra.legal.termsOfUseUrl` unset and the app
 links to Apple's standard EULA, which is always live. `TERMS.md` is there if you
@@ -92,7 +92,34 @@ Then point the app at it, in `packages/mobile/eas.json`:
 
 ---
 
-## 2. Create the store products
+## 2. Turn on payments with Apple
+
+**[you] Do this before anything else — it has a waiting period, and nothing
+about in-app purchase works until it is finished.**
+
+1. **Apple Developer Program** — $99/year. Enrolment is reviewed, so budget a
+   day or two.
+2. **App Store Connect → Business → Agreements.** Sign the **Paid Applications
+   Agreement**, then complete the **banking** and **tax** forms attached to it.
+
+> **This is the step that wastes people's weeks.** Until the Paid Applications
+> agreement shows **Active**, `getSubscriptions()` returns an **empty array** and
+> every purchase fails — with no error that points at the cause. The app looks
+> broken, the code is fine. If products do not appear on a device, check this
+> before you debug anything else.
+
+3. **Create the app record** with bundle ID `com.getfit.app`, and copy its
+   Apple ID into `eas.json` as `ascAppId`.
+4. **Sandbox tester:** Users and Access → Sandbox → Testers. Use an email you
+   control that has **never** been an Apple ID. This account is for testing
+   only; never sign into the real App Store with it.
+
+Google Play is the same shape: a $25 one-off registration, then Payments
+profile under Setup → Payments, then the app record.
+
+---
+
+## 3. Create the store products
 
 Product IDs must match `SUBSCRIPTION_PLANS` in
 `packages/shared/src/constants.ts` **exactly**, or purchases fail with
@@ -116,7 +143,7 @@ the purchase cannot start.
 
 ---
 
-## 3. Publish the privacy policy and support page
+## 4. Publish the privacy policy and support page
 
 **[you]** Fill in every placeholder in `PRIVACY.md`, host it at a public HTTPS
 URL, and enter that URL in **three** places: App Store Connect, Play Console,
@@ -150,16 +177,24 @@ Answer these to match what the app does:
 
 ---
 
-## 4. Build and test the purchase flow
+## 5. Build and test the purchase flow
 
 **This is the step that cannot be skipped.** In-app purchases have never run on
 a real device in this project. The store adapter is written against
 `react-native-iap` and compiles, but no sandbox purchase has been made.
 
+**In-app purchases cannot be tested in Expo Go.** `react-native-iap` is a
+native module, so Expo Go falls back to the mock store. You need a real build:
+
 ```bash
 cd packages/mobile
 eas build --platform ios --profile preview     # [you] internal distribution
 ```
+
+On the device, **sign out of the App Store first** (Settings → your name →
+Media & Purchases → Sign Out). The sandbox prompt appears at purchase time.
+Sandbox subscriptions renew on a compressed clock — a month is 5 minutes, a
+year is an hour — so renewal and expiry are testable in one sitting.
 
 **[you]** With a sandbox tester account signed in, verify each of:
 
@@ -185,7 +220,7 @@ eas build --platform ios --profile preview     # [you] internal distribution
 
 ---
 
-## 5. Submit
+## 6. Submit
 
 ```bash
 cd packages/mobile

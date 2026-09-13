@@ -28,6 +28,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Matches PORT in the server's .env. */
+const DEV_API_PORT = 4000;
+
 const TOKEN_KEY = 'getfit.accessToken';
 const CACHE_PREFIX = 'getfit.cache.';
 
@@ -49,8 +52,19 @@ function resolveBaseUrl(): string {
   if (configured) return configured.replace(/\/$/, '');
   if (!__DEV__) return '';
 
+  // On a physical phone, `localhost` is the phone — not the laptop running the
+  // API. Expo tells us the machine serving the bundle, so reuse that host and
+  // swap the port: the app finds the dev server on the same Wi-Fi with nothing
+  // to configure.
+  const bundlerHost = Constants.expoConfig?.hostUri?.split(':')[0];
+  if (bundlerHost && !bundlerHost.startsWith('127.') && bundlerHost !== 'localhost') {
+    return `http://${bundlerHost}:${DEV_API_PORT}`;
+  }
+
   // The Android emulator reaches the host machine on 10.0.2.2.
-  return Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
+  return Platform.OS === 'android'
+    ? `http://10.0.2.2:${DEV_API_PORT}`
+    : `http://localhost:${DEV_API_PORT}`;
 }
 
 export const API_BASE_URL = resolveBaseUrl();
