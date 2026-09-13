@@ -77,6 +77,15 @@ The suite covers the arithmetic, the combat rules, the economy, save/load,
 level generation and — most importantly — **parity between the live game and
 the simulator** (see below).
 
+### Publishing as a single-page build
+
+`node tools/build-artifact.mjs` emits `dist/artifact.html`: the same game with
+the stylesheet inlined, for hosts that insert the page into an existing
+document body. A `<link rel="stylesheet">` is not applied from there, and the
+failure is quiet and total — `.hidden` stops hiding, the layers stop being
+positioned, and all five screens stack up as one unstyled document. The module
+scripts are left alone; those load normally as sibling files.
+
 ### Mobile check
 
 Layout and touch need a real browser, so they live in a separate harness that
