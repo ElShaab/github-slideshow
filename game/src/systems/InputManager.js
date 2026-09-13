@@ -64,11 +64,26 @@ export class InputManager {
     if (!this._pointerActive) return;
     this._pointerActive = false;
     if (this._consumed) return;
-    // A quick flick that never crossed the threshold still counts.
+
     const dx = event.clientX - this._startX;
+    const dy = event.clientY - this._startY;
     const elapsed = performance.now() - this._startTime;
+
+    // A quick flick that never crossed the threshold still counts.
     if (elapsed < 260 && Math.abs(dx) > this.config.lanes.swipeThresholdPx * 0.55) {
       this._emit('move', Math.sign(dx));
+      return;
+    }
+
+    // A TAP moves one lane towards the side that was tapped.  This is the
+    // control that survives a host application: a swipe can be claimed by the
+    // app the page is embedded in (phones use horizontal drags for navigation
+    // and sheet dismissal), but a tap that never moves has nothing to claim.
+    const travelled = Math.hypot(dx, dy);
+    if (elapsed < 400 && travelled < this.config.lanes.tapSlopPx) {
+      const middle = this.element.clientWidth / 2;
+      const direction = event.clientX < middle ? -1 : 1;
+      this._emit('move', direction);
     }
   }
 

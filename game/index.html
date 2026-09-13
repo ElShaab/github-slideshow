@@ -51,6 +51,14 @@
 
       <div id="toast-stack" class="toast-stack"></div>
       <button id="pause-button" class="icon-button" aria-label="Pause">❚❚</button>
+
+      <!-- Touch controls. Swiping is the nicer gesture, but a page embedded in
+           another app does not always receive swipes, so these are always
+           available on a touch device. -->
+      <div class="lane-controls">
+        <button id="lane-left" class="lane-button" aria-label="Move left">◀</button>
+        <button id="lane-right" class="lane-button" aria-label="Move right">▶</button>
+      </div>
     </div>
 
     <!-- ========================== MAIN MENU ======================== -->
@@ -68,7 +76,7 @@
           <button id="skins-button" class="button">SKINS</button>
           <button id="store-button" class="button">GEMS</button>
         </div>
-        <p class="hint">Swipe left / right — or use the ← → arrow keys</p>
+        <p class="hint">Swipe, tap a side of the screen, or use the ← → arrow keys</p>
       </div>
     </div>
 

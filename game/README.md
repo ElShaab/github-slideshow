@@ -27,8 +27,11 @@ otherwise resizes the viewport mid-run.
 
 ## What it does
 
-* **Three lanes, one squad.** Swipe (or press ←/→) and the *whole* squad slides
-  across; you never control an individual soldier.
+* **Three lanes, one squad.** Swipe, tap the side of the screen you want, use
+  the on-screen buttons, or press ←/→ — the *whole* squad slides across and you
+  never control an individual soldier. There are three input paths on purpose:
+  a page embedded in another app does not always receive swipes, because phones
+  spend horizontal drags on their own navigation.
 * **Real gate maths.** `+25`, `−5`, `×3`, `÷2` do exactly what they say.
   Division floors (25 ÷ 2 = 12), subtraction never goes below zero, and the
   squad is always a whole number.

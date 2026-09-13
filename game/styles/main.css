@@ -190,6 +190,42 @@ html, body {
 
 /* --------------------------------------------------------------- toasts */
 
+/* Touch controls sit above the weapon panel and pause button, thumb-reachable
+   on a phone. Hidden for mouse and trackpad, where the keyboard and drag
+   already work and the buttons would only be clutter. */
+.lane-controls {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
+  left: 0;
+  right: 0;
+  display: none;
+  justify-content: space-between;
+  padding: 0 14px;
+  pointer-events: none;
+}
+.lane-button {
+  pointer-events: auto;
+  width: clamp(58px, 17vw, 84px);
+  height: clamp(58px, 17vw, 84px);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(13, 27, 38, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--paper);
+  font-size: clamp(20px, 6vw, 30px);
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+.lane-button:active {
+  transform: scale(0.92);
+  background: rgba(63, 191, 111, 0.55);
+}
+@media (pointer: coarse) {
+  .lane-controls { display: flex; }
+}
+
 .toast-stack {
   position: absolute;
   top: 34%;

@@ -16,7 +16,8 @@ export const CONFIG = {
     count: 3,
     width: 3.2,          // metres between lane centres
     switchSpeed: 11.0,   // lateral metres/second when changing lane
-    swipeThresholdPx: 28 // minimum horizontal travel for a swipe to register
+    swipeThresholdPx: 28, // minimum horizontal travel for a swipe to register
+    tapSlopPx: 14        // a touch that moves less than this is a tap, not a drag
   },
 
   /* ------------------------------------------------------------------ squad */

@@ -55,6 +55,14 @@ export class UIManager {
     $('continue-button').addEventListener('click', () => this.game.continueRun());
     $('endrun-button').addEventListener('click', () => this.game.endRun());
     $('pause-button').addEventListener('click', () => this.game.pause());
+    // Lane buttons fire on pointerdown so they feel immediate, and they call
+    // the same path a swipe does.
+    for (const [id, direction] of [['lane-left', -1], ['lane-right', 1]]) {
+      $(id).addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        this.game.onSwipe(direction);
+      });
+    }
     $('resume-button').addEventListener('click', () => this.game.resume());
     $('quit-button').addEventListener('click', () => this.game.endRun());
     $('audio-toggle').addEventListener('change', (event) => {
