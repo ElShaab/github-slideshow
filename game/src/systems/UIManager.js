@@ -12,6 +12,12 @@ import { WEAPON_STATS } from '../core/WeaponStats.js';
 
 const $ = (id) => document.getElementById(id);
 
+/** Error text is shown as text, never parsed as markup. */
+function escapeHtml (value) {
+  return value.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 /** 1 234 -> "1.2K" so a five-digit squad never breaks the HUD. */
 export function formatCount (value) {
   const n = Math.trunc(value);
@@ -73,6 +79,28 @@ export class UIManager {
     for (const button of document.querySelectorAll('[data-close]')) {
       button.addEventListener('click', () => this.closePanel(button.dataset.close));
     }
+  }
+
+  /**
+   * Shows a failure the player can read and report, instead of a control that
+   * silently does nothing. Anything thrown while starting a run lands here.
+   */
+  showFatal (message, detail = '') {
+    let box = document.getElementById('fatal');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'fatal';
+      box.className = 'fatal-banner';
+      document.getElementById('app').appendChild(box);
+    }
+    box.innerHTML = `<strong>Something broke</strong><span>${escapeHtml(String(message))}</span>` +
+      (detail ? `<code>${escapeHtml(String(detail).slice(0, 400))}</code>` : '');
+    box.classList.remove('hidden');
+  }
+
+  hideFatal () {
+    const box = document.getElementById('fatal');
+    if (box) box.classList.add('hidden');
   }
 
   /* ------------------------------------------------------------- screens */

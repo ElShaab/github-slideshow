@@ -429,6 +429,37 @@ html, body {
   cursor: pointer;
 }
 
+/* ------------------------------------------------------- failure banner */
+
+.fatal-banner {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid rgba(226, 87, 76, 0.6);
+  background: rgba(20, 10, 12, 0.94);
+  color: #ffd7d2;
+  font-size: 12px;
+  pointer-events: auto;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.fatal-banner strong { font-size: 13px; letter-spacing: 0.06em; }
+.fatal-banner code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  color: #ffb3ab;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ------------------------------------------------------------ loading */
 
 .loading-layer {
@@ -437,6 +468,11 @@ html, body {
   justify-content: center;
   background: #0d1b26;
   pointer-events: auto;
+  /* Above the panels. The menu is visible in the markup from the first paint,
+     so without this a boot failure hides behind a perfectly healthy-looking
+     menu whose PLAY button was never wired up -- a button that does nothing,
+     with the explanation sitting invisible underneath it. */
+  z-index: 60;
 }
 .loading-text { font-weight: 800; letter-spacing: 0.3em; opacity: 0.8; }
 

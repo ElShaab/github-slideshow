@@ -14,6 +14,7 @@ import { GemManager, continueCost, continueRestoration } from '../core/Economy.j
 import { LevelGenerator } from '../core/LevelGenerator.js';
 import { LevelSimulator } from '../core/LevelSimulator.js';
 import { GateType, gateLabel, WEAPON_STAT_ICONS, WEAPON_STAT_LABELS } from '../core/GateMath.js';
+import { WEAPON_STATS } from '../core/WeaponStats.js';
 import { combatPower, squadDps } from '../core/CombatModel.js';
 
 import { LaneController } from './LaneController.js';
@@ -56,11 +57,25 @@ export class GameManager {
     this.generator = new LevelGenerator(config);
     this.simulator = new LevelSimulator(config);
 
+    // Generation is by far the most expensive thing a stage transition does:
+    // it generates a candidate, simulates it, and rejects it until one is
+    // provably winnable, which on an unlucky seed takes a hundred rounds. Done
+    // on the PLAY tap that is a visible freeze on a phone, so we do it while
+    // the player is reading the menu or the STAGE CLEAR banner instead.
+    this._prefetched = null;      // { key, generated }
+    this._prefetchTimer = 0;
+
     /* ---- renderer ---- */
-    this.renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: window.devicePixelRatio < 2,
-      powerPreference: 'high-performance'
+    this.renderer = createRenderer(canvas);
+    // iOS drops WebGL contexts when the tab is backgrounded or memory runs
+    // short. Without this the canvas silently stops updating forever.
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.warn('WebGL context lost');
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.warn('WebGL context restored');
+      this._loopFailed = false;
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -149,15 +164,34 @@ export class GameManager {
     this.ui.showLoading(false);
     this.ui.showMenu();
     document.getElementById('audio-toggle').checked = this.profile.settings.audio !== false;
+    this.prefetchStage(1, freshEntry(this.config));
     requestAnimationFrame((time) => this._loop(time));
   }
 
   /* ----------------------------------------------------------- run flow */
 
   startRun () {
-    this.audio.unlock();
-    this.audio.setEnabled(this.profile.settings.audio !== false);
-    this.audio.startAmbience();
+    try {
+      this._startRun();
+    } catch (error) {
+      console.error('startRun failed', error);
+      this.ui.showFatal('Could not start the run.', error && (error.stack || error.message));
+    }
+  }
+
+  _startRun () {
+    // If the player tapped before the menu's prefetch ran, let it go rather
+    // than have it fire a stage-1 generation in the middle of gameplay.
+    this._cancelPrefetch();
+    // Sound is cosmetic and the most browser-dependent thing here; it must
+    // never be the reason a run fails to start.
+    try {
+      this.audio.unlock();
+      this.audio.setEnabled(this.profile.settings.audio !== false);
+      this.audio.startAmbience();
+    } catch (error) {
+      console.warn('audio unavailable, continuing without it', error);
+    }
 
     this.run.reset();
     this.squadZ = 0;
@@ -175,9 +209,54 @@ export class GameManager {
     this.ui.banner('STAGE 1', 'Good luck, commander');
   }
 
+  /**
+   * Key for a prefetched stage: a stage is only reusable if it was built for
+   * the same stage number AND the same squad + weapon the run is entering it
+   * with, because both feed the solvability proof.
+   */
+  _stageKey (stage, entry) {
+    const levels = WEAPON_STATS.map((key) => entry.weapon.levels[key]).join(',');
+    return `${stage}|${entry.squad}|${levels}`;
+  }
+
+  /** Builds a stage ahead of time, off the critical path. Never throws. */
+  prefetchStage (stage, entry) {
+    const key = this._stageKey(stage, entry);
+    if (this._prefetched && this._prefetched.key === key) return;
+    this._cancelPrefetch();
+    const frozen = { squad: entry.squad, weapon: entry.weapon.clone() };
+    this._prefetchTimer = setTimeout(() => {
+      this._prefetchTimer = 0;
+      try {
+        this._prefetched = { key, generated: this.generator.generate(stage, frozen) };
+      } catch (error) {
+        // A failed prefetch is not a failed run: loadStage falls back to
+        // generating on demand, which reports its own errors.
+        console.warn('stage prefetch failed, will generate on demand', error);
+        this._prefetched = null;
+      }
+    }, 0);
+  }
+
+  /** Drops a prefetch that has not run yet, so it cannot fire mid-gameplay. */
+  _cancelPrefetch () {
+    if (this._prefetchTimer) clearTimeout(this._prefetchTimer);
+    this._prefetchTimer = 0;
+  }
+
   /** Generates and streams in a stage, carrying the run state untouched. */
   loadStage (stage) {
-    const generated = this.generator.generate(stage, this.run.toEntry());
+    const entry = this.run.toEntry();
+    const key = this._stageKey(stage, entry);
+    let generated;
+    if (this._prefetched && this._prefetched.key === key) {
+      generated = this._prefetched.generated;
+      this._prefetched = null;
+      this.lastStageWasPrefetched = true;
+    } else {
+      generated = this.generator.generate(stage, entry);
+      this.lastStageWasPrefetched = false;
+    }
     this.level = generated.level;
     this.levelManager.load(this.level, this.squadZ);
     this.environment.setTheme(Math.floor((stage - 1) / 2));
@@ -199,6 +278,9 @@ export class GameManager {
     this.audio.play('victory');
     const next = this.run.stage + 1;
     this.ui.banner('STAGE CLEAR', `Stage ${next} — squad ${formatCount(this.run.squad)}`);
+    // The banner holds for 1.6s; build the next stage inside that window so
+    // the hand-off itself costs nothing.
+    this.prefetchStage(next, this.run.toEntry());
   }
 
   _beginNextStage () {
@@ -290,6 +372,7 @@ export class GameManager {
     this.audio.stopAmbience();
     this.state = GameState.MENU;
     this.ui.showMenu();
+    this.prefetchStage(1, freshEntry(this.config));
   }
 
   pause () {
@@ -448,8 +531,19 @@ export class GameManager {
     // Development-only: lets QA run a whole stage in a fraction of the time.
     if (this.debugTimeScale && this.debug.available) dt *= this.debugTimeScale;
 
-    if (this.state !== GameState.PAUSED) this.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    // A throw in here would repeat every frame and look exactly like a frozen
+    // game, so report the first one on screen instead of only to the console.
+    try {
+      if (this.state !== GameState.PAUSED) this.update(dt);
+      this.renderer.render(this.scene, this.camera);
+    } catch (error) {
+      if (!this._loopFailed) {
+        this._loopFailed = true;
+        console.error('frame failed', error);
+        this.ui.showFatal('The game hit an error while running.',
+          error && (error.stack || error.message));
+      }
+    }
   }
 
   /* -------------------------------------------------------- debug hooks */
@@ -522,6 +616,40 @@ function bossDisplayName (type) {
     HORDE: 'ENEMY HORDE',
     COMBO: 'WARLORD & GUARD'
   }[type] || 'BOSS';
+}
+
+/**
+ * Builds the renderer, giving the device more than one chance to say yes.
+ *
+ * A phone can refuse a high-performance context while happily granting a
+ * plain one -- iOS caps how many live WebGL contexts a browser may hold, and
+ * hands out the cheap ones longer. Asking once and giving up turns a playable
+ * device into a menu whose PLAY button does nothing.
+ */
+function createRenderer (canvas) {
+  const attempts = [
+    { antialias: (window.devicePixelRatio || 1) < 2, powerPreference: 'high-performance' },
+    { antialias: false },
+    { antialias: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false }
+  ];
+  let last = null;
+  for (const options of attempts) {
+    try {
+      return new THREE.WebGLRenderer({ canvas, ...options });
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw last || new Error('WebGL is unavailable on this device');
+}
+
+/**
+ * The squad + weapon a brand new run starts with. Built from a throwaway
+ * RunState with no Profile attached, so asking the question never counts as
+ * starting a run.
+ */
+function freshEntry (config) {
+  return new RunState(config).toEntry();
 }
 
 /** localStorage can throw in private mode; fall back to memory. */

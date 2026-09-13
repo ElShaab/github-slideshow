@@ -122,6 +122,12 @@ export const CONFIG = {
     fightLossBase: 0.11,          // stage 1: a wave costs ~11% of the squad
     fightLossAtCap: 0.21,         // ... rising to ~21% once difficulty caps
     bossLossMultiplier: 1.7,     // the boss bites harder than a wave
+    // A stage's total attrition is what the difficulty bound actually limits,
+    // so the cost of ONE fight has to fall as the number of fights rises.
+    // Without this the generator rediscovers the right value by trial and
+    // error on every stage -- a median of 10 attempts and a tail past 100,
+    // which is a multi-second freeze on a phone the moment PLAY is tapped.
+    fightBudgetReference: 10,    // fights per stage the base loss is tuned for
     partialWaveLossMultiplier: 1.35, // taking an occupied lane of a dodgeable wave
     entryRequirementTolerance: 0.02,
     minEntryRequirementRatio: 0.30 // reject stages that pose no threat at all

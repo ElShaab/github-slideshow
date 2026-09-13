@@ -115,11 +115,19 @@ export class LevelGenerator {
     const difficulty = this.difficulty.difficultyFor(stage);
     const enemySpeed = this.difficulty.enemySpeed(stage);
     const enemyHp = this.difficulty.enemyHp(stage);
-    // How much of a full-strength squad each fight is designed to cost.
-    const lossFraction = Math.min(0.6,
-      this.difficulty.fightLossFractionFor(stage) * intensity);
 
     const sectionCount = rng.int(gen.sectionsMin, gen.sectionsMax);
+
+    // How much of a full-strength squad each fight is designed to cost, scaled
+    // down by how many fights this stage will hold: the difficulty bound caps
+    // the stage's TOTAL attrition, so a stage with twice the fights has to make
+    // each one cost about half as much, or every candidate is rejected and the
+    // generator burns dozens of attempts rediscovering that.
+    const expectedFights = sectionCount *
+      ((gen.wavesPerSectionMin + gen.wavesPerSectionMax) / 2) + 1;
+    const budgetScale = Math.min(1, cfg.difficulty.fightBudgetReference / expectedFights);
+    const lossFraction = Math.min(0.6,
+      this.difficulty.fightLossFractionFor(stage) * intensity * budgetScale);
     const targetSeconds = rng.range(
       Math.max(gen.minStageSeconds + 8, gen.targetStageSeconds - 22),
       Math.min(gen.maxStageSeconds - 8, gen.targetStageSeconds + 28)
@@ -597,13 +605,14 @@ export class LevelGenerator {
     const enemySpeed = this.difficulty.enemySpeed(stage);
     const enemyHp = this.difficulty.enemyHp(stage);
     const bossRunIn = 120;
-    const sectionCount = 4;
+    // Must satisfy the validator's own minimum, or the rescue path throws.
+    const sectionCount = Math.max(cfg.generation.sectionsMin, 4);
     const totalLength = cfg.generation.targetStageSeconds * cfg.squad.forwardSpeed;
     const sectionLength = (totalLength - bossRunIn) / sectionCount;
     const squad = Math.max(1, Math.floor(entry.squad));
     const weapon = entry.weapon.clone();
 
-    const sections = [0, 1, 2, 3].map((i) => {
+    const sections = Array.from({ length: sectionCount }, (_, i) => {
       const startZ = i * sectionLength;
       const count = 14;
       const hp = this._sizeHpForLoss({
@@ -617,7 +626,7 @@ export class LevelGenerator {
         // so the two are bit-identical; startZ + length can land one ULP
         // apart and read as an overlap.
         endZ: (i + 1) * sectionLength,
-        isMajor: i === 3,
+        isMajor: i === sectionCount - 1,
         gateRow: {
           z: startZ + sectionLength * 0.28,
           gates: [
@@ -656,7 +665,7 @@ export class LevelGenerator {
       estimatedSeconds: totalLength / cfg.squad.forwardSpeed,
       entrySquad: entry.squad,
       entryWeaponLevels: entry.weapon.toJSON(),
-      goldenPath: [1, 1, 1, 1],
+      goldenPath: new Array(sectionCount).fill(1),
       requirements: []
     };
 
@@ -710,8 +719,17 @@ export class LevelGenerator {
       return { ok: false, reason: 'stage-poses-no-threat' };
     }
 
+    // Deciding whether to KEEP a candidate only needs one winning path, and
+    // stopping at the first one avoids walking 3^sections routes for every
+    // candidate on the way to the bin. Most candidates are rejected, so this
+    // is the difference between a stage appearing instantly and the main
+    // thread locking up for seconds on a phone.
+    if (!this.simulator.hasWinningPath(level, entry)) {
+      return { ok: false, reason: 'no-winning-path' };
+    }
+
+    // Only the candidate actually being shipped pays for the full count.
     const paths = this.simulator.enumeratePaths(level, entry);
-    if (paths.winningPaths < 1) return { ok: false, reason: 'no-winning-path' };
 
     return {
       ok: true,

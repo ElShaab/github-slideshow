@@ -31,7 +31,13 @@ export class AudioManager {
 
   unlock () {
     if (this.context) {
-      if (this.context.state === 'suspended') this.context.resume();
+      // resume() is a promise, and on iOS it rejects whenever the browser
+      // decides the gesture did not count. Sound is cosmetic, so swallow it:
+      // an unhandled rejection here would surface as a fatal error banner.
+      if (this.context.state === 'suspended') {
+        try { Promise.resolve(this.context.resume()).catch(() => {}); }
+        catch (error) { console.warn('AudioManager: resume refused', error); }
+      }
       return;
     }
     const Ctor = window.AudioContext || window.webkitAudioContext;
