@@ -200,7 +200,7 @@ describe('cancellation is the store\'s to perform', () => {
       status: 'active',
       platform,
       productId: SUBSCRIPTION_PRODUCT_ID,
-      priceUsd: 4.99,
+      priceUsd: 5,
       originalTransactionId: null,
       currentPeriodStart: new Date(),
       currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),

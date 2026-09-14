@@ -54,7 +54,7 @@ built on that result.
 GetFit requires a paid membership to generate a training program. Your body
 analysis is shown before any payment is requested.
 
-- **Pricing:** $4.99 per month, or $19.99 per year. Prices are shown in the app
+- **Pricing:** $5.00 per month, or $20.00 per year. Prices are shown in the app
   before you buy and may differ in your local currency.
 - **There is no free trial.**
 - **All payments are handled by Apple or Google.** We never see or store your

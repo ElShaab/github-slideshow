@@ -129,12 +129,23 @@ Product IDs must match `SUBSCRIPTION_PLANS` in
 
 | Product ID | Price | Duration |
 | --- | --- | --- |
-| `getfit_membership_monthly` | $4.99 | 1 month |
-| `getfit_membership_yearly` | $19.99 | 1 year |
+| `getfit_membership_monthly` | **$5.00** | 1 month |
+| `getfit_membership_yearly` | **$20.00** | 1 year |
+
+Pick the price point that is **exactly $5.00 and $20.00** in the US storefront,
+not the neighbouring $4.99 / $19.99 tiers. The app displays `priceUsd` from
+`SUBSCRIPTION_PLANS`, and Guideline 3.1.2 requires the price on screen to be the
+price actually charged — a $4.99 product behind a "$5" label is a mismatch.
 
 Rank the yearly plan higher in the group so an upgrade takes effect
 immediately. Add **no** introductory offer — GetFit has no free trial, and the
 "was $40" is our own discount, not a store offer.
+
+> **Selling outside the US?** The app shows a hardcoded `$5` / `$20` while Apple
+> charges each storefront its own local price — so a user in the UK would be
+> charged £X and shown "$5", which is the same 3.1.2 mismatch. Until the paywall
+> reads `localizedPrice` from the store, **limit availability to the United
+> States** in App Store Connect → Pricing and Availability.
 
 **[you] Play Console → Monetise → Subscriptions.** The same two IDs, each with
 a base plan at the matching price. Android requires an **active** base plan
@@ -272,7 +283,7 @@ eas submit --platform ios --profile production   # [you] Apple credentials + 2FA
 > Apple owns the billing relationship. The paywall carries the price, the
 > period, the auto-renewal terms and links to our privacy policy and terms.
 >
-> There is no free trial. Pricing is $4.99/month or $19.99/year.
+> There is no free trial. Pricing is $5.00/month or $20.00/year.
 
 ---
 

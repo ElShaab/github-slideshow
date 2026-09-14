@@ -48,7 +48,7 @@ async function finishQuietly(store: StoreProvider, purchase: StorePurchase): Pro
 }
 
 /**
- * The $5/month membership offer.
+ * The membership offer: $5 a month, or $20 a year.
  *
  * The user always reaches this after seeing their body analysis. There is no
  * free trial. Purchases go through the platform store and are verified on the

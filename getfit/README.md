@@ -371,8 +371,8 @@ real purchases. Without it, the mock store is used when the server allows it.
 
 1. In **App Store Connect → Your App → Subscriptions**, create one subscription
    group containing both auto-renewable subscriptions:
-   - `getfit_membership_monthly` at **$4.99/month** (the $5 tier)
-   - `getfit_membership_yearly` at **$19.99/year** (the $20 tier)
+   - `getfit_membership_monthly` at **$5.00/month**
+   - `getfit_membership_yearly` at **$20.00/year**
 
    Put them in the same group so members can move between them, and rank the
    yearly plan higher so an upgrade takes effect immediately.
