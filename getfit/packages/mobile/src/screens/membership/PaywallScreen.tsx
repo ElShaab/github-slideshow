@@ -21,6 +21,7 @@ import { subscriptionApi, type SubscriptionPlanOption } from '../../api/endpoint
 import {
   createStoreProvider,
   StorePurchaseCancelled,
+  StorePurchaseDeferred,
   StoreUnavailable,
   type StoreProvider,
   type StorePurchase,
@@ -61,6 +62,8 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
   const plan = useAsync(() => subscriptionApi.plan(), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A purchase awaiting approval is not a failure, so it is not shown as one.
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   // An older server answers without the catalogue, so fall back to the plans
@@ -114,6 +117,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
   const buy = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const purchase = await store.purchase(selected?.productId ?? SUBSCRIPTION_PRODUCT_ID);
       // The store receipt proves nothing on its own — the server verifies it
@@ -134,6 +138,10 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     } catch (caught) {
       if (caught instanceof StorePurchaseCancelled) {
         setError('Purchase cancelled.');
+      } else if (caught instanceof StorePurchaseDeferred) {
+        // The customer has done everything asked of them; someone else has to
+        // approve it. Telling them the purchase failed would be wrong.
+        setNotice(caught.message);
       } else if (caught instanceof StoreUnavailable) {
         setError(caught.message);
       } else if (caught instanceof ApiError) {
@@ -149,6 +157,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
   const restore = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const purchase = await store.restore();
       if (!purchase) {
@@ -181,6 +190,11 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
           {error ? (
             <Text variant="caption" color="danger" align="center" accessibilityLiveRegion="polite">
               {error}
+            </Text>
+          ) : null}
+          {notice ? (
+            <Text variant="caption" color="accent" align="center" accessibilityLiveRegion="polite">
+              {notice}
             </Text>
           ) : null}
           <PrimaryButton
