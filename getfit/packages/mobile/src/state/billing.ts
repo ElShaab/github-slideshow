@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { SUBSCRIPTION_PRODUCT_ID } from '@getfit/shared';
+import { SUBSCRIPTION_PRODUCT_ID, type StorePrice } from '@getfit/shared';
 
 export type BillingPlatform = 'apple' | 'google' | 'mock';
 
@@ -15,6 +15,14 @@ export interface StorePurchase {
 export interface StoreProvider {
   readonly platform: BillingPlatform;
   readonly available: boolean;
+  /**
+   * What the store will charge this customer, in their own currency.
+   *
+   * Returns an empty list when there is no store to ask, and the caller falls
+   * back to the bundled USD figures. Never throws: a paywall that cannot show a
+   * price is worse than one showing the fallback.
+   */
+  getPrices(productIds: string[]): Promise<StorePrice[]>;
   purchase(productId: string): Promise<StorePurchase>;
   restore(): Promise<StorePurchase | null>;
   /**
@@ -85,6 +93,22 @@ export class NativeStoreProvider implements StoreProvider {
       return await fn(iap);
     } finally {
       await iap.endConnection().catch(() => undefined);
+    }
+  }
+
+  async getPrices(productIds: string[]): Promise<StorePrice[]> {
+    if (productIds.length === 0) return [];
+    try {
+      return await this.withConnection(async (iap) => {
+        const subscriptions = await iap.getSubscriptions({ skus: productIds });
+        return subscriptions
+          .map((subscription) => readStorePrice(subscription))
+          .filter((price): price is StorePrice => price !== null);
+      });
+    } catch {
+      // An unreachable store must not empty the paywall — the bundled USD
+      // prices stand in until it answers.
+      return [];
     }
   }
 
@@ -202,6 +226,11 @@ export class MockStoreProvider implements StoreProvider {
 
   constructor(private readonly scenario: string = 'mock-success') {}
 
+  /** There is no store behind the mock, so the bundled USD prices are used. */
+  async getPrices(): Promise<StorePrice[]> {
+    return [];
+  }
+
   async purchase(productId: string): Promise<StorePurchase> {
     // A short delay so the loading state is visible during testing.
     await new Promise((resolve) => setTimeout(resolve, 700));
@@ -237,10 +266,60 @@ export interface IapPurchase {
   transactionDate?: number;
 }
 
+interface IapPricingPhase {
+  formattedPrice?: string;
+  priceCurrencyCode?: string;
+  /** Play reports amounts in millionths of the currency unit. */
+  priceAmountMicros?: string;
+  billingPeriod?: string;
+}
+
 interface IapSubscription {
   productId: string;
+  /** iOS: StoreKit's pre-formatted price for the customer's storefront. */
+  localizedPrice?: string;
+  currency?: string;
+  /** iOS: the same amount as a numeric string. */
+  price?: string;
   /** Android only: Play Billing 5 base-plan offers. */
-  subscriptionOfferDetails?: Array<{ offerToken: string }>;
+  subscriptionOfferDetails?: Array<{
+    offerToken: string;
+    pricingPhases?: { pricingPhaseList?: IapPricingPhase[] };
+  }>;
+}
+
+/**
+ * Normalises one subscription into a price, across two different shapes.
+ *
+ * StoreKit hands back a formatted string directly. Play Billing nests it in
+ * the base plan's pricing phases, in millionths, and a product can carry
+ * several phases — an introductory or free phase first, then the recurring
+ * one. The recurring phase is the price the customer keeps paying, so the last
+ * phase is the one to show.
+ */
+function readStorePrice(subscription: IapSubscription): StorePrice | null {
+  if (Platform.OS === 'android') {
+    const phases = subscription.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList;
+    const phase = phases?.[phases.length - 1];
+    if (!phase?.formattedPrice || !phase.priceCurrencyCode) return null;
+
+    const micros = Number(phase.priceAmountMicros);
+    return {
+      productId: subscription.productId,
+      localizedPrice: phase.formattedPrice,
+      currencyCode: phase.priceCurrencyCode,
+      amount: Number.isFinite(micros) ? micros / 1_000_000 : 0,
+    };
+  }
+
+  if (!subscription.localizedPrice || !subscription.currency) return null;
+  const amount = Number(subscription.price);
+  return {
+    productId: subscription.productId,
+    localizedPrice: subscription.localizedPrice,
+    currencyCode: subscription.currency,
+    amount: Number.isFinite(amount) ? amount : 0,
+  };
 }
 
 interface IapModule {

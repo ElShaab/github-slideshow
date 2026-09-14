@@ -2,8 +2,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, View } from 'react-native';
 import {
   SUBSCRIPTION_PLANS,
-  SUBSCRIPTION_PRICE_USD,
   SUBSCRIPTION_PRODUCT_ID,
+  planPricing,
 } from '@getfit/shared';
 import {
   ErrorState,
@@ -26,6 +26,7 @@ import {
   type StorePurchase,
 } from '../../state/billing';
 import { useAsync } from '../../state/useAsync';
+import { useStorePrices } from '../../state/useStorePrices';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 
@@ -82,6 +83,33 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     () => createStoreProvider({ mockAvailable: plan.data?.mockBillingAvailable ?? false }),
     [plan.data?.mockBillingAvailable],
   );
+
+  // What the store will actually charge, in the customer's own currency.
+  // GetFit never converts — Apple and Google set each storefront's price, and
+  // the figure on screen has to be the one that gets billed.
+  const { prices } = useStorePrices(
+    store,
+    useMemo(() => options.map((option) => option.productId), [options]),
+  );
+
+  const monthlyOption = useMemo(
+    () => options.find((option) => option.period === 'month') ?? options[0],
+    [options],
+  );
+
+  const pricingFor = useCallback(
+    (option: SubscriptionPlanOption) =>
+      planPricing(
+        option,
+        prices[option.productId],
+        monthlyOption
+          ? { plan: monthlyOption, storePrice: prices[monthlyOption.productId] }
+          : null,
+      ),
+    [monthlyOption, prices],
+  );
+
+  const selectedPricing = selected ? pricingFor(selected) : null;
 
   const buy = useCallback(async () => {
     setBusy(true);
@@ -160,8 +188,8 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
             onPress={() => void buy()}
             loading={busy}
             accessibilityHint={
-              selected
-                ? `Subscribes at $${selected.priceUsd} per ${selected.period}`
+              selectedPricing && selected
+                ? `Subscribes at ${selectedPricing.price} per ${selected.period}`
                 : undefined
             }
           />
@@ -188,24 +216,28 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         accessibilityRole="radiogroup"
         accessibilityLabel="Choose a membership"
       >
-        {options.map((option) => (
-          <PlanOptionCard
-            key={option.productId}
-            label={option.period === 'year' ? 'Yearly' : 'Monthly'}
-            priceUsd={option.priceUsd}
-            listPriceUsd={option.listPriceUsd}
-            periodLabel={option.period === 'year' ? '/ year' : '/ month'}
-            detail={
-              option.period === 'year'
-                ? `Works out at $${(option.priceUsd / 12).toFixed(2)} a month`
-                : undefined
-            }
-            badge={option.badge}
-            limitedTime={option.limitedTime}
-            selected={selected?.productId === option.productId}
-            onPress={() => setSelectedProductId(option.productId)}
-          />
-        ))}
+        {options.map((option) => {
+          const pricing = pricingFor(option);
+          return (
+            <PlanOptionCard
+              key={option.productId}
+              label={option.period === 'year' ? 'Yearly' : 'Monthly'}
+              price={pricing.price}
+              listPrice={pricing.listPrice}
+              periodLabel={option.period === 'year' ? '/ year' : '/ month'}
+              detail={
+                pricing.perMonth
+                  ? `Works out at ${pricing.perMonth} a month` +
+                    (pricing.savingPercent ? ` — ${pricing.savingPercent}% off monthly` : '')
+                  : undefined
+              }
+              badge={option.badge}
+              limitedTime={option.limitedTime}
+              selected={selected?.productId === option.productId}
+              onPress={() => setSelectedProductId(option.productId)}
+            />
+          );
+        })}
       </View>
 
       {/*
@@ -217,8 +249,8 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
       */}
       <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
         <Text variant="subheading">
-          GetFit Membership — {selected?.period === 'year' ? '1 year' : '1 month'} for $
-          {selected?.priceUsd ?? SUBSCRIPTION_PRICE_USD}
+          GetFit Membership — {selected?.period === 'year' ? '1 year' : '1 month'} for{' '}
+          {selectedPricing?.price}
         </Text>
         <Text variant="caption" color="muted">
           No free trial. Payment is charged to your {storeAccountName()} at confirmation of

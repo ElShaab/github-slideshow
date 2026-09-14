@@ -5,3 +5,4 @@ export * from './exercises';
 export * from './volume';
 export * from './bodyComposition';
 export * from './format';
+export * from './pricing';

@@ -5,9 +5,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   GOAL_LABELS,
   LEVEL_LABELS,
-  SUBSCRIPTION_PRICE_USD,
   formatWeight,
   planForProduct,
+  planPricing,
 } from '@getfit/shared';
 import {
   ErrorState,
@@ -86,6 +86,9 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
 
   const { profile, goals, equipment, preferences, entitlement } = settings.data;
   const plan = planForProduct(entitlement.productId);
+  // The detail screen asks the store for the exact localized figure; this row
+  // only needs to name the plan, so it uses the bundled price.
+  const pricing = plan ? planPricing(plan) : null;
 
   const membershipLabel = {
     active: 'Active',
@@ -184,9 +187,7 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
         {/* The plan the user bought, not whichever one happens to be first. */}
         <SettingsRow
           label="Membership"
-          value={
-            plan ? `$${plan.priceUsd}/${plan.period}` : `$${SUBSCRIPTION_PRICE_USD}/month`
-          }
+          value={pricing && plan ? `${pricing.price} / ${plan.period}` : 'Not subscribed'}
         />
         <SettingsRow
           label="Status"

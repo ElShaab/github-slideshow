@@ -5,9 +5,13 @@ import { Text } from './Text';
 
 export interface PlanOptionCardProps {
   label: string;
-  priceUsd: number;
+  /**
+   * The price exactly as the store states it, in the customer's own currency.
+   * Already formatted — this component never does currency arithmetic.
+   */
+  price: string;
   /** Shown struck through beside the price. Null when there is no offer. */
-  listPriceUsd: number | null;
+  listPrice: string | null;
   /** Per-period suffix, e.g. "/ year". */
   periodLabel: string;
   /** Small caption under the price, e.g. "$1.67 / month". */
@@ -28,8 +32,8 @@ export interface PlanOptionCardProps {
  */
 export const PlanOptionCard = memo(function PlanOptionCard({
   label,
-  priceUsd,
-  listPriceUsd,
+  price,
+  listPrice,
   periodLabel,
   detail,
   badge,
@@ -40,17 +44,16 @@ export const PlanOptionCard = memo(function PlanOptionCard({
 }: PlanOptionCardProps): React.ReactElement {
   const { colors, spacing, radius } = useTheme();
 
-  const savedLabel =
-    listPriceUsd && listPriceUsd > priceUsd
-      ? `, normally $${listPriceUsd}, save ${Math.round(((listPriceUsd - priceUsd) / listPriceUsd) * 100)} percent`
-      : '';
+  const savedLabel = listPrice ? `, normally ${listPrice}` : '';
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${label}, $${priceUsd} ${periodLabel}${savedLabel}`}
+      accessibilityLabel={`${label}, ${price} ${periodLabel}${savedLabel}${
+        detail ? `, ${detail}` : ''
+      }`}
       style={({ pressed }) => [
         styles.card,
         {
@@ -87,18 +90,18 @@ export const PlanOptionCard = memo(function PlanOptionCard({
       </View>
 
       <View style={[styles.priceRow, { marginTop: spacing.sm }]}>
-        {listPriceUsd !== null ? (
+        {listPrice !== null ? (
           <Text
             variant="subheading"
             color="muted"
             style={[styles.struck, { marginRight: spacing.sm }]}
           >
-            ${listPriceUsd}
+            {listPrice}
           </Text>
         ) : null}
 
         <Text variant="heading" tabular>
-          ${priceUsd}
+          {price}
         </Text>
         <Text variant="body" color="muted" style={{ marginLeft: 4 }}>
           {periodLabel}

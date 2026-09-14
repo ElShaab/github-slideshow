@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -8,8 +8,8 @@ import {
   LEVEL_DESCRIPTIONS,
   LEVEL_LABELS,
   SESSION_DURATIONS,
-  SUBSCRIPTION_PRICE_USD,
   planForProduct,
+  planPricing,
   TRAINING_DAY_OPTIONS,
   type EquipmentId,
   type GoalType,
@@ -34,6 +34,8 @@ import {
 } from '../../components';
 import { ApiError } from '../../api/client';
 import { legal } from '../../config/legal';
+import { createStoreProvider } from '../../state/billing';
+import { useStorePrices } from '../../state/useStorePrices';
 import { settingsApi, subscriptionApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
@@ -457,6 +459,14 @@ export function SettingsSubscriptionScreen({
   const entitlement = useAsync(() => subscriptionApi.entitlement(), []);
   const [busy, setBusy] = useState(false);
 
+  // Show what the store charges this customer, not a hardcoded dollar figure.
+  const store = useMemo(() => createStoreProvider({ mockAvailable: false }), []);
+  const plan = planForProduct(entitlement.data?.productId);
+  const { prices } = useStorePrices(
+    store,
+    useMemo(() => (plan ? [plan.productId] : []), [plan]),
+  );
+
   /**
    * Cancellation belongs to whoever takes the money.
    *
@@ -506,9 +516,8 @@ export function SettingsSubscriptionScreen({
   }
 
   const data = entitlement.data;
-  // Show the plan the user actually bought, not whichever one is listed first.
-  const plan = planForProduct(data.productId);
   const storeManaged = data.platform === 'apple' || data.platform === 'google';
+  const pricing = plan ? planPricing(plan, prices[plan.productId]) : null;
 
   return (
     <Screen footer={<SecondaryButton label="Back" onPress={navigation.goBack} />}>
@@ -521,7 +530,7 @@ export function SettingsSubscriptionScreen({
           GetFit Membership
         </Text>
         <Text variant="display" style={{ marginTop: spacing.sm }}>
-          ${plan?.priceUsd ?? SUBSCRIPTION_PRICE_USD}
+          {pricing?.price ?? '—'}
           <Text variant="subheading" color="muted">
             {' '}
             / {plan?.period ?? 'month'}

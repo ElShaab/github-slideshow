@@ -141,11 +141,22 @@ Rank the yearly plan higher in the group so an upgrade takes effect
 immediately. Add **no** introductory offer — GetFit has no free trial, and the
 "was $40" is our own discount, not a store offer.
 
-> **Selling outside the US?** The app shows a hardcoded `$5` / `$20` while Apple
-> charges each storefront its own local price — so a user in the UK would be
-> charged £X and shown "$5", which is the same 3.1.2 mismatch. Until the paywall
-> reads `localizedPrice` from the store, **limit availability to the United
-> States** in App Store Connect → Pricing and Availability.
+**Sell worldwide if you want to.** The paywall asks the store what it will
+charge and renders that string, so a customer in the UK sees Apple's `£4.49`
+and one in Japan sees `¥800`. GetFit never converts currency — Apple and Google
+set each storefront's price from the point you choose above, and displaying
+anything else would be the 3.1.2 mismatch again. The bundled `$5` / `$20` show
+only in the moment before the store answers.
+
+Two things follow from that:
+
+- **The "was $40" strike-through only appears in USD storefronts.** It is our
+  own claim about US pricing; converting it at a rate we invented would quote a
+  price we have never charged. Everywhere else the yearly card shows the real
+  saving against twelve months at that storefront's own monthly rate.
+- Apple's generated local prices are *approximate* equivalents, not conversions,
+  and they change when Apple adjusts its price matrix. That is expected and
+  needs nothing from you.
 
 **[you] Play Console → Monetise → Subscriptions.** The same two IDs, each with
 a base plan at the matching price. Android requires an **active** base plan
@@ -211,6 +222,9 @@ year is an hour — so renewal and expiry are testable in one sitting.
 
 - [ ] Both plans appear with the right prices; yearly shows **$40 struck
       through**, **$20**, and the **BEST DEAL** badge
+- [ ] Change the device's App Store region to the UK and reopen the paywall —
+      prices switch to **£**, and the $40 strike-through disappears rather than
+      being converted
 - [ ] Buying monthly grants access; the server records `$5` and a one-month period
 - [ ] Buying yearly grants access; the server records `$20` and a one-year period
 - [ ] Cancelling the sheet shows "Purchase cancelled", not an error
