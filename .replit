@@ -1,0 +1,19 @@
+run = "cd dashboard && npm install && npm start"
+entrypoint = "dashboard/src/server.js"
+modules = ["nodejs-22"]
+
+hidden = [".config", "package-lock.json", "dashboard/node_modules"]
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+PORT = "3000"
+
+[deployment]
+run = ["sh", "-c", "cd dashboard && npm install --omit=dev && npm start"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
