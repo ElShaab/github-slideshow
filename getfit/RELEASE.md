@@ -217,8 +217,8 @@ renewals then stop.
 - [ ] Change the device's App Store region to the UK and reopen the paywall —
       prices switch to **£**, and the $40 strike-through disappears rather than
       being converted
-- [ ] Buying monthly grants access; the server records `$5` and a one-month period
-- [ ] Buying yearly grants access; the server records `$20` and a one-year period
+- [ ] Buying monthly grants access, and Settings → Membership shows `$5 / month`
+- [ ] Buying yearly grants access, and Settings → Membership shows `$20 / year`
 - [ ] Cancelling the sheet shows "Purchase cancelled", not an error
 - [ ] **Restore purchase** works on a second device with the same Apple ID
 - [ ] Let a sandbox subscription lapse (about 30 minutes at 5 minutes a
@@ -236,7 +236,7 @@ renewals then stop.
 - [ ] An assessment with no tape reading is labelled **Estimated**, not Measured
 - [ ] Symmetry reads **Not measured** when no limb pair was entered
 - [ ] Camera and photo-library permission prompts appear with our wording
-- [ ] Account deletion removes everything and signs you out
+- [ ] Account deletion empties the device and returns you to onboarding
 
 ---
 
