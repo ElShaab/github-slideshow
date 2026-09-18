@@ -11,7 +11,7 @@
  * poll() must throw on failure; the scheduler isolates each source so one
  * broken API never stops the others.
  */
-const modules = [require('./reddit')];
+const modules = [require('./reddit'), require('./x')];
 
 const registry = new Map(modules.map((m) => [m.id, m]));
 
