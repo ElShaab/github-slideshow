@@ -24,6 +24,8 @@ export interface StorePurchase {
   platform: BillingPlatform;
   /** Apple: the app receipt. Google: the purchase token. Mock: a scenario key. */
   receipt: string;
+  /** The store's own identifier, used to de-duplicate the local log. */
+  transactionId: string;
   productId: string;
   /** Opaque native transaction, carried so the purchase can be acknowledged. */
   handle?: unknown;
@@ -407,6 +409,7 @@ export class NativeStoreProvider implements StoreProvider {
     return {
       platform: this.platform,
       receipt,
+      transactionId: transactionIdOf(purchase),
       productId: purchase.productId ?? fallbackProductId,
       handle: purchase,
     };
@@ -485,12 +488,22 @@ export class MockStoreProvider implements StoreProvider {
     // A short delay so the loading state is visible during testing.
     await new Promise((resolve) => setTimeout(resolve, 700));
     if (this.scenario === 'mock-cancel') throw new StorePurchaseCancelled();
-    return { platform: 'mock', receipt: this.scenario, productId };
+    return {
+      platform: 'mock',
+      receipt: this.scenario,
+      transactionId: `mock-${productId}`,
+      productId,
+    };
   }
 
   async restore(): Promise<StorePurchase | null> {
     await new Promise((resolve) => setTimeout(resolve, 400));
-    return { platform: 'mock', receipt: 'mock-success', productId: SUBSCRIPTION_PRODUCT_ID };
+    return {
+      platform: 'mock',
+      receipt: 'mock-success',
+      transactionId: `mock-${SUBSCRIPTION_PRODUCT_ID}`,
+      productId: SUBSCRIPTION_PRODUCT_ID,
+    };
   }
 
   /** Nothing to acknowledge — no real transaction was opened. */

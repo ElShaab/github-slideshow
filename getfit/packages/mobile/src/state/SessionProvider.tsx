@@ -10,7 +10,9 @@ import React, {
 import { AppState } from 'react-native';
 import type { Entitlement, UserProfile } from '@getfit/shared';
 import { ApiError, clearCache, clearToken, loadToken, onUnauthorized } from '../api/client';
-import { assessmentApi, authApi, onboardingApi, subscriptionApi } from '../api/endpoints';
+import { assessmentApi, authApi, onboardingApi } from '../api/endpoints';
+import { createStoreProvider } from './billing';
+import { resolveEntitlement } from './localEntitlement';
 
 /**
  * Ends the session on this device. The offline cache holds body-composition
@@ -63,9 +65,10 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * SessionProvider
  *
  * Owns the user's position in the journey and, critically, the membership
- * state. Entitlement is always read back from the server — the client never
- * decides for itself that a subscription is active, and it re-checks whenever
- * the app returns to the foreground so an expiry is caught promptly.
+ * state. Entitlement comes from the store itself — what Apple or Google says
+ * this customer owns — and is re-read whenever the app returns to the
+ * foreground, so an expiry or a refund is caught promptly. It is never a flag
+ * this app wrote for itself.
  */
 export function SessionProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [state, setState] = useState<SessionState>({
@@ -112,9 +115,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       };
     }
 
+    // The store is the authority on membership, so it is asked directly
+    // rather than relayed through an API.
     const [assessment, entitlement] = await Promise.all([
       assessmentApi.latest(),
-      subscriptionApi.entitlement(),
+      resolveEntitlement(createStoreProvider({ mockAvailable: __DEV__ })),
     ]);
 
     const hasAssessment = Boolean(assessment.assessment);

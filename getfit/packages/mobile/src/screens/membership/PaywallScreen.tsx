@@ -26,6 +26,7 @@ import {
   type StoreProvider,
   type StorePurchase,
 } from '../../state/billing';
+import { recordDevGrant, recordPurchase } from '../../state/localEntitlement';
 import { useAsync } from '../../state/useAsync';
 import { useStorePrices } from '../../state/useStorePrices';
 import { useSession } from '../../state/SessionProvider';
@@ -114,19 +115,59 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
 
   const selectedPricing = selected ? pricingFor(selected) : null;
 
+  /**
+   * Writes a purchase to the on-device log, and — in development only — grants
+   * the membership the mock store cannot grant itself.
+   *
+   * This never decides entitlement on a real build. The refresh that follows
+   * asks the store again, and its answer is what unlocks the app, so nothing
+   * written here can turn into a membership by itself.
+   */
+  const logPurchase = useCallback(
+    async (purchase: StorePurchase, kind: 'purchase' | 'restore') => {
+      const option = options.find((item) => item.productId === purchase.productId);
+      const recordedAt = new Date().toISOString();
+
+      await recordPurchase({
+        productId: purchase.productId,
+        platform: purchase.platform,
+        transactionId: purchase.transactionId,
+        recordedAt,
+        kind,
+        price: option ? pricingFor(option).price : '',
+      });
+
+      if (purchase.platform === 'mock') {
+        // Expo Go links no billing module, so without this the paid product
+        // is unreachable while developing. The scenario keys drive the same
+        // states a real subscription can be in.
+        await recordDevGrant({
+          productId: purchase.productId,
+          platform: 'mock',
+          transactionId: purchase.transactionId,
+          purchasedAt: recordedAt,
+          expiresAt:
+            purchase.receipt === 'mock-expired'
+              ? new Date(Date.now() - 86_400_000).toISOString()
+              : null,
+          autoRenewing: purchase.receipt === 'mock-cancelled' ? false : null,
+        });
+      }
+    },
+    [options, pricingFor],
+  );
+
   const buy = useCallback(async () => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const purchase = await store.purchase(selected?.productId ?? SUBSCRIPTION_PRODUCT_ID);
-      // The store receipt proves nothing on its own — the server verifies it
-      // and decides whether the membership is active.
-      await subscriptionApi.purchase({
-        platform: purchase.platform,
-        receipt: purchase.receipt,
-        productId: purchase.productId,
-      });
+
+      // Entitlement is not granted from here. The store is asked again on the
+      // refresh below, and what it reports is what unlocks the app — so a log
+      // entry cannot become a membership on its own.
+      await logPurchase(purchase, 'purchase');
 
       // Entitlement is granted, so tell the store the purchase was delivered.
       // Left unacknowledged, Google refunds it after three days and StoreKit
@@ -152,7 +193,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     } finally {
       setBusy(false);
     }
-  }, [refresh, selected?.productId, store]);
+  }, [logPurchase, refresh, selected?.productId, store]);
 
   const restore = useCallback(async () => {
     setBusy(true);
@@ -164,11 +205,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         setError('We could not find a previous purchase on this account.');
         return;
       }
-      await subscriptionApi.restore({
-        platform: purchase.platform,
-        receipt: purchase.receipt,
-        productId: purchase.productId,
-      });
+      await logPurchase(purchase, 'restore');
       await finishQuietly(store, purchase);
       await refresh();
     } catch (caught) {
@@ -176,7 +213,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     } finally {
       setBusy(false);
     }
-  }, [refresh, store]);
+  }, [logPurchase, refresh, store]);
 
   if (plan.loading) return <LoadingScreen message="Loading membership…" />;
   if (!plan.data) return <ErrorState message={plan.error ?? undefined} onRetry={plan.reload} />;
