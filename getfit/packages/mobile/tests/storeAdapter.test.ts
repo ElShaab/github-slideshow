@@ -31,6 +31,8 @@ type Listener = (value: never) => void;
 class FakeStore {
   connections = 0;
   endCalls = 0;
+  storekitMode: string | null = null;
+  activeOnlyRequests: Array<boolean | undefined> = [];
   finished: string[] = [];
   owned: Array<Record<string, unknown>> = [];
   purchaseListeners: Listener[] = [];
@@ -92,7 +94,13 @@ class FakeStore {
         setTimeout(() => this.emitPurchase(this.transaction()), 0);
         return undefined as never;
       },
-      getAvailablePurchases: async () => this.owned as never,
+      setup: (options: { storekitMode: string }) => {
+        this.storekitMode = options.storekitMode;
+      },
+      getAvailablePurchases: async (options?: { onlyIncludeActiveItems?: boolean }) => {
+        this.activeOnlyRequests.push(options?.onlyIncludeActiveItems);
+        return this.owned as never;
+      },
       finishTransaction: async ({ purchase }: { purchase: { productId?: string } }) => {
         this.finished.push(purchase.productId ?? '');
         return true;
@@ -295,5 +303,46 @@ describe('prices come through in the customer\'s currency', () => {
   test('an unreachable store leaves the paywall to its fallback', async () => {
     const provider = new NativeStoreProvider('ios', () => null);
     assert.deepEqual(await provider.getPrices([MONTHLY]), []);
+  });
+});
+
+describe('StoreKit 2 is pinned, not left to the default', () => {
+  test('iOS is put into StoreKit 2 mode before the connection opens', async () => {
+    // The library defaults to StoreKit 1, where getAvailablePurchases returns
+    // the whole receipt — expired subscriptions included — and the active-only
+    // filter is ignored. Entitlement here is "the store says you own it", so
+    // that default would leave a lapsed subscriber with the paid product.
+    const { store, provider } = build('ios');
+    await provider.getActivePurchases();
+    assert.equal(store.storekitMode, 'STOREKIT2_MODE');
+  });
+
+  test('every entitlement read asks for active items only', async () => {
+    const { store, provider } = build('ios');
+    await provider.getActivePurchases();
+    await provider.restore();
+
+    assert.ok(store.activeOnlyRequests.length >= 2);
+    assert.ok(
+      store.activeOnlyRequests.every((asked) => asked === true),
+      `a read did not filter to active items: ${JSON.stringify(store.activeOnlyRequests)}`,
+    );
+  });
+
+  test('Android is left alone — setup is an iOS concern', async () => {
+    const { store, provider } = build('android');
+    await provider.getActivePurchases();
+    assert.equal(store.storekitMode, null);
+  });
+
+  test('an older library with no setup still connects', async () => {
+    // setup is optional on the module interface, so a build without it must
+    // not throw on the way to opening the connection.
+    const store = new FakeStore('ios');
+    const withoutSetup = { ...store.module } as Record<string, unknown>;
+    delete withoutSetup.setup;
+
+    const provider = new NativeStoreProvider('ios', () => withoutSetup as never);
+    assert.deepEqual(await provider.getActivePurchases(), []);
   });
 });

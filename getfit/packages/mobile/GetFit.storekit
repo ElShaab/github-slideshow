@@ -1,0 +1,69 @@
+{
+  "identifier": "A71A2385-D769-504F-8576-D39B6F872448",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "6470000000",
+    "_developerTeamID": "TEAMID0000",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "21437654",
+      "localizations": [],
+      "name": "GetFit Membership",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "056C95C7-F1D2-5F86-8408-31046F607796",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Your training programme, guided workouts and weekly body analysis.",
+              "displayName": "GetFit Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "getfit_membership_monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "GetFit Membership Monthly",
+          "subscriptionGroupID": "21437654",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "20.00",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "36573490-3363-5FC8-B8F1-456D40D8A731",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "A full year of GetFit. Everything in the monthly plan.",
+              "displayName": "GetFit Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "getfit_membership_yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "GetFit Membership Yearly",
+          "subscriptionGroupID": "21437654",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

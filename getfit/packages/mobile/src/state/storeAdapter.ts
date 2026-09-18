@@ -164,6 +164,17 @@ export class NativeStoreProvider implements StoreProvider {
     if (!iap) throw new StoreUnavailable();
 
     this.connection = (async () => {
+      // StoreKit 2, explicitly. The library defaults to StoreKit 1, where
+      // `getAvailablePurchases` returns the whole receipt — expired
+      // subscriptions included — and the active-only filter is ignored. Since
+      // entitlement here is "the store says you own it", that default would
+      // leave a lapsed subscriber with the paid product forever. Expo SDK 52
+      // requires iOS 15.1, so StoreKit 2 is available on every device that can
+      // run this app.
+      if (this.os === 'ios' && typeof iap.setup === 'function') {
+        iap.setup({ storekitMode: 'STOREKIT2_MODE' });
+      }
+
       await iap.initConnection();
       // Clears purchases Play left pending from an interrupted flow; without
       // this they can block a new purchase of the same subscription.
@@ -299,7 +310,10 @@ export class NativeStoreProvider implements StoreProvider {
 
   async getActivePurchases(): Promise<ActivePurchase[]> {
     const iap = await this.connect();
-    const purchases = await iap.getAvailablePurchases();
+    // Asked for explicitly rather than relying on the default, because this
+    // single flag is the difference between a lapsed subscriber losing access
+    // and keeping it.
+    const purchases = await iap.getAvailablePurchases({ onlyIncludeActiveItems: true });
     return [...purchases, ...this.unclaimed]
       .map((purchase) => readActivePurchase(purchase, this.os, this.platform))
       .filter((entry): entry is ActivePurchase => entry !== null);
@@ -366,7 +380,10 @@ export class NativeStoreProvider implements StoreProvider {
 
   async restore(): Promise<StorePurchase | null> {
     const iap = await this.connect();
-    const purchases = [...(await iap.getAvailablePurchases()), ...this.unclaimed];
+    const purchases = [
+      ...(await iap.getAvailablePurchases({ onlyIncludeActiveItems: true })),
+      ...this.unclaimed,
+    ];
 
     // The most recent entitlement is the one worth reading back.
     const purchase = [...purchases]
@@ -393,7 +410,10 @@ export class NativeStoreProvider implements StoreProvider {
   private async ownedPurchase(productId: string): Promise<StorePurchase | null> {
     try {
       const iap = await this.connect();
-      const purchases = [...(await iap.getAvailablePurchases()), ...this.unclaimed];
+      const purchases = [
+        ...(await iap.getAvailablePurchases({ onlyIncludeActiveItems: true })),
+        ...this.unclaimed,
+      ];
       const owned = purchases.find(
         (item) => item.productId === productId && Boolean(receiptOf(item, this.os)),
       );
@@ -624,7 +644,14 @@ export interface IapModule {
       | { sku: string; andDangerouslyFinishTransactionAutomaticallyIOS?: boolean }
       | { subscriptionOffers: Array<{ sku: string; offerToken: string }> },
   ): Promise<IapPurchase | IapPurchase[] | null | void>;
-  getAvailablePurchases(): Promise<IapPurchase[]>;
+  /**
+   * `onlyIncludeActiveItems` is honoured by StoreKit 2 and by Play Billing.
+   * Under StoreKit 1 it is silently ignored, which is why `setup` above pins
+   * StoreKit 2 rather than trusting the library's default.
+   */
+  getAvailablePurchases(options?: { onlyIncludeActiveItems?: boolean }): Promise<IapPurchase[]>;
+  /** Selects the StoreKit generation. iOS only; absent on older library builds. */
+  setup?(options: { storekitMode: 'STOREKIT1_MODE' | 'STOREKIT_HYBRID_MODE' | 'STOREKIT2_MODE' }): void;
   purchaseUpdatedListener(listener: (purchase: IapPurchase) => void): { remove(): void };
   purchaseErrorListener(listener: (error: unknown) => void): { remove(): void };
   finishTransaction(request: { purchase: IapPurchase; isConsumable?: boolean }): Promise<unknown>;

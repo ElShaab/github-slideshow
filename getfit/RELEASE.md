@@ -145,7 +145,37 @@ Answer these to match what the app does:
 
 ---
 
-## 4. Build and test the purchase flow
+## 4. Test purchases in the simulator, free
+
+Before any of the Apple setup above, you can run real purchase flows in the
+iOS Simulator with **no Apple Developer account and nothing in App Store
+Connect**, using `packages/mobile/GetFit.storekit`. It carries both plans at
+their real ids and prices.
+
+```bash
+cd packages/mobile
+npx expo prebuild --platform ios      # once, to create the Xcode project
+open ios/GetFit.xcworkspace
+```
+
+In Xcode: **Product → Scheme → Edit Scheme → Run → Options**, and set
+**StoreKit Configuration** to `GetFit.storekit`. Run on a simulator and the
+paywall shows both plans; buying one opens a real StoreKit sheet and completes.
+
+The **Debug → StoreKit** menu then drives the cases that are painful to reach
+any other way: expire a subscription, force a renewal, decline a purchase, turn
+on Ask to Buy, or simulate an interrupted purchase. A test keeps the file's
+product ids and prices matching `SUBSCRIPTION_PLANS`, because a drifted id
+fails silently — the paywall simply shows nothing to buy.
+
+This is not a substitute for a sandbox purchase on a device. StoreKit
+Configuration never talks to Apple, so it cannot tell you that your products
+are live, that your Paid Applications agreement is active, or that your bundle
+id matches. It tells you the app handles what StoreKit sends.
+
+---
+
+## 5. Build and test the purchase flow
 
 **This is the step that cannot be skipped.** In-app purchases have never run on
 a real device in this project. The store adapter is written against
@@ -164,6 +194,22 @@ Media & Purchases → Sign Out). The sandbox prompt appears at purchase time.
 Sandbox subscriptions renew on a compressed clock — a month is 5 minutes, a
 year is an hour — so renewal and expiry are testable in one sitting.
 
+### How sandbox is chosen
+
+**There is no sandbox setting, and no switch to flip.** The same binary talks to
+sandbox or production depending on how it was signed and who is signed in:
+
+| Build | Store it reaches |
+| --- | --- |
+| Xcode run with a StoreKit config file | Neither — local simulation |
+| Development, ad-hoc or TestFlight | **Sandbox**, automatically |
+| Downloaded from the App Store | Production |
+| Android from a Play track, licensed tester account | **Sandbox** (no charge) |
+
+Sandbox subscriptions also renew on a compressed clock — a month is 5 minutes,
+a year is an hour — so renewal and expiry are testable in one sitting. Six
+renewals then stop.
+
 **[you]** With a sandbox tester account signed in, verify each of:
 
 - [ ] Both plans appear with the right prices; yearly shows **$40 struck
@@ -175,6 +221,9 @@ year is an hour — so renewal and expiry are testable in one sitting.
 - [ ] Buying yearly grants access; the server records `$20` and a one-year period
 - [ ] Cancelling the sheet shows "Purchase cancelled", not an error
 - [ ] **Restore purchase** works on a second device with the same Apple ID
+- [ ] Let a sandbox subscription lapse (about 30 minutes at 5 minutes a
+      renewal) and confirm the app **locks** — this is the one StoreKit 1 got
+      wrong, so it is worth watching happen
 - [ ] The transaction is **finished** — it must not reappear on relaunch
 - [ ] An expired membership blocks the app and shows the renewal screen
 - [ ] **Manage or cancel in App Store** opens Apple's subscription settings —
@@ -191,7 +240,7 @@ year is an hour — so renewal and expiry are testable in one sitting.
 
 ---
 
-## 5. Submit
+## 6. Submit
 
 ```bash
 cd packages/mobile
