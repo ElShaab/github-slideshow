@@ -20,7 +20,6 @@ const { problems, warnings } = checkRelease({
   app: JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8')).expo,
   eas: JSON.parse(readFileSync(resolve(root, 'eas.json'), 'utf8')),
   profile,
-  env: process.env,
 });
 
 for (const warning of warnings) console.warn(`  note     ${warning}`);

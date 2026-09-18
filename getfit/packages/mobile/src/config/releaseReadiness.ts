@@ -1,13 +1,11 @@
-import { API_BASE_URL, apiBaseUrlIsSecure } from '../api/client';
 import { legal, missingLegalFields } from './legal';
 
 /**
  * The configuration a shipped build cannot do without.
  *
  * Each of these is something App Review checks, and each fails in a way that is
- * invisible on the machine that built the app: an unset API URL looks fine in
- * Expo Go and reaches nothing on a reviewer's phone; a missing privacy-policy
- * link is a Guideline 3.1.2 rejection two days after upload.
+ * invisible on the machine that built the app — a missing privacy-policy link
+ * is a Guideline 3.1.2 rejection two days after upload, not a build error.
  *
  * Surfacing them at launch, in the build itself, is the only way they get found
  * before submission rather than after.
@@ -20,18 +18,8 @@ export interface ReadinessProblem {
 export function releaseReadiness(): ReadinessProblem[] {
   const problems: ReadinessProblem[] = [];
 
-  if (!API_BASE_URL) {
-    problems.push({
-      field: 'EXPO_PUBLIC_API_URL',
-      detail: 'No API URL is configured, so the app cannot reach its server at all.',
-    });
-  } else if (!apiBaseUrlIsSecure) {
-    problems.push({
-      field: 'EXPO_PUBLIC_API_URL',
-      detail: `"${API_BASE_URL}" is not https. App Transport Security blocks cleartext requests, so every call would fail on a real device.`,
-    });
-  }
-
+  // No API URL is checked because there is no API. Every read and write goes
+  // to local storage, so a build with no network configuration is correct.
   for (const field of missingLegalFields()) {
     problems.push({
       field,

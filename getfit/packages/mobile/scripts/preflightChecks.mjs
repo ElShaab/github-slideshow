@@ -13,28 +13,12 @@ export const isHttpsUrl = (value) =>
 const isPlaceholderUrl = (value) =>
   /\.example($|[/:])/.test(value) || value.includes('localhost') || value.includes('10.0.2.2');
 
-export function checkRelease({ app, eas, profile = 'production', env = {} }) {
+export function checkRelease({ app, eas, profile = 'production' }) {
   const problems = [];
   const warnings = [];
 
-  /* --------------------------- API endpoint --------------------------- */
-
-  const profileEnv = eas.build?.[profile]?.env ?? {};
-  const apiUrl = env.EXPO_PUBLIC_API_URL ?? profileEnv.EXPO_PUBLIC_API_URL;
-
-  if (!apiUrl) {
-    problems.push(
-      `eas.json build.${profile}.env.EXPO_PUBLIC_API_URL is not set — the app would have no server to talk to.`,
-    );
-  } else if (!isHttpsUrl(apiUrl)) {
-    problems.push(
-      `EXPO_PUBLIC_API_URL is "${apiUrl}", which is not https. App Transport Security blocks cleartext, so every request would fail on device.`,
-    );
-  } else if (isPlaceholderUrl(apiUrl)) {
-    problems.push(
-      `EXPO_PUBLIC_API_URL is still the placeholder "${apiUrl}". Point it at your deployed API.`,
-    );
-  }
+  // There is no API to point at: the app reads and writes local storage, so a
+  // build with no network configuration is correct rather than broken.
 
   /* ---------------------------- legal links --------------------------- */
 

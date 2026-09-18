@@ -24,41 +24,54 @@ import type {
   UserProfile,
   WorkoutProgram,
 } from '@getfit/shared';
-import { request, setToken } from './client';
+import {
+  SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_PRICE_USD,
+  SUBSCRIPTION_PRODUCT_ID,
+  errors,
+} from '@getfit/shared';
+import { localApi, localRepository } from '../local/api';
+import { createStoreProvider } from '../state/billing';
+import { clearLocalBilling, resolveEntitlement } from '../state/localEntitlement';
+
+/**
+ * The app's data layer.
+ *
+ * Every one of these used to be an HTTP call. They now run against local
+ * storage and the rules in @getfit/shared, with the signatures unchanged so no
+ * screen had to be touched. Nothing here reaches a network.
+ */
 
 /* ------------------------------ auth ------------------------------ */
 
 export const authApi = {
+  /**
+   * There are no accounts to sign in to.
+   *
+   * The install is the identity: data lives on this device and the membership
+   * belongs to the App Store or Play account, so there is nothing to
+   * authenticate against. These remain so the screens that call them keep
+   * working, and they simply make sure local identity exists.
+   */
   async startGuestSession(): Promise<AuthTokens> {
-    const tokens = await request<AuthTokens>('/api/auth/guest', { method: 'POST' });
-    await setToken(tokens.accessToken);
-    return tokens;
+    const { userId } = await localApi.me();
+    return { accessToken: userId, userId, isGuest: false } as AuthTokens;
   },
 
-  async createAccount(email: string, password: string): Promise<AuthTokens> {
-    const tokens = await request<AuthTokens>('/api/auth/account', {
-      method: 'POST',
-      body: { email, password },
-    });
-    await setToken(tokens.accessToken);
-    return tokens;
+  createAccount(_email: string, _password: string): Promise<AuthTokens> {
+    return authApi.startGuestSession();
   },
 
-  async login(email: string, password: string): Promise<AuthTokens> {
-    const tokens = await request<AuthTokens>('/api/auth/login', {
-      method: 'POST',
-      body: { email, password },
-    });
-    await setToken(tokens.accessToken);
-    return tokens;
+  login(_email: string, _password: string): Promise<AuthTokens> {
+    return authApi.startGuestSession();
   },
 
   me(): Promise<{ userId: string; email: string | null; isGuest: boolean }> {
-    return request('/api/auth/me');
+    return localApi.me();
   },
 
   deleteAccount(): Promise<{ deleted: boolean; photosRemoved: number }> {
-    return request('/api/auth/account', { method: 'DELETE' });
+    return localApi.deleteAccount();
   },
 };
 
@@ -89,14 +102,11 @@ export interface OnboardingPayload {
 
 export const onboardingApi = {
   options(): Promise<OnboardingOptions> {
-    return request('/api/onboarding/options', {
-      cacheKey: 'onboarding-options',
-      fallbackToCache: true,
-    });
+    return localApi.options();
   },
 
   submit(payload: OnboardingPayload): Promise<{ profile: UserProfile }> {
-    return request('/api/onboarding', { method: 'POST', body: payload });
+    return localApi.submitOnboarding(payload);
   },
 
   status(): Promise<{
@@ -105,39 +115,11 @@ export const onboardingApi = {
     equipment: EquipmentId[];
     hasPreferences: boolean;
   }> {
-    return request('/api/onboarding/status');
+    return localApi.onboardingStatus();
   },
 };
 
 /* --------------------------- assessments -------------------------- */
-
-/**
- * Builds an assessment submission.
- *
- * The measurements are what the analysis is computed from. The photo is
- * optional and is only kept as a private progress photo, so a submission with
- * no photo is perfectly valid.
- */
-function assessmentForm(input: AssessmentSubmission): FormData {
-  const form = new FormData();
-
-  for (const [key, value] of Object.entries(input.measurements)) {
-    if (typeof value === 'number' && Number.isFinite(value)) form.append(key, String(value));
-  }
-  if (input.weightKg !== undefined) form.append('weightKg', String(input.weightKg));
-
-  if (input.photoUri) {
-    const name = input.photoUri.split('/').pop() ?? 'body.jpg';
-    const extension = name.split('.').pop()?.toLowerCase() ?? 'jpg';
-    const type =
-      extension === 'png' ? 'image/png' : extension === 'heic' ? 'image/heic' : 'image/jpeg';
-
-    // React Native's FormData accepts this file descriptor shape.
-    form.append('photo', { uri: input.photoUri, name, type } as unknown as Blob);
-  }
-
-  return form;
-}
 
 export interface AssessmentSubmission {
   measurements: BodyMeasurements;
@@ -148,38 +130,24 @@ export interface AssessmentSubmission {
 
 export const assessmentApi = {
   runInitial(input: AssessmentSubmission): Promise<{ assessment: BodyAssessment; repeated: boolean }> {
-    return request('/api/assessments/initial', {
-      method: 'POST',
-      form: assessmentForm(input),
-      timeoutMs: 60_000,
-    });
+    return localApi.runInitialAssessment(input);
   },
 
   runWeekly(input: AssessmentSubmission): Promise<{ assessment: BodyAssessment }> {
-    return request('/api/assessments/weekly', {
-      method: 'POST',
-      form: assessmentForm(input),
-      timeoutMs: 60_000,
-    });
+    return localApi.runWeeklyAssessment(input);
   },
 
   availability(): Promise<AssessmentAvailability> {
-    return request('/api/assessments/availability');
+    return localApi.assessmentAvailability();
   },
 
   latest(): Promise<{ assessment: BodyAssessment | null }> {
-    return request('/api/assessments/latest', {
-      cacheKey: 'latest-assessment',
-      fallbackToCache: true,
-    });
+    return localApi.latestAssessment();
   },
 
   /** History never includes the source photo — only the hologram and metrics. */
   history(): Promise<{ assessments: BodyAssessment[] }> {
-    return request('/api/assessments/history', {
-      cacheKey: 'assessment-history',
-      fallbackToCache: true,
-    });
+    return localApi.assessmentHistory();
   },
 };
 
@@ -209,32 +177,55 @@ export interface SubscriptionPlan {
 
 export const subscriptionApi = {
   plan(): Promise<SubscriptionPlan> {
-    return request('/api/subscription/plan', { cacheKey: 'plan', fallbackToCache: true });
+    return Promise.resolve({
+      productId: SUBSCRIPTION_PRODUCT_ID,
+      priceUsd: SUBSCRIPTION_PRICE_USD,
+      period: 'month',
+      freeTrial: false,
+      plans: SUBSCRIPTION_PLANS,
+      features: [
+        'Personalized workouts',
+        'Progressive overload',
+        'Guided workouts',
+        'Weekly body analysis',
+        'Progress tracking',
+        'Goal tracking',
+      ],
+      mockBillingAvailable: __DEV__,
+    });
   },
 
   /** The only trustworthy answer about membership state. */
   entitlement(): Promise<Entitlement> {
-    return request('/api/subscription/entitlement');
+    return resolveEntitlement(createStoreProvider({ mockAvailable: __DEV__ }));
   },
 
-  purchase(input: {
-    platform: 'apple' | 'google' | 'mock';
-    receipt: string;
-    productId?: string;
-  }): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
-    return request('/api/subscription/purchase', { method: 'POST', body: input, timeoutMs: 45_000 });
+  /**
+   * Re-reads membership after a purchase.
+   *
+   * The receipt is not sent anywhere: with no server to verify it, the store
+   * itself is the authority, so this asks the store what the customer now owns
+   * rather than taking the app's word for what just happened.
+   */
+  purchase(): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
+    return subscriptionApi.entitlement().then((entitlement) => ({
+      subscription: null as unknown as Subscription,
+      entitlement,
+    }));
   },
 
-  restore(input: {
-    platform: 'apple' | 'google' | 'mock';
-    receipt: string;
-    productId?: string;
-  }): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
-    return request('/api/subscription/restore', { method: 'POST', body: input, timeoutMs: 45_000 });
+  restore(): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
+    return subscriptionApi.purchase();
   },
 
   cancel(): Promise<Entitlement> {
-    return request('/api/subscription/cancel', { method: 'POST' });
+    // Apple and Google own the billing relationship, so cancelling happens in
+    // their settings. Settings → Membership opens the right page.
+    return Promise.reject(
+      errors.invalidInput(
+        'Your store manages this subscription. Cancel it from Settings → Membership.',
+      ),
+    );
   },
 };
 
@@ -248,10 +239,7 @@ export interface ExerciseChoiceSet {
 
 export const exerciseApi = {
   library(): Promise<{ exercises: Exercise[]; muscleGroups: unknown[]; cardio: unknown[] }> {
-    return request('/api/exercises/library', {
-      cacheKey: 'exercise-library',
-      fallbackToCache: true,
-    });
+    return localApi.exerciseLibrary();
   },
 
   preferenceChoices(): Promise<{
@@ -259,27 +247,24 @@ export const exerciseApi = {
     choiceSets: ExerciseChoiceSet[];
     saved: ExercisePreference[];
   }> {
-    return request('/api/exercises/preferences/choices', {
-      cacheKey: 'preference-choices',
-      fallbackToCache: true,
-    });
+    return localApi.preferenceChoices();
   },
 
   generatePreferences(): Promise<{ preferences: ExercisePreference[]; autoGenerated: boolean }> {
-    return request('/api/exercises/preferences/generate', { method: 'POST' });
+    return localApi.generatePreferences();
   },
 
   savePreferences(
     preferences: Array<{ muscleGroup: MuscleGroup; exerciseIds: string[] }>,
   ): Promise<{ preferences: ExercisePreference[] }> {
-    return request('/api/exercises/preferences', { method: 'PUT', body: { preferences } });
+    return localApi.savePreferences(preferences);
   },
 
   /** Saving from Settings also rebuilds future training. */
   applyPreferences(
     preferences: Array<{ muscleGroup: MuscleGroup; exerciseIds: string[] }>,
   ): Promise<{ preferences: ExercisePreference[]; programRegenerated: boolean }> {
-    return request('/api/exercises/preferences/apply', { method: 'PUT', body: { preferences } });
+    return localApi.savePreferences(preferences);
   },
 };
 
@@ -287,11 +272,11 @@ export const exerciseApi = {
 
 export const programApi = {
   generate(): Promise<{ program: WorkoutProgram }> {
-    return request('/api/program/generate', { method: 'POST', timeoutMs: 45_000 });
+    return localApi.generateProgram();
   },
 
   active(): Promise<{ program: WorkoutProgram }> {
-    return request('/api/program/active', { cacheKey: 'active-program', fallbackToCache: true });
+    return localApi.activeProgram();
   },
 
   schedule(): Promise<{
@@ -299,11 +284,11 @@ export const programApi = {
     upcoming: ScheduledWorkout[];
     completed: CompletedWorkout[];
   }> {
-    return request('/api/program/schedule', { cacheKey: 'schedule', fallbackToCache: true });
+    return localApi.programSchedule();
   },
 
   day(workoutDayId: string): Promise<{ day: ProgramDay }> {
-    return request(`/api/program/day/${workoutDayId}`);
+    return localApi.programDay(workoutDayId);
   },
 };
 
@@ -344,26 +329,23 @@ export interface WorkoutSummary extends CompletedWorkout {
 
 export const workoutApi = {
   today(): Promise<{ workout: TodaysWorkout | null }> {
-    return request('/api/workouts/today', {
-      cacheKey: 'todays-workout',
-      fallbackToCache: true,
-    });
+    return localApi.todaysWorkout();
   },
 
   complete(payload: CompleteWorkoutPayload): Promise<{ summary: WorkoutSummary }> {
-    return request('/api/workouts/complete', { method: 'POST', body: payload, timeoutMs: 45_000 });
+    return localApi.completeWorkout(payload);
   },
 
   history(): Promise<{ workouts: CompletedWorkout[] }> {
-    return request('/api/workouts/history', { cacheKey: 'workout-history', fallbackToCache: true });
+    return localApi.workoutHistory();
   },
 
   detail(workoutId: string): Promise<{ workout: CompletedWorkout }> {
-    return request(`/api/workouts/history/${workoutId}`);
+    return localApi.workoutDetail(workoutId);
   },
 
   skip(scheduledWorkoutId: string): Promise<{ skipped: boolean }> {
-    return request(`/api/workouts/skip/${scheduledWorkoutId}`, { method: 'POST' });
+    return localApi.skipWorkout(scheduledWorkoutId);
   },
 };
 
@@ -371,11 +353,11 @@ export const workoutApi = {
 
 export const progressApi = {
   overview(): Promise<ProgressOverview> {
-    return request('/api/progress/overview', { cacheKey: 'progress', fallbackToCache: true });
+    return localApi.progressOverview();
   },
 
   records(): Promise<{ records: PersonalRecord[] }> {
-    return request('/api/progress/records');
+    return localApi.personalRecords();
   },
 };
 
@@ -407,7 +389,7 @@ export interface HomeData {
 
 export const homeApi = {
   load(): Promise<HomeData> {
-    return request('/api/home', { cacheKey: 'home', fallbackToCache: true });
+    return localApi.home();
   },
 };
 
@@ -424,31 +406,27 @@ export interface SettingsData {
 
 export const settingsApi = {
   load(): Promise<SettingsData> {
-    return request('/api/settings', { cacheKey: 'settings', fallbackToCache: true });
+    return localApi.settings();
   },
 
   updateProfile(
     patch: Partial<UserProfile>,
   ): Promise<{ profile: UserProfile; programRegenerated: boolean }> {
-    return request('/api/settings/profile', { method: 'PATCH', body: patch, timeoutMs: 45_000 });
+    return localApi.updateProfile(patch);
   },
 
   updateGoals(goals: GoalType[]): Promise<{ goals: UserGoal[]; programRegenerated: boolean }> {
-    return request('/api/settings/goals', {
-      method: 'PUT',
-      body: { goals: goals.map((goalType) => ({ goalType })) },
-      timeoutMs: 45_000,
-    });
+    return localApi.updateGoals(goals);
   },
 
   updateEquipment(
     equipment: EquipmentId[],
   ): Promise<{ equipment: EquipmentId[]; programRegenerated: boolean }> {
-    return request('/api/settings/equipment', { method: 'PUT', body: { equipment }, timeoutMs: 45_000 });
+    return localApi.updateEquipment(equipment);
   },
 
   updateApp(patch: Partial<AppSettings>): Promise<{ appSettings: AppSettings }> {
-    return request('/api/settings/app', { method: 'PATCH', body: patch });
+    return localApi.updateAppSettings(patch);
   },
 };
 
@@ -457,22 +435,54 @@ export const settingsApi = {
 export const devApi = {
   config(): Promise<{
     devMode: boolean;
-    mockAiMode: boolean;
     mockBilling: boolean;
+    aiProvider: string;
+    storageDriver: string;
     scenarios: string[];
   }> {
-    return request('/api/dev/config');
+    return Promise.resolve({
+      devMode: __DEV__,
+      mockBilling: __DEV__,
+      aiProvider: 'measurement',
+      storageDriver: 'device',
+      scenarios: ['mock-success', 'mock-expired', 'mock-cancelled', 'mock-cancel'],
+    });
   },
 
-  expireSubscription(): Promise<{ entitlement: Entitlement }> {
-    return request('/api/dev/subscription/expire', { method: 'POST' });
+  /** Clears the development grant, so the paywall returns. */
+  async expireSubscription(): Promise<{ entitlement: Entitlement }> {
+    await clearLocalBilling();
+    return { entitlement: await resolveEntitlement(createStoreProvider({ mockAvailable: __DEV__ })) };
   },
 
-  backdateAssessment(days = 7): Promise<{ backdatedDays: number }> {
-    return request(`/api/dev/assessment/backdate?days=${days}`, { method: 'POST' });
+  /** Moves the last assessment back so the seven-day lock can be exercised. */
+  async backdateAssessment(days = 7): Promise<{ backdatedDays: number }> {
+    await localRepository.updateAssessmentsDoc((doc) => ({
+      assessments: doc.assessments.map((assessment, index) =>
+        index === doc.assessments.length - 1
+          ? {
+              ...assessment,
+              createdAt: new Date(
+                Date.parse(assessment.createdAt) - days * 86_400_000,
+              ).toISOString(),
+            }
+          : assessment,
+      ),
+    }));
+    return { backdatedDays: days };
   },
 
-  backdateSchedule(days = 3): Promise<{ backdatedDays: number }> {
-    return request(`/api/dev/schedule/backdate?days=${days}`, { method: 'POST' });
+  /** Moves the week back so a session falls due today. */
+  async backdateSchedule(days = 3): Promise<{ backdatedDays: number }> {
+    await localRepository.updateProgramDoc((doc) => ({
+      ...doc,
+      schedule: doc.schedule.map((slot) => ({
+        ...slot,
+        scheduledDate: new Date(Date.parse(slot.scheduledDate) - days * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+      })),
+    }));
+    return { backdatedDays: days };
   },
 };

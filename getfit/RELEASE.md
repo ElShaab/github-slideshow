@@ -14,85 +14,31 @@ cd packages/mobile
 npm run preflight -- --profile production
 ```
 
-A fresh checkout fails it with six items, and every one of them is something
-only you can supply — a deployed API host, two hosted URLs, and three App Store
-Connect identifiers:
+A fresh checkout fails it with five items, and every one of them is something
+only you can supply — two hosted URLs and three App Store Connect identifiers:
 
 | What | Where it goes | Section |
 | --- | --- | --- |
-| Your deployed API URL | `eas.json` → `build.production.env.EXPO_PUBLIC_API_URL` | 1 |
-| Your hosted privacy policy | `app.json` → `extra.legal.privacyPolicyUrl` | 4 |
-| Your support page | `app.json` → `extra.legal.supportUrl` | 4 |
-| Apple ID, `ascAppId`, team ID | `eas.json` → `submit.production.ios` | 2 and 6 |
+| Your hosted privacy policy | `app.json` → `extra.legal.privacyPolicyUrl` | 3 |
+| Your support page | `app.json` → `extra.legal.supportUrl` | 3 |
+| Apple ID, `ascAppId`, team ID | `eas.json` → `submit.production.ios` | 1 and 5 |
+
+**There is no server to deploy.** GetFit reads and writes local storage, and
+computes body composition and every training decision on the device. Nothing in
+the app makes a network request except the App Store and Play Billing.
 
 Your own terms are optional: leave `extra.legal.termsOfUseUrl` unset and the app
 links to Apple's standard EULA, which is always live. `TERMS.md` is there if you
 would rather host your own.
 
-**None of this is optional, and none of it fails loudly on its own.** A build
-with an unset API URL launches and reaches nothing, which reads to a reviewer as
-a broken app rather than an unset variable — so a release build that fails these
-checks refuses to start and says which field is missing, instead of looking
-broken.
+**None of this fails loudly on its own.** A missing privacy-policy link is a
+rejection two days after upload, not a build error — so a release build that
+fails these checks refuses to start and names the missing field, rather than
+shipping and being rejected.
 
 ---
 
-## 1. Deploy the API
-
-Nothing in the app works until this exists — a release build points at the URL
-configured in `eas.json`, and a reviewer opening an app that cannot reach its
-server is an immediate rejection under Guideline 2.1.
-
-```bash
-cd getfit
-
-fly launch --no-deploy              # [you] names the app, picks a region
-fly postgres create --name getfit-db
-fly postgres attach getfit-db       # sets DATABASE_URL
-```
-
-There is **no AI provider to configure**. Body composition is calculated on the
-server from the user's tape measurements using published anthropometric
-formulas, so there is no vision endpoint, no API key and no per-analysis cost.
-
-Set the remaining secrets. The server **refuses to boot** if any of these is
-missing or unsafe, which is deliberate — a misconfigured production deploy
-fails loudly instead of quietly handing out free memberships:
-
-```bash
-fly secrets set \
-  JWT_SECRET="$(openssl rand -base64 48)" \
-  MOCK_BILLING=false \
-  DEV_MODE=false \
-  CORS_ORIGINS=https://[your-domain] \
-  STORAGE_S3_BUCKET=[bucket] \
-  STORAGE_S3_REGION=[region] \
-  AWS_ACCESS_KEY_ID=[key] \
-  AWS_SECRET_ACCESS_KEY=[secret] \
-  APPLE_SHARED_SECRET=[from App Store Connect] \
-  GOOGLE_SERVICE_ACCOUNT_JSON="$(cat play-service-account.json | tr -d '\n')"
-```
-
-The S3 bucket must be **private** — block all public access. Photos are served
-only through authenticated, ownership-checked requests, and a public bucket
-would defeat that entirely.
-
-```bash
-fly deploy
-curl https://[your-app].fly.dev/health     # expect {"status":"ok"}
-```
-
-Migrations and the exercise seed run on every boot. Both are idempotent.
-
-Then point the app at it, in `packages/mobile/eas.json`:
-
-```json
-"production": { "env": { "EXPO_PUBLIC_API_URL": "https://[your-app].fly.dev" } }
-```
-
----
-
-## 2. Turn on payments with Apple
+## 1. Turn on payments with Apple
 
 **[you] Do this before anything else — it has a waiting period, and nothing
 about in-app purchase works until it is finished.**
@@ -119,7 +65,7 @@ profile under Setup → Payments, then the app record.
 
 ---
 
-## 3. Create the store products
+## 2. Create the store products
 
 Product IDs must match `SUBSCRIPTION_PLANS` in
 `packages/shared/src/constants.ts` **exactly**, or purchases fail with
@@ -165,7 +111,7 @@ the purchase cannot start.
 
 ---
 
-## 4. Publish the privacy policy and support page
+## 3. Publish the privacy policy and support page
 
 **[you]** Fill in every placeholder in `PRIVACY.md`, host it at a public HTTPS
 URL, and enter that URL in **three** places: App Store Connect, Play Console,
@@ -199,7 +145,7 @@ Answer these to match what the app does:
 
 ---
 
-## 5. Build and test the purchase flow
+## 4. Build and test the purchase flow
 
 **This is the step that cannot be skipped.** In-app purchases have never run on
 a real device in this project. The store adapter is written against
@@ -245,7 +191,7 @@ year is an hour — so renewal and expiry are testable in one sitting.
 
 ---
 
-## 6. Submit
+## 5. Submit
 
 ```bash
 cd packages/mobile
@@ -326,11 +272,6 @@ Honest list of what has **not** been verified, so nothing is assumed:
 
 - **No purchase has ever completed on a device.** The IAP adapter is written
   and type-checked but never exercised against StoreKit or Play Billing.
-- **The S3 photo driver has never run against a real bucket.** Its key scoping
-  and encryption settings are implemented but untested.
-- **The optional remote vision provider has never been connected.** It is not
-  needed — the built-in measurement analyser is the default — but its request
-  and response handling has only been exercised against a stub.
 - The app has not been run on a physical device or simulator — it is verified
   by an automated test suite, type checking and a clean production bundle.
 - **No screenshots exist.** They have to be captured from a running build and

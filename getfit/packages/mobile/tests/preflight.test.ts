@@ -46,7 +46,6 @@ function readyConfig() {
       },
     },
     profile: 'production',
-    env: {},
   };
 }
 
@@ -76,34 +75,11 @@ describe('checkRelease', () => {
     assert.deepEqual(problems, []);
   });
 
-  test('catches an unset, cleartext or placeholder API URL', () => {
-    const missing = run((c) => {
-      c.eas.build.production.env = {};
-    });
-    assert.ok(missing.problems.some((p) => p.includes('EXPO_PUBLIC_API_URL is not set')));
-
-    const cleartext = run((c) => {
-      c.eas.build.production.env.EXPO_PUBLIC_API_URL = 'http://api.getfit.app';
-    });
-    assert.ok(cleartext.problems.some((p) => p.includes('not https')));
-
-    // The shipped default. Building with it produces an app that reaches
-    // nothing, which reads as a broken app rather than an unset variable.
-    for (const placeholder of ['https://api.getfit.example', 'https://localhost:4000']) {
-      const result = run((c) => {
-        c.eas.build.production.env.EXPO_PUBLIC_API_URL = placeholder;
-      });
-      assert.ok(
-        result.problems.some((p) => p.includes('EXPO_PUBLIC_API_URL')),
-        `accepted ${placeholder}`,
-      );
-    }
-  });
-
-  test('an env override counts as configured', () => {
+  test('no API URL is required, because there is no API', () => {
+    // Every read and write is local. A build with no network configuration is
+    // correct, and demanding one would block every release.
     const { problems } = run((c) => {
       c.eas.build.production.env = {};
-      c.env = { EXPO_PUBLIC_API_URL: 'https://api.getfit.app' };
     });
     assert.deepEqual(problems, []);
   });
@@ -156,15 +132,13 @@ describe('checkRelease', () => {
 
   test('the checked-in config is complete apart from what only a human can supply', () => {
     // Everything left is a credential or a hosted URL nobody can invent: the
-    // API host, the two legal links, and the App Store Connect identifiers.
+    // two legal links and the App Store Connect identifiers.
     const { problems } = checkRelease({
       app: structuredClone(realApp),
       eas: structuredClone(realEas),
       profile: 'production',
-      env: {},
     });
     const expected = [
-      'EXPO_PUBLIC_API_URL',
       'privacyPolicyUrl',
       'supportUrl',
       'appleId',
