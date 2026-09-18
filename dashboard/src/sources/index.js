@@ -9,9 +9,9 @@
  *   poll(options) -> { fetched, added, duplicates, unmatched, notes }
  *
  * poll() must throw on failure; the scheduler isolates each source so one
- * broken API never stops the others. Source modules are added one at a time.
+ * broken API never stops the others.
  */
-const modules = [];
+const modules = [require('./reddit')];
 
 const registry = new Map(modules.map((m) => [m.id, m]));
 
