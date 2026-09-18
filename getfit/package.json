@@ -1,0 +1,38 @@
+{
+  "name": "getfit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GetFit \u2014 AI-powered fitness application (iOS + Android)",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/mobile"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace @getfit/shared",
+    "dev:server": "npm run build:shared && npm run dev --workspace @getfit/server",
+    "build:server": "npm run build:shared && npm run build --workspace @getfit/server",
+    "build": "npm run build:shared && npm run build --workspace @getfit/server",
+    "start:server": "npm run start --workspace @getfit/server",
+    "db:migrate": "npm run build:shared && npm run migrate --workspace @getfit/server",
+    "db:seed": "npm run build:shared && npm run seed --workspace @getfit/server",
+    "db:reset": "npm run build:shared && npm run reset --workspace @getfit/server",
+    "lint": "eslint packages",
+    "lint:fix": "eslint packages --fix",
+    "verify": "npm run lint && npm run typecheck && npm test",
+    "test": "npm run build:shared && npm run test --workspace @getfit/shared && npm run test --workspace @getfit/server && npm run test --workspace @getfit/mobile",
+    "typecheck": "npm run typecheck --workspace @getfit/shared && npm run typecheck --workspace @getfit/server && npm run typecheck --workspace @getfit/mobile",
+    "mobile": "npm run start --workspace @getfit/mobile",
+    "mobile:ios": "npm run ios --workspace @getfit/mobile",
+    "mobile:android": "npm run android --workspace @getfit/mobile"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "typescript-eslint": "^8.70.0"
+  }
+}
