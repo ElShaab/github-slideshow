@@ -1,13 +1,6 @@
-import {
-  CARDIO_BY_ID,
-  CARDIO_EXERCISES,
-  MAX_CARDIO_MINUTES,
-  type CardioExercise,
-  type CardioPrescription,
-  type EquipmentId,
-  type GoalType,
-  type TrainingLocation,
-} from '@getfit/shared';
+import { MAX_CARDIO_MINUTES } from '../constants';
+import { CARDIO_BY_ID, CARDIO_EXERCISES } from '../exercises';
+import type { CardioExercise, CardioPrescription, EquipmentId, GoalType, TrainingLocation } from '../types';
 
 /**
  * Cardio is prescribed like any other exercise: the AI chooses the type from

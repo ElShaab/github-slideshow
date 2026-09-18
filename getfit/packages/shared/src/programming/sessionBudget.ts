@@ -1,4 +1,4 @@
-import type { Exercise, ProgramExercise } from '@getfit/shared';
+import type { Exercise, ProgramExercise } from '../types';
 
 /** Seconds of general setup at the start of a session. */
 const SESSION_OVERHEAD_SECONDS = 90;

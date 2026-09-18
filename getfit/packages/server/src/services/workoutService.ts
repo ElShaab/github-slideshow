@@ -13,8 +13,8 @@ import { userRepository } from '../repositories/userRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
 import { errors } from '../utils/errors';
 import { logger } from '../utils/logger';
-import { detectPersonalRecords } from './personalRecordService';
-import { ProgressionService } from './progressionService';
+import { detectPersonalRecords } from '@getfit/shared';
+import { ProgressionService } from '@getfit/shared';
 
 export interface CompleteWorkoutRequest {
   userId: string;

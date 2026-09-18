@@ -10,7 +10,7 @@ import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { requireSubscription } from '../middleware/subscriptionGate';
 import { asyncHandler, validateBody } from '../middleware/validate';
 import { userRepository } from '../repositories/userRepository';
-import { ExerciseSelectionService } from '../services/exerciseSelectionService';
+import { ExerciseSelectionService } from '@getfit/shared';
 import { programService } from '../services/programService';
 import { userService } from '../services/userService';
 import { errors } from '../utils/errors';

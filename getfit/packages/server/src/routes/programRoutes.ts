@@ -5,7 +5,7 @@ import { requireSubscription } from '../middleware/subscriptionGate';
 import { asyncHandler } from '../middleware/validate';
 import { programRepository } from '../repositories/programRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
-import { hydrateProgram } from '../services/programGenerationService';
+import { hydrateProgram } from '@getfit/shared';
 import { programService } from '../services/programService';
 import { errors } from '../utils/errors';
 

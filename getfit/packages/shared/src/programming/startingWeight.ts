@@ -1,10 +1,6 @@
-import {
-  EXERCISE_BY_ID,
-  roundToIncrement,
-  type Exercise,
-  type Sex,
-  type TrainingLevel,
-} from '@getfit/shared';
+import { EXERCISE_BY_ID } from '../exercises';
+import { roundToIncrement } from '../format';
+import type { Exercise, Sex, TrainingLevel } from '../types';
 
 export interface StartingWeightContext {
   bodyWeightKg: number;

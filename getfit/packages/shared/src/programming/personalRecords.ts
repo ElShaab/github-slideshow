@@ -1,4 +1,5 @@
-import { estimateOneRepMax, type CompletedSet, type PersonalRecord } from '@getfit/shared';
+import { estimateOneRepMax } from '../format';
+import type { CompletedSet, PersonalRecord } from '../types';
 
 export interface ExistingRecords {
   weight: number | null;

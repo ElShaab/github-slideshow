@@ -1,10 +1,5 @@
-import {
-  roundToIncrement,
-  type Exercise,
-  type ExercisePerformance,
-  type ProgressionDecision,
-  type TrainingLocation,
-} from '@getfit/shared';
+import { roundToIncrement } from '../format';
+import type { Exercise, ExercisePerformance, ProgressionDecision, TrainingLocation } from '../types';
 import { incrementFor } from './startingWeight';
 
 export interface ProgressionInput {

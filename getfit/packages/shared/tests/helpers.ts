@@ -1,6 +1,6 @@
-import { GYM_EQUIPMENT, type EquipmentId, type GoalType, type TrainingLevel, type TrainingLocation } from '@getfit/shared';
-import type { SelectionContext } from '../src/services/exerciseSelectionService';
-import type { ProgramGenerationInput } from '../src/services/programGenerationService';
+import { GYM_EQUIPMENT, type EquipmentId, type GoalType, type TrainingLevel, type TrainingLocation } from '../src/index';
+import type { SelectionContext } from '../src/index';
+import type { ProgramGenerationInput } from '../src/index';
 
 export function selectionContext(overrides: Partial<SelectionContext> = {}): SelectionContext {
   return {

@@ -1,4 +1,4 @@
-import type { MuscleGroup, TrainingDays } from '@getfit/shared';
+import type { MuscleGroup, TrainingDays } from '../types';
 
 export interface DayTemplate {
   focus: string;

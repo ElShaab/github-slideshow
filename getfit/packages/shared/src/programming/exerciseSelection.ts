@@ -1,19 +1,8 @@
-import {
-  EXERCISE_BY_ID,
-  EXERCISE_CHOICES_PER_MUSCLE,
-  MAX_EXERCISES_PER_MUSCLE,
-  MUSCLE_GROUP_IDS,
-  exercisesForMuscle,
-  isExerciseAvailable,
-  type EquipmentId,
-  type Exercise,
-  type ExercisePreference,
-  type GoalType,
-  type MuscleGroup,
-  type TrainingLevel,
-  type TrainingLocation,
-} from '@getfit/shared';
-import { errors } from '../utils/errors';
+import { EXERCISE_CHOICES_PER_MUSCLE, MAX_EXERCISES_PER_MUSCLE } from '../constants';
+import { EXERCISE_BY_ID, exercisesForMuscle, isExerciseAvailable } from '../exercises';
+import { MUSCLE_GROUP_IDS } from '../muscles';
+import type { EquipmentId, Exercise, ExercisePreference, GoalType, MuscleGroup, TrainingLevel, TrainingLocation } from '../types';
+import { errors } from '../errors';
 
 export interface SelectionContext {
   location: TrainingLocation;

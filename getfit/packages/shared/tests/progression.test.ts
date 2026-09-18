@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { EXERCISE_BY_ID, type ExercisePerformance, type TrainingLocation } from '@getfit/shared';
-import { ProgressionService } from '../src/services/progressionService';
+import { EXERCISE_BY_ID, type ExercisePerformance, type TrainingLocation } from '../src/index';
+import { ProgressionService } from '../src/index';
 
 const progression = new ProgressionService();
 const bench = EXERCISE_BY_ID.bench_press;

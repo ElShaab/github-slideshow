@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isoDate } from '@getfit/shared';
-import { WorkoutAdaptationService, WEEK_LAYOUTS } from '../src/services/workoutAdaptationService';
+import { isoDate } from '../src/index';
+import { WorkoutAdaptationService, WEEK_LAYOUTS } from '../src/index';
 
 const adaptation = new WorkoutAdaptationService();
 

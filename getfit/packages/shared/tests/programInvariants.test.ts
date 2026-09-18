@@ -23,9 +23,9 @@ import {
   type TrainingDays,
   type TrainingLevel,
   type TrainingLocation,
-} from '@getfit/shared';
-import { ExerciseSelectionService } from '../src/services/exerciseSelectionService';
-import { ProgramGenerationService } from '../src/services/programGenerationService';
+} from '../src/index';
+import { ExerciseSelectionService } from '../src/index';
+import { ProgramGenerationService } from '../src/index';
 
 const generator = new ProgramGenerationService();
 const selection = new ExerciseSelectionService();

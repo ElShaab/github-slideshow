@@ -10,10 +10,10 @@ import {
   type GoalType,
   type SessionDuration,
   type TrainingDays,
-} from '@getfit/shared';
-import { ExerciseSelectionService } from '../src/services/exerciseSelectionService';
-import { ProgramGenerationService } from '../src/services/programGenerationService';
-import { baseCardioMinutes } from '../src/services/cardioService';
+} from '../src/index';
+import { ExerciseSelectionService } from '../src/index';
+import { ProgramGenerationService } from '../src/index';
+import { baseCardioMinutes } from '../src/index';
 import { programInput, selectionContext } from './helpers';
 
 const generator = new ProgramGenerationService();

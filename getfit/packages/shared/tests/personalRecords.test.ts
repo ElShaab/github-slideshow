@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { estimateOneRepMax } from '@getfit/shared';
-import { detectPersonalRecords } from '../src/services/personalRecordService';
+import { estimateOneRepMax } from '../src/index';
+import { detectPersonalRecords } from '../src/index';
 import { setsOf } from './helpers';
 
 const achievedAt = new Date().toISOString();

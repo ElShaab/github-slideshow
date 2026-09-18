@@ -7,3 +7,5 @@ export * from './bodyComposition';
 export * from './format';
 export * from './pricing';
 export * from './entitlement';
+export * from './errors';
+export * from './programming';

@@ -1,28 +1,11 @@
-import {
-  EXERCISE_BY_ID,
-  MAX_WARMUP_SETS,
-  MUSCLE_GROUPS,
-  computeVolume,
-  type CardioPrescription,
-  type EquipmentId,
-  type Exercise,
-  type ExercisePreference,
-  type GoalType,
-  type MuscleGroup,
-  type PrescribedSet,
-  type ProgramDay,
-  type ProgramExercise,
-  type SessionDuration,
-  type Sex,
-  type TrainingDays,
-  type TrainingLevel,
-  type TrainingLocation,
-  type VolumeSummary,
-  type WorkoutProgram,
-} from '@getfit/shared';
-import { errors } from '../utils/errors';
-import { ExerciseSelectionService, type SelectionContext } from './exerciseSelectionService';
-import { selectCardio } from './cardioService';
+import { MAX_WARMUP_SETS } from '../constants';
+import { EXERCISE_BY_ID } from '../exercises';
+import { MUSCLE_GROUPS } from '../muscles';
+import type { CardioPrescription, EquipmentId, Exercise, ExercisePreference, GoalType, MuscleGroup, PrescribedSet, ProgramDay, ProgramExercise, SessionDuration, Sex, TrainingDays, TrainingLevel, TrainingLocation, VolumeSummary, WorkoutProgram } from '../types';
+import { computeVolume } from '../volume';
+import { errors } from '../errors';
+import { ExerciseSelectionService, type SelectionContext } from './exerciseSelection';
+import { selectCardio } from './cardio';
 import { estimateWorkoutSeconds, type TimedExerciseEstimate } from './sessionBudget';
 import { estimateStartingWeight, type StartingWeightContext } from './startingWeight';
 import { getSplit, type DayTemplate } from './splits';

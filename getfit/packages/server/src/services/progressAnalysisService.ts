@@ -10,7 +10,7 @@ import { assessmentRepository } from '../repositories/assessmentRepository';
 import { progressRepository } from '../repositories/progressRepository';
 import { userRepository } from '../repositories/userRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
-import { GoalTrackingService } from './goalTrackingService';
+import { GoalTrackingService } from '@getfit/shared';
 
 /**
  * ProgressAnalysisService

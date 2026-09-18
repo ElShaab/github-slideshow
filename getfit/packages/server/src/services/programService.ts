@@ -10,9 +10,9 @@ import { userRepository } from '../repositories/userRepository';
 import { workoutRepository } from '../repositories/workoutRepository';
 import { errors } from '../utils/errors';
 import { logger } from '../utils/logger';
-import { ExerciseSelectionService } from './exerciseSelectionService';
-import { ProgramGenerationService } from './programGenerationService';
-import { WorkoutAdaptationService } from './workoutAdaptationService';
+import { ExerciseSelectionService } from '@getfit/shared';
+import { ProgramGenerationService } from '@getfit/shared';
+import { WorkoutAdaptationService } from '@getfit/shared';
 
 /**
  * ProgramService

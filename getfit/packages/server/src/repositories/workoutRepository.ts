@@ -9,7 +9,7 @@ import type {
   TrendPoint,
 } from '@getfit/shared';
 import { query, transaction } from '../db/pool';
-import type { ExistingRecords } from '../services/personalRecordService';
+import type { ExistingRecords } from '@getfit/shared';
 
 export interface CompleteWorkoutInput {
   userId: string;

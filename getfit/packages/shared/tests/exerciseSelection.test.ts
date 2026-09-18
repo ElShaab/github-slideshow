@@ -7,9 +7,9 @@ import {
   MUSCLE_GROUP_IDS,
   isExerciseAvailable,
   type EquipmentId,
-} from '@getfit/shared';
-import { ExerciseSelectionService } from '../src/services/exerciseSelectionService';
-import { AppError } from '../src/utils/errors';
+} from '../src/index';
+import { ExerciseSelectionService } from '../src/index';
+import { AppError } from '../src/errors';
 import { selectionContext } from './helpers';
 
 const service = new ExerciseSelectionService();

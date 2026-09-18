@@ -1,4 +1,5 @@
-import { addDays, isoDate, type TrainingDays } from '@getfit/shared';
+import { addDays, isoDate } from '../format';
+import type { TrainingDays } from '../types';
 
 export interface ScheduleSlot {
   id: string;

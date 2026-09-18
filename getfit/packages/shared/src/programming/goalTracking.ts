@@ -1,12 +1,6 @@
-import {
-  EXERCISE_BY_ID,
-  GOAL_LABELS,
-  type BodyAssessment,
-  type GoalProgress,
-  type GoalType,
-  type PersonalRecord,
-  type UserGoal,
-} from '@getfit/shared';
+import { GOAL_LABELS } from '../constants';
+import { EXERCISE_BY_ID } from '../exercises';
+import type { BodyAssessment, GoalProgress, GoalType, PersonalRecord, UserGoal } from '../types';
 
 export interface GoalTrackingInput {
   goals: UserGoal[];
