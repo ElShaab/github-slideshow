@@ -1,0 +1,49 @@
+'use strict';
+
+const path = require('path');
+
+require('dotenv').config({
+  path: path.join(__dirname, '..', '.env'),
+  quiet: true,
+});
+
+const root = path.join(__dirname, '..');
+
+/**
+ * All secrets come from the environment. Nothing here has a hardcoded default
+ * that could leak a credential into git.
+ */
+const config = {
+  root,
+  port: Number(process.env.PORT || 3000),
+  host: process.env.HOST || '0.0.0.0',
+  dbPath: process.env.DB_PATH
+    ? path.resolve(root, process.env.DB_PATH)
+    : path.join(root, 'data', 'dashboard.db'),
+
+  // Polling can be disabled entirely (useful for tests and for local UI work).
+  pollingEnabled: process.env.POLLING_ENABLED !== 'false',
+
+  // Reddit's public JSON endpoints need no credentials, but they do want a
+  // descriptive, unique User-Agent or they start answering with 429s.
+  userAgent:
+    process.env.USER_AGENT ||
+    'amputee-research-dashboard/1.0 (personal research tool)',
+
+  x: {
+    bearerToken: process.env.X_BEARER_TOKEN || '',
+  },
+
+  youtube: {
+    apiKey: process.env.YOUTUBE_API_KEY || '',
+  },
+
+  pubmed: {
+    // Optional. Without a key NCBI allows ~3 requests/second, which is plenty.
+    apiKey: process.env.PUBMED_API_KEY || '',
+    tool: process.env.PUBMED_TOOL || 'amputee-research-dashboard',
+    email: process.env.PUBMED_EMAIL || '',
+  },
+};
+
+module.exports = config;

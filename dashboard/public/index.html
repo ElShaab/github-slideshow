@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Amputee Research Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <h1>Amputee Research Dashboard</h1>
+        <p class="subtle" id="brand-sub">Community signal &amp; literature tracking</p>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab is-active" data-tab="feed">Feed</button>
+        <button class="tab" data-tab="research">Research</button>
+        <button class="tab" data-tab="keywords">Keywords</button>
+        <button class="tab" data-tab="sources">Sources</button>
+      </nav>
+    </header>
+
+    <main>
+      <!-- FEED -->
+      <section class="panel" id="panel-feed">
+        <div class="toolbar">
+          <div class="filters" id="feed-filters">
+            <label>
+              Source
+              <select id="filter-source">
+                <option value="">All sources</option>
+                <option value="reddit">Reddit</option>
+                <option value="x">X (Twitter)</option>
+                <option value="youtube">YouTube</option>
+                <option value="pubmed">PubMed</option>
+              </select>
+            </label>
+            <label>
+              Keyword
+              <select id="filter-keyword">
+                <option value="">All keywords</option>
+              </select>
+            </label>
+            <label>
+              Status
+              <select id="filter-status">
+                <option value="">All statuses</option>
+                <option value="new">New</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="used">Used</option>
+              </select>
+            </label>
+            <label class="grow">
+              Search
+              <input id="filter-q" type="search" placeholder="Text, author or origin" />
+            </label>
+            <button class="ghost" id="feed-refresh">Refresh</button>
+          </div>
+          <div class="counts" id="feed-counts"></div>
+        </div>
+        <div id="feed-list" class="list"></div>
+        <div class="pager">
+          <button class="ghost" id="feed-prev">Previous</button>
+          <span id="feed-range" class="subtle"></span>
+          <button class="ghost" id="feed-next">Next</button>
+        </div>
+      </section>
+
+      <!-- RESEARCH -->
+      <section class="panel hidden" id="panel-research">
+        <div class="card">
+          <div class="card-head">
+            <h2>PubMed pull</h2>
+            <div class="row">
+              <button class="ghost" id="pubmed-poll">Pull now</button>
+            </div>
+          </div>
+          <p class="subtle">
+            Uses PubMed E-utilities (no key required at this volume). Searches
+            title and abstract for every keyword scoped to <code>all</code> or
+            to <code>pubmed</code>. To keep clinical searches separate from
+            community chatter, add keywords scoped to PubMed only.
+          </p>
+          <div class="grid-2">
+            <label>
+              Look back (days)
+              <input type="number" min="1" max="365" id="pubmed-reldate" />
+            </label>
+            <label>
+              Max articles per pull
+              <input type="number" min="1" max="100" id="pubmed-max" />
+            </label>
+          </div>
+          <div class="row">
+            <button id="pubmed-save">Save research settings</button>
+            <span class="subtle" id="pubmed-status"></span>
+          </div>
+          <pre class="query" id="pubmed-query"></pre>
+        </div>
+        <div id="research-list" class="list"></div>
+      </section>
+
+      <!-- KEYWORDS -->
+      <section class="panel hidden" id="panel-keywords">
+        <div class="card">
+          <h2 id="keyword-form-title">Add a keyword</h2>
+          <form id="keyword-form" class="keyword-form">
+            <input type="hidden" id="keyword-id" />
+            <label class="grow">
+              Keyword or phrase
+              <input
+                id="keyword-term"
+                type="text"
+                placeholder="e.g. phantom limb pain"
+                autocomplete="off"
+                required
+              />
+            </label>
+            <fieldset class="scope">
+              <legend>Applies to</legend>
+              <label class="inline">
+                <input type="radio" name="scope" value="all" checked />
+                All sources
+              </label>
+              <label class="inline">
+                <input type="radio" name="scope" value="specific" />
+                Specific sources
+              </label>
+              <div class="source-checks" id="keyword-sources">
+                <label class="inline"><input type="checkbox" value="reddit" /> Reddit</label>
+                <label class="inline"><input type="checkbox" value="x" /> X</label>
+                <label class="inline"><input type="checkbox" value="youtube" /> YouTube</label>
+                <label class="inline"><input type="checkbox" value="pubmed" /> PubMed</label>
+              </div>
+            </fieldset>
+            <label class="grow">
+              Notes (optional)
+              <input id="keyword-notes" type="text" placeholder="Why you are tracking this" />
+            </label>
+            <div class="row">
+              <button type="submit" id="keyword-submit">Add keyword</button>
+              <button type="button" class="ghost hidden" id="keyword-cancel">Cancel</button>
+              <span class="error" id="keyword-error"></span>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>Tracked keywords</h2>
+            <span class="subtle" id="keyword-count"></span>
+          </div>
+          <div id="keyword-list" class="keyword-list"></div>
+        </div>
+      </section>
+
+      <!-- SOURCES -->
+      <section class="panel hidden" id="panel-sources">
+        <div id="source-cards"></div>
+        <div class="card">
+          <h2>Recent poll activity</h2>
+          <div id="poll-log" class="log"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
