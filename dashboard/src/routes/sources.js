@@ -4,6 +4,8 @@ const express = require('express');
 const scheduler = require('../scheduler');
 const state = require('../lib/state');
 const subreddits = require('../lib/subreddits');
+const youtubeChannels = require('../lib/youtubeChannels');
+const youtube = require('../sources/youtube');
 
 const router = express.Router();
 
@@ -28,6 +30,7 @@ router.post('/:source/clear-backoff', (req, res) => {
 });
 
 /* ---- Reddit: subreddit list ---- */
+
 router.get('/reddit/subreddits', (req, res) => {
   res.json(subreddits.list());
 });
@@ -45,6 +48,38 @@ router.patch('/reddit/subreddits/:id', (req, res) => {
 router.delete('/reddit/subreddits/:id', (req, res) => {
   if (!subreddits.remove(Number(req.params.id))) {
     return res.status(404).json({ error: 'Subreddit not found' });
+  }
+  res.status(204).end();
+});
+
+/* ---- YouTube: channel list ---- */
+
+router.get('/youtube/channels', (req, res) => {
+  res.json(youtubeChannels.list());
+});
+
+router.post('/youtube/channels', async (req, res) => {
+  const body = req.body || {};
+  const raw = String(body.channel_id || body.channel || '').trim();
+  if (!raw) return res.status(400).json({ error: 'channel_id is required' });
+
+  // A raw UC... ID needs no API call; a handle or URL costs 1 quota unit.
+  if (/^UC[A-Za-z0-9_-]{20,24}$/.test(raw)) {
+    return res.status(201).json(youtubeChannels.add(raw, body.title));
+  }
+  const resolved = await youtube.resolveChannel(raw);
+  res.status(201).json(youtubeChannels.add(resolved.channel_id, resolved.title));
+});
+
+router.patch('/youtube/channels/:id', (req, res) => {
+  const ok = youtubeChannels.setEnabled(Number(req.params.id), (req.body || {}).enabled);
+  if (!ok) return res.status(404).json({ error: 'Channel not found' });
+  res.json({ ok: true });
+});
+
+router.delete('/youtube/channels/:id', (req, res) => {
+  if (!youtubeChannels.remove(Number(req.params.id))) {
+    return res.status(404).json({ error: 'Channel not found' });
   }
   res.status(204).end();
 });
