@@ -6,6 +6,7 @@ const state = require('../lib/state');
 const subreddits = require('../lib/subreddits');
 const youtubeChannels = require('../lib/youtubeChannels');
 const youtube = require('../sources/youtube');
+const searchSites = require('../lib/searchSites');
 
 const router = express.Router();
 
@@ -80,6 +81,30 @@ router.patch('/youtube/channels/:id', (req, res) => {
 router.delete('/youtube/channels/:id', (req, res) => {
   if (!youtubeChannels.remove(Number(req.params.id))) {
     return res.status(404).json({ error: 'Channel not found' });
+  }
+  res.status(204).end();
+});
+
+/* ---- Web search: site list ---- */
+
+router.get('/websearch/sites', (req, res) => {
+  res.json(searchSites.list());
+});
+
+router.post('/websearch/sites', (req, res) => {
+  const body = req.body || {};
+  res.status(201).json(searchSites.add(body.domain || body.site, body.label));
+});
+
+router.patch('/websearch/sites/:id', (req, res) => {
+  const ok = searchSites.setEnabled(Number(req.params.id), (req.body || {}).enabled);
+  if (!ok) return res.status(404).json({ error: 'Site not found' });
+  res.json({ ok: true });
+});
+
+router.delete('/websearch/sites/:id', (req, res) => {
+  if (!searchSites.remove(Number(req.params.id))) {
+    return res.status(404).json({ error: 'Site not found' });
   }
   res.status(204).end();
 });

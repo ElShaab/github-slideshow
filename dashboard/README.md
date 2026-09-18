@@ -16,7 +16,7 @@ dashboard/
 │   ├── config.js          Environment / secrets
 │   ├── lib/               keywords, items, matcher, ingest, state, quota, http
 │   ├── routes/            /api/keywords, /api/items, /api/settings, /api/sources
-│   └── sources/           reddit.js, x.js, youtube.js, pubmed.js
+│   └── sources/           reddit.js, x.js, youtube.js, pubmed.js, websearch.js
 ├── public/                index.html, app.js, styles.css
 ├── test/                  node:test suites (no network required)
 └── data/                  SQLite file (gitignored)
@@ -145,17 +145,47 @@ you set `PUBMED_API_KEY`). To keep clinical searches separate from community
 chatter, add keywords scoped to PubMed only — the Research tab shows the
 resulting query and the articles it returned.
 
+### Web search — `BRAVE_SEARCH_API_KEY` *or* `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX`
+
+Covers communities that have no API of their own — Quora and Inspire are
+seeded, and any domain can be added. It asks a licensed search index for
+site-scoped matches and stores **only what that search API returns**: title,
+snippet and link. The result pages themselves are never fetched, so this does
+not scrape a site that prohibits it. You get told which threads are worth
+reading and click through to read them in context.
+
+Providers (pick one in the Sources tab):
+
+| Provider | Free tier | Results/query |
+| -------- | --------- | ------------- |
+| Brave Search API | 2,000 queries/month | 20 |
+| Google Programmable Search | 100 queries/day | 10 |
+
+Each query is one keyword against one site, and polls rotate through the
+keyword × site matrix, so keyword attribution is exact and the query count is
+predictable. At the defaults (every 12 h, 4 queries per poll) that is ~240
+queries/month, comfortably inside Brave's free tier. Queries are counted
+before they run, metered monthly or daily to match the provider, and the poll
+stops early rather than overspending. Results dedup on a normalized URL, with
+tracking parameters and fragments stripped, so the same thread never repeats.
+
+Where a result carries no publication date, the item is timestamped at
+discovery and `meta.published_known` is `false`.
+
 ### Intentionally excluded
 
-Quora, Inspire and Facebook groups have no public API, and scraping them
-violates their terms of service. There are no scrapers for them here; they
-stay manual-check sources outside this tool.
+There are no scrapers in this project. Quora, Inspire, Facebook groups and X's
+web interface all prohibit scraping in their terms and enforce it with bot
+protection, and Inspire in particular carries identifiable patient health
+discussion. Quora and Inspire are covered through the licensed search index
+described above; X is covered through its official API.
 
 ## Scheduling
 
 Each source has its own timer that re-reads its interval from the database
 after every run, so changing an interval in the UI takes effect without a
-restart. Defaults: Reddit 15 min, X 30 min, YouTube 30 min, PubMed 6 h.
+restart. Defaults: Reddit 15 min, X 30 min, YouTube 30 min, PubMed 6 h, web
+search 12 h.
 
 Failures are isolated. `runSource` never throws: a failing source records its
 error and the other timers keep running. A 429 or 503 sets `next_allowed_at`
@@ -182,14 +212,20 @@ staggered so every API is not called at once.
 | GET    | `/api/health` | Liveness plus per-source status |
 
 Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
-`/api/sources/youtube/channels` (both support GET/POST/PATCH/DELETE).
+`/api/sources/youtube/channels`, and web-search domains under
+`/api/sources/websearch/sites` (all support GET/POST/PATCH/DELETE).
 
 ## Database
 
 `keywords`, `keyword_sources`, `items`, `item_keywords`, `seen_items`,
-`source_state`, `settings`, `subreddits`, `youtube_channels`, `api_usage`,
-`poll_log`. The schema is created on boot by `src/db.js`; deleting
-`data/dashboard.db` resets everything.
+`source_state`, `settings`, `subreddits`, `youtube_channels`, `search_sites`,
+`api_usage`, `poll_log`. The schema is created on boot by `src/db.js`;
+deleting `data/dashboard.db` resets everything.
+
+Databases created before the source list grew are migrated on boot: `items`
+and `keyword_sources` are rebuilt without the old `CHECK (source IN …)`
+constraint, which SQLite cannot alter in place. Rows and indexes are
+preserved.
 
 ## Tests
 

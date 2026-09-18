@@ -6,6 +6,7 @@ const SOURCE_LABELS = {
   x: 'X (Twitter)',
   youtube: 'YouTube',
   pubmed: 'PubMed',
+  websearch: 'Web search',
 };
 
 const STATUSES = ['new', 'reviewed', 'used'];
@@ -488,6 +489,7 @@ function sourceCard(source) {
   if (source.id === 'reddit') card.append(redditControls(source));
   if (source.id === 'x') card.append(xControls(source));
   if (source.id === 'youtube') card.append(youtubeControls(source));
+  if (source.id === 'websearch') card.append(websearchControls(source));
 
   return card;
 }
@@ -651,6 +653,102 @@ function youtubeControls(source) {
     line.append(` ${label}`);
     wrap.append(line);
   }
+  return wrap;
+}
+
+function websearchControls(source) {
+  const d = source.details;
+  const wrap = el('div');
+
+  wrap.append(el('h3', '', 'Search provider'));
+  const select = el('select');
+  for (const id of d.providers) {
+    const option = el('option', '', id);
+    option.value = id;
+    if (d.provider === id) option.selected = true;
+    select.append(option);
+  }
+  select.addEventListener('change', async () => {
+    await saveSettings({ 'websearch.provider': select.value });
+    loadSources();
+  });
+  wrap.append(select);
+
+  wrap.append(
+    el(
+      'p',
+      'subtle',
+      `${d.quota.used} of ${d.quota.limit} queries used this ${d.quota.period} ` +
+        `(${d.quota.window}); ${d.quota.remaining} left. Each poll runs up to ` +
+        `${d.max_queries_per_poll} query(s), rotating through the keyword × site ` +
+        'list so every keyword gets covered over successive polls. Only the ' +
+        'search API\u2019s own titles, snippets and links are stored \u2014 the ' +
+        'pages themselves are never fetched.'
+    )
+  );
+
+  wrap.append(el('h3', '', 'Sites searched'));
+  wrap.append(
+    chipList(d.sites, {
+      labelFor: (entry) => entry.label || entry.domain,
+      onToggle: async (entry) => {
+        await api(`/sources/websearch/sites/${entry.id}`, {
+          method: 'PATCH',
+          body: { enabled: !entry.enabled },
+        });
+        loadSources();
+      },
+      onRemove: async (entry) => {
+        await api(`/sources/websearch/sites/${entry.id}`, { method: 'DELETE' });
+        loadSources();
+      },
+    })
+  );
+
+  const form = el('form', 'row');
+  form.style.marginTop = '0.6rem';
+  const input = el('input');
+  input.type = 'text';
+  input.placeholder = 'Add a domain, e.g. quora.com';
+  input.style.minWidth = '220px';
+  const submit = el('button', 'tiny', 'Add');
+  submit.type = 'submit';
+  form.append(input, submit);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      await api('/sources/websearch/sites', {
+        method: 'POST',
+        body: { domain: input.value },
+      });
+      input.value = '';
+      loadSources();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+  wrap.append(form);
+
+  const controls = el('div', 'grid-2');
+  for (const [key, label, min, max] of [
+    ['websearch.results_per_query', 'Results per query', 1, 20],
+    ['websearch.freshness_days', 'Look back (days)', 1, 365],
+    ['websearch.max_queries_per_poll', 'Queries per poll', 1, 50],
+  ]) {
+    const line = el('label', '', label);
+    const field = el('input');
+    field.type = 'number';
+    field.min = String(min);
+    field.max = String(max);
+    field.value = state.settings[key];
+    field.addEventListener('change', async () => {
+      await saveSettings({ [key]: field.value });
+      loadSources();
+    });
+    line.append(field);
+    controls.append(line);
+  }
+  wrap.append(controls);
   return wrap;
 }
 

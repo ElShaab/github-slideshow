@@ -176,6 +176,7 @@ button.tiny { padding: 0.2rem 0.5rem; font-size: 0.78rem; }
 .badge.source-x { color: var(--text); }
 .badge.source-youtube { color: #c4302b; }
 .badge.source-pubmed { color: #2b6cb0; }
+.badge.source-websearch { color: #6b46c1; }
 .badge.kw { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 
 .status-group { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }

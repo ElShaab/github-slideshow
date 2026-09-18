@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS keywords (
 -- Only populated when scope = 'specific'.
 CREATE TABLE IF NOT EXISTS keyword_sources (
   keyword_id  INTEGER NOT NULL REFERENCES keywords(id) ON DELETE CASCADE,
-  source      TEXT    NOT NULL CHECK (source IN ('reddit', 'x', 'youtube', 'pubmed')),
+  source      TEXT    NOT NULL,
   PRIMARY KEY (keyword_id, source)
 );
 
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS seen_items (
 -- The unified feed. Every source normalizes into this shape.
 CREATE TABLE IF NOT EXISTS items (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  source          TEXT    NOT NULL CHECK (source IN ('reddit', 'x', 'youtube', 'pubmed')),
+  source          TEXT    NOT NULL,
   external_id     TEXT    NOT NULL,
   author          TEXT,
   text            TEXT    NOT NULL,
@@ -99,6 +99,15 @@ CREATE TABLE IF NOT EXISTS subreddits (
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Domains the licensed-search-API source runs site: queries against.
+CREATE TABLE IF NOT EXISTS search_sites (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  domain     TEXT    NOT NULL UNIQUE,
+  label      TEXT,
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS youtube_channels (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   channel_id TEXT    NOT NULL UNIQUE,
@@ -130,9 +139,57 @@ CREATE TABLE IF NOT EXISTS poll_log (
 CREATE INDEX IF NOT EXISTS idx_poll_log_started ON poll_log (started_at DESC);
 `;
 
+/**
+ * Databases created before the source list grew carry a CHECK constraint that
+ * only allows the original four sources. SQLite cannot alter a CHECK in place,
+ * so those two tables are rebuilt without it. Runs before the schema is
+ * applied, so the CREATE INDEX statements below restore the dropped indexes.
+ */
+function migrateLegacySourceChecks() {
+  const tableSql = (name) => {
+    const row = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(name);
+    return row ? row.sql : null;
+  };
+
+  const stale = ['items', 'keyword_sources'].filter((name) => {
+    const sql = tableSql(name);
+    return sql && /CHECK \(source IN/.test(sql);
+  });
+  if (!stale.length) return;
+
+  db.pragma('foreign_keys = OFF');
+  db.transaction(() => {
+    for (const name of stale) {
+      const rebuilt = tableSql(name)
+        .replace(/CHECK \(source IN \([^)]*\)\)/, '')
+        .replace(/source(\s+)TEXT(\s+)NOT NULL(\s+),/, 'source$1TEXT$2NOT NULL,')
+        .replace(new RegExp(`(CREATE TABLE )("?)${name}\\2`), `$1${name}__migrated`);
+      db.exec(rebuilt);
+      const columns = db
+        .prepare(`PRAGMA table_info(${name})`)
+        .all()
+        .map((c) => `"${c.name}"`)
+        .join(', ');
+      db.exec(
+        `INSERT INTO ${name}__migrated (${columns}) SELECT ${columns} FROM ${name}`
+      );
+      db.exec(`DROP TABLE ${name}`);
+      db.exec(`ALTER TABLE ${name}__migrated RENAME TO ${name}`);
+    }
+  })();
+  db.pragma('foreign_keys = ON');
+  console.log(
+    `[db] migrated ${stale.join(', ')} to the extensible source list`
+  );
+}
+
+migrateLegacySourceChecks();
+
 db.exec(SCHEMA);
 
-const SOURCES = ['reddit', 'x', 'youtube', 'pubmed'];
+const SOURCES = ['reddit', 'x', 'youtube', 'pubmed', 'websearch'];
 
 const DEFAULT_SETTINGS = {
   'reddit.enabled': 'true',
@@ -154,11 +211,28 @@ const DEFAULT_SETTINGS = {
   'youtube.channel_comments': 'true',
   'youtube.max_search_keywords': '4',
 
+  // Licensed search APIs have small free tiers, so this polls twice a day.
+  'websearch.enabled': 'false',
+  'websearch.interval_minutes': '720',
+  'websearch.provider': 'brave',
+  'websearch.results_per_query': '10',
+  'websearch.freshness_days': '30',
+  'websearch.max_queries_per_poll': '4',
+  // Brave's free tier is 2,000 queries/month; Google's is 100/day.
+  'websearch.monthly_quota': '2000',
+  'websearch.daily_quota': '100',
+  'websearch.quota_reserve': '0',
+
   'pubmed.enabled': 'true',
   'pubmed.interval_minutes': '360',
   'pubmed.reldate_days': '30',
   'pubmed.max_results': '25',
 };
+
+const DEFAULT_SEARCH_SITES = [
+  ['quora.com', 'Quora'],
+  ['inspire.com', 'Inspire'],
+];
 
 const DEFAULT_SUBREDDITS = [
   'amputee',
@@ -180,6 +254,9 @@ function seed() {
   const insertSub = db.prepare(
     'INSERT OR IGNORE INTO subreddits (name) VALUES (?)'
   );
+  const insertSite = db.prepare(
+    'INSERT OR IGNORE INTO search_sites (domain, label) VALUES (?, ?)'
+  );
 
   db.transaction(() => {
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
@@ -193,6 +270,12 @@ function seed() {
       .get().n;
     if (existing === 0) {
       for (const name of DEFAULT_SUBREDDITS) insertSub.run(name);
+    }
+    const existingSites = db
+      .prepare('SELECT COUNT(*) AS n FROM search_sites')
+      .get().n;
+    if (existingSites === 0) {
+      for (const [domain, label] of DEFAULT_SEARCH_SITES) insertSite.run(domain, label);
     }
   })();
 }

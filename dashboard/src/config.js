@@ -38,6 +38,17 @@ const config = {
     apiKey: process.env.YOUTUBE_API_KEY || '',
   },
 
+  // Licensed search APIs, used to discover discussions on sites that have no
+  // API of their own. Only what the search API returns is stored: the result
+  // pages themselves are never fetched.
+  search: {
+    brave: { apiKey: process.env.BRAVE_SEARCH_API_KEY || '' },
+    google: {
+      apiKey: process.env.GOOGLE_SEARCH_API_KEY || '',
+      cx: process.env.GOOGLE_SEARCH_CX || '',
+    },
+  },
+
   pubmed: {
     // Optional. Without a key NCBI allows ~3 requests/second, which is plenty.
     apiKey: process.env.PUBMED_API_KEY || '',

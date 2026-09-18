@@ -12,6 +12,11 @@ const stmts = {
   recent: db.prepare(
     'SELECT * FROM api_usage WHERE source = ? ORDER BY day DESC LIMIT ?'
   ),
+  month: db.prepare(
+    `SELECT COALESCE(SUM(units), 0) AS units, COALESCE(SUM(calls), 0) AS calls
+       FROM api_usage
+      WHERE source = ? AND day LIKE ?`
+  ),
 };
 
 /**
@@ -46,8 +51,37 @@ function remaining(source, dailyQuota, reserve = 0, day = pacificDay()) {
   return Math.max(0, dailyQuota - reserve - used(source, day));
 }
 
+/** Calendar month of the quota day, e.g. "2026-09". */
+function pacificMonth(date = new Date()) {
+  return pacificDay(date).slice(0, 7);
+}
+
+/** Units used this calendar month, for providers that meter monthly. */
+function monthUsed(source, month = pacificMonth()) {
+  return stmts.month.get(source, `${month}%`).units;
+}
+
+function monthCalls(source, month = pacificMonth()) {
+  return stmts.month.get(source, `${month}%`).calls;
+}
+
+function monthRemaining(source, monthlyQuota, reserve = 0, month = pacificMonth()) {
+  return Math.max(0, monthlyQuota - reserve - monthUsed(source, month));
+}
+
 function history(source, limit = 7) {
   return stmts.recent.all(source, limit);
 }
 
-module.exports = { record, used, calls, remaining, history, pacificDay };
+module.exports = {
+  record,
+  used,
+  calls,
+  remaining,
+  history,
+  pacificDay,
+  pacificMonth,
+  monthUsed,
+  monthCalls,
+  monthRemaining,
+};

@@ -25,7 +25,13 @@ test('rejects an empty keyword', () => {
 
 test('scope "all" expands to every source', () => {
   const created = keywords.create({ term: 'socket fit' });
-  assert.deepEqual(created.sources, ['reddit', 'x', 'youtube', 'pubmed']);
+  assert.deepEqual(created.sources, [
+    'reddit',
+    'x',
+    'youtube',
+    'pubmed',
+    'websearch',
+  ]);
 });
 
 test('specific scope stores only the chosen sources', () => {

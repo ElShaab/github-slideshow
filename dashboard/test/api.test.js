@@ -34,7 +34,7 @@ test('health reports every source', async () => {
   assert.equal(status, 200);
   assert.deepEqual(
     data.sources.map((s) => s.id),
-    ['reddit', 'x', 'youtube', 'pubmed']
+    ['reddit', 'x', 'youtube', 'pubmed', 'websearch']
   );
 });
 
@@ -62,7 +62,13 @@ test('keyword CRUD round trip', async () => {
     method: 'PUT',
     body: { scope: 'all' },
   });
-  assert.deepEqual(updated.data.sources, ['reddit', 'x', 'youtube', 'pubmed']);
+  assert.deepEqual(updated.data.sources, [
+    'reddit',
+    'x',
+    'youtube',
+    'pubmed',
+    'websearch',
+  ]);
 
   const listed = await call('/api/keywords');
   assert.equal(listed.data.keywords.length, 1);
