@@ -7,7 +7,7 @@ import {
 import { env } from '../config/env';
 import { AppError } from '../utils/errors';
 import { logger } from '../utils/logger';
-import { buildHologramData } from './hologram';
+import { buildHologramData } from '@getfit/shared';
 import { MeasurementBodyAnalysisProvider } from './measurementBodyAnalysisProvider';
 import type { BodyAnalysisInput, BodyAnalysisProvider } from './types';
 

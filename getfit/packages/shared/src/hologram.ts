@@ -1,12 +1,5 @@
-import { createHash } from 'node:crypto';
-import {
-  limbBalance,
-  shoulderToWaistRatio,
-  type BodyMeasurements,
-  type HologramData,
-  type HologramSegment,
-  type Sex,
-} from '@getfit/shared';
+import { limbBalance, shoulderToWaistRatio } from './bodyComposition';
+import type { BodyMeasurements, HologramData, HologramSegment, Sex } from './types';
 
 /**
  * Hologram geometry.
@@ -157,7 +150,24 @@ function geometrySeed(input: HologramInput): number {
     m.leftThighCm ?? '',
     m.rightThighCm ?? '',
   ].join('|');
-  return createHash('sha256').update(canonical).digest().readUInt32BE(0);
+  return hash32(canonical);
+}
+
+/**
+ * FNV-1a, in plain arithmetic.
+ *
+ * This used to be a SHA-256 prefix, which needed node:crypto and therefore a
+ * server. The seed is stored so an assessment can be identified, and nothing
+ * in the geometry is derived from it — every segment comes from the
+ * measurements — so any stable hash does the job, and this one runs anywhere.
+ */
+function hash32(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
 }
 
 /** Mean of a measured pair, or null when neither side was measured. */

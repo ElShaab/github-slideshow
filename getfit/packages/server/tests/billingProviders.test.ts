@@ -142,7 +142,7 @@ describe('hologram seeding (#13)', () => {
     const { MeasurementBodyAnalysisProvider } = await import(
       '../src/ai/measurementBodyAnalysisProvider'
     );
-    const { buildHologramData } = await import('../src/ai/hologram');
+    const { buildHologramData } = await import('@getfit/shared');
 
     const result = await new MeasurementBodyAnalysisProvider().analyze({ measurements, profile });
 

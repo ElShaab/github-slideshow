@@ -9,3 +9,5 @@ export * from './pricing';
 export * from './entitlement';
 export * from './errors';
 export * from './programming';
+export * from './hologram';
+export * from './bodyAnalysis';
