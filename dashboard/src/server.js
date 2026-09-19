@@ -16,6 +16,8 @@ app.use('/api/keywords', require('./routes/keywords'));
 app.use('/api/items', require('./routes/items'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/sources', require('./routes/sources'));
+app.use('/api', require('./routes/research'));
+app.use('/api', require('./routes/drafts'));
 
 app.get('/api/health', (req, res) => {
   res.json({

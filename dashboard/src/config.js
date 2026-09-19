@@ -38,6 +38,18 @@ const config = {
     apiKey: process.env.YOUTUBE_API_KEY || '',
   },
 
+  // Optional: raises Semantic Scholar's shared rate limit. The other five
+  // research APIs need no credentials.
+  semanticScholar: {
+    apiKey: process.env.SEMANTIC_SCHOLAR_API_KEY || '',
+  },
+
+  // Draft reply generation. Stored as a Replit secret / environment variable,
+  // never in the repository.
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
+  },
+
   // Licensed search APIs, used to discover discussions on sites that have no
   // API of their own. Only what the search API returns is stored: the result
   // pages themselves are never fetched.

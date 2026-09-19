@@ -125,6 +125,35 @@ CREATE TABLE IF NOT EXISTS api_usage (
   PRIMARY KEY (day, source)
 );
 
+-- Feature: research matching. One merged, ranked result set per question,
+-- cached so the six upstream APIs are not re-queried on every page view.
+CREATE TABLE IF NOT EXISTS research_matches (
+  item_id           INTEGER PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+  query_terms       TEXT    NOT NULL,
+  results           TEXT    NOT NULL,
+  providers         TEXT    NOT NULL,
+  no_strong_matches INTEGER NOT NULL DEFAULT 0,
+  note              TEXT,
+  considered        INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Feature: draft replies. Generated drafts are for review only; nothing in
+-- this application posts anywhere.
+CREATE TABLE IF NOT EXISTS drafts (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id    INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  content    TEXT    NOT NULL,
+  status     TEXT    NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'edited', 'used')),
+  model      TEXT,
+  usage      TEXT,
+  citations  TEXT,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_drafts_item ON drafts (item_id, id DESC);
+
 CREATE TABLE IF NOT EXISTS poll_log (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   source     TEXT    NOT NULL,
@@ -222,6 +251,29 @@ const DEFAULT_SETTINGS = {
   'websearch.monthly_quota': '2000',
   'websearch.daily_quota': '100',
   'websearch.quota_reserve': '0',
+
+  // Research matching across the six literature APIs.
+  'research.max_results': '8',
+  'research.min_results': '3',
+  'research.min_relevance': '0.25',
+  'research.strong_relevance': '0.45',
+  'research.max_terms': '6',
+  'research.per_provider_limit': '20',
+  'research.cache_hours': '168',
+  // Crossref, OpenAlex and NCBI all ask for a contact address and give
+  // politer rate limits when they get one.
+  'research.contact_email': '',
+  'research.provider_pubmed': 'true',
+  'research.provider_europepmc': 'true',
+  'research.provider_crossref': 'true',
+  'research.provider_semanticscholar': 'true',
+  'research.provider_openalex': 'true',
+  'research.provider_clinicaltrials': 'true',
+
+  // Draft reply generation (Anthropic API).
+  'draft.model': 'claude-opus-5',
+  'draft.effort': 'high',
+  'draft.max_tokens': '16000',
 
   'pubmed.enabled': 'true',
   'pubmed.interval_minutes': '360',

@@ -19,6 +19,11 @@ function mockFetch(routes) {
   global.fetch = async (url, options) => {
     const href = String(url);
     calls.push(href);
+    // Requests to the test's own HTTP server always pass through, so a route
+    // table for upstream APIs does not swallow the calls under test.
+    if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])[:/]/.test(href)) {
+      return original(url, options);
+    }
     const key = Object.keys(routes).find((k) => href.includes(k));
     if (!key) {
       return new Response('{"error":"unexpected url"}', {
