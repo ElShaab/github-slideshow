@@ -8,8 +8,12 @@ const scheduler = require('./scheduler');
 const items = require('./lib/items');
 const settings = require('./lib/settings');
 
+const guard = require('./lib/guard');
+
 const app = express();
 app.disable('x-powered-by');
+// Optional password, in front of everything including the OAuth callbacks.
+app.use(guard.middleware());
 app.use(express.json({ limit: '256kb' }));
 
 app.use('/api/keywords', require('./routes/keywords'));
@@ -18,6 +22,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/sources', require('./routes/sources'));
 app.use('/api', require('./routes/research'));
 app.use('/api', require('./routes/drafts'));
+app.use('/api', require('./routes/connections'));
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -66,6 +71,7 @@ function start() {
       `Amputee research dashboard listening on http://${config.host}:${config.port}`
     );
     console.log(`Database: ${config.dbPath}`);
+    guard.warnIfUnprotected();
     if (config.pollingEnabled) {
       scheduler.start();
     } else {

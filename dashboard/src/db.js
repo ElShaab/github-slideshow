@@ -138,6 +138,46 @@ CREATE TABLE IF NOT EXISTS research_matches (
   created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Linked accounts. OAuth tokens are encrypted at rest (src/lib/secrets.js);
+-- one row per provider, since this is a single-physician tool.
+CREATE TABLE IF NOT EXISTS connections (
+  provider      TEXT PRIMARY KEY,
+  account_id    TEXT,
+  account_name  TEXT,
+  scopes        TEXT,
+  access_token  TEXT NOT NULL,
+  refresh_token TEXT,
+  expires_at    TEXT,
+  connected_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  last_error    TEXT
+);
+
+-- Short-lived CSRF state (and PKCE verifier) for an in-flight connect.
+CREATE TABLE IF NOT EXISTS oauth_states (
+  state      TEXT PRIMARY KEY,
+  provider   TEXT NOT NULL,
+  verifier   TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Every reply this dashboard sends, successful or not. Append-only record.
+CREATE TABLE IF NOT EXISTS replies (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id   INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  draft_id  INTEGER REFERENCES drafts(id) ON DELETE SET NULL,
+  provider  TEXT    NOT NULL,
+  target_id TEXT    NOT NULL,
+  content   TEXT    NOT NULL,
+  status    TEXT    NOT NULL CHECK (status IN ('posted', 'failed')),
+  remote_id TEXT,
+  url       TEXT,
+  error     TEXT,
+  posted_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_replies_item ON replies (item_id, id DESC);
+
 -- Feature: draft replies. Generated drafts are for review only; nothing in
 -- this application posts anywhere.
 CREATE TABLE IF NOT EXISTS drafts (
@@ -271,6 +311,11 @@ const DEFAULT_SETTINGS = {
   'research.provider_clinicaltrials': 'true',
 
   // Draft reply generation (Anthropic API).
+  // Replying. Nothing here posts on a schedule or in bulk: a reply is sent
+  // only by an explicit, confirmed click on one draft.
+  'reply.enabled': 'true',
+  'reply.confirm_each': 'true',
+
   'draft.model': 'claude-opus-5',
   'draft.effort': 'high',
   'draft.max_tokens': '16000',

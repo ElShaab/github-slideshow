@@ -228,6 +228,40 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .question-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.6rem 0; }
 
+.reply-bar {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.reply-bar .dest { font-size: 0.82rem; color: var(--text-dim); }
+.reply-bar .dest b { color: var(--text); font-weight: 600; }
+.reply-sent {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ok);
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+}
+.reply-sent.failed { border-left-color: var(--err); }
+
+.connection {
+  display: flex; gap: 0.6rem; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; padding: 0.6rem; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--surface-2); margin-bottom: 0.5rem;
+}
+.connection .who { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.connection .who strong { font-size: 0.9rem; }
+.connection .who span { font-size: 0.78rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.redirect {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.15rem 0.4rem; overflow-wrap: anywhere;
+}
+
 .citations { margin-top: 0.75rem; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
 .citations .cite { color: var(--text-dim); }
 .citations .cite b { color: var(--text); font-weight: 600; }

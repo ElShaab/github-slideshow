@@ -17,7 +17,7 @@ const state = {
   settings: {},
   feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0 },
   editingKeyword: null,
-  workbench: { itemId: null, items: [], match: null, draft: null, drafts: [] },
+  workbench: { itemId: null, items: [], match: null, draft: null, drafts: [], replyTarget: null },
 };
 
 /* ------------------------------------------------------------------ utils */
@@ -758,6 +758,83 @@ function websearchControls(source) {
   return wrap;
 }
 
+function connectionsCard(info) {
+  const card = el('div', 'card');
+  const head = el('div', 'card-head');
+  head.append(el('h2', '', 'Linked accounts'));
+  head.append(
+    el('span', 'subtle', `${info.replies.posted} reply(s) sent · ${info.replies.failed} failed`)
+  );
+  card.append(head);
+  card.append(
+    el(
+      'p',
+      'subtle',
+      'Replies post as the account you link here. Nothing is ever sent automatically: you confirm each reply from the Workbench.'
+    )
+  );
+
+  for (const provider of info.providers) {
+    const row = el('div', 'connection');
+    const who = el('div', 'who');
+    who.append(el('strong', '', provider.label));
+
+    if (provider.connection) {
+      who.append(el('span', '', `Connected as ${provider.connection.account_name}`));
+      if (provider.connection.last_error) {
+        who.append(el('span', 'error', provider.connection.last_error));
+      }
+    } else if (!provider.registered) {
+      who.append(el('span', '', `Not set up yet — ${provider.registration}`));
+      const uri = el('span', 'redirect', provider.redirect_uri);
+      who.append(uri);
+    } else {
+      who.append(el('span', '', 'Not connected'));
+    }
+    row.append(who);
+
+    const actions = el('div', 'row');
+    if (provider.connection) {
+      const reconnect = el('button', 'tiny ghost', 'Reconnect');
+      reconnect.addEventListener('click', () => startConnect(provider));
+      const remove = el('button', 'tiny danger', 'Disconnect');
+      remove.addEventListener('click', async () => {
+        if (!confirm(`Disconnect ${provider.connection.account_name}? Replies to ${provider.label} will stop working until you link it again.`)) {
+          return;
+        }
+        try {
+          await api(`/connections/${provider.id}`, { method: 'DELETE' });
+          toast(`${provider.label} disconnected`);
+          loadSources();
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+      actions.append(reconnect, remove);
+    } else {
+      const connect = el('button', 'tiny', `Connect ${provider.label}`);
+      connect.disabled = !provider.registered;
+      connect.title = provider.registered
+        ? `Sign in and authorize ${provider.label}`
+        : 'Add this platform\u2019s client credentials first';
+      connect.addEventListener('click', () => startConnect(provider));
+      actions.append(connect);
+    }
+    row.append(actions);
+    card.append(row);
+  }
+  return card;
+}
+
+function startConnect(provider) {
+  // The consent screen belongs to the platform, so it opens in its own tab
+  // and the dashboard picks up the result when you come back.
+  window.open(`/api/connections/${provider.id}/start`, '_blank', 'noopener');
+  toast(`Finish signing in to ${provider.label} in the new tab`);
+  const recheck = setInterval(loadSources, 4000);
+  setTimeout(() => clearInterval(recheck), 120000);
+}
+
 function researchCard(info) {
   const card = el('div', 'card');
   const head = el('div', 'card-head');
@@ -817,6 +894,7 @@ async function loadSources() {
     container.innerHTML = '';
     for (const source of data.sources) container.append(sourceCard(source));
     try {
+      container.append(connectionsCard(await api('/connections')));
       container.append(researchCard(await api('/research/providers')));
     } catch (err) {
       console.error(err);
@@ -1193,6 +1271,103 @@ async function refreshDraftAvailability() {
   }
 }
 
+function renderReply() {
+  const bar = $('#wb-reply');
+  const target = state.workbench.replyTarget;
+  const draft = state.workbench.draft;
+  bar.innerHTML = '';
+  if (!target) return;
+
+  for (const sent of target.already_posted || []) {
+    const box = el('div', `reply-sent${sent.status === 'failed' ? ' failed' : ''}`);
+    box.append(
+      document.createTextNode(
+        `Replied ${relativeTime(sent.posted_at)} as ${SOURCE_LABELS[sent.provider] || sent.provider}. `
+      )
+    );
+    if (sent.url) {
+      const link = el('a', '', 'View the reply ↗');
+      link.href = sent.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      box.append(link);
+    }
+    bar.append(box);
+  }
+
+  const dest = el('div', 'dest');
+  if (!target.can_reply) {
+    dest.textContent = target.reason || 'This item cannot be replied to from the dashboard.';
+    bar.append(dest);
+    if (target.provider && !target.connected) {
+      const connect = el('button', 'tiny ghost', `Link a ${target.provider_label} account`);
+      connect.addEventListener('click', () => showTab('sources'));
+      bar.append(connect);
+    }
+    return;
+  }
+
+  dest.append(document.createTextNode('Posts as '));
+  dest.append(el('b', '', target.account_name));
+  dest.append(document.createTextNode(` to ${target.description}.`));
+  bar.append(dest);
+
+  const row = el('div', 'row');
+  const send = el('button', '', 'Post reply');
+  send.disabled = !draft || !draft.content.trim();
+  send.title = send.disabled ? 'Write or generate a draft first' : `Send to ${target.provider_label}`;
+  send.addEventListener('click', () => postReply(target));
+  row.append(send);
+
+  if (target.target_url) {
+    const link = el('a', '', 'Open the thread ↗');
+    link.href = target.target_url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    row.append(link);
+  }
+  bar.append(row);
+}
+
+async function postReply(target) {
+  const draft = state.workbench.draft;
+  if (!draft) return;
+
+  // Save any unsent edits first, so what goes out is what is on screen.
+  const onScreen = $('#wb-draft-text').value;
+  if (onScreen.trim() !== draft.content.trim()) await saveDraft();
+
+  const current = state.workbench.draft;
+  const warning = (target.already_posted || []).some((r) => r.status === 'posted')
+    ? '\n\nYou have already replied to this thread once.'
+    : '';
+  const preview = current.content.trim().slice(0, 400);
+  const ok = confirm(
+    `Post this reply as ${target.account_name} to ${target.description}?` +
+      `${warning}\n\n${preview}${current.content.trim().length > 400 ? '…' : ''}` +
+      '\n\nThis publishes publicly and cannot be undone from the dashboard.'
+  );
+  if (!ok) return;
+
+  const button = $('#wb-reply').querySelector('button');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Posting…';
+  }
+  try {
+    const result = await api(`/drafts/${current.id}/post`, {
+      method: 'POST',
+      body: { confirm: true },
+    });
+    toast(`Posted as ${result.account}`);
+    await loadWorkbench();
+    refreshCounts();
+  } catch (err) {
+    toast(err.message, true);
+    await loadWorkbench();
+  }
+}
+
 async function loadWorkbench() {
   try {
     await Promise.all([loadWorkbenchQuestions(), refreshDraftAvailability()]);
@@ -1206,19 +1381,22 @@ async function loadWorkbench() {
       return;
     }
 
-    const [item, match, draftData] = await Promise.all([
+    const [item, match, draftData, replyTarget] = await Promise.all([
       api(`/items/${itemId}`),
       api(`/items/${itemId}/research`),
       api(`/items/${itemId}/drafts`),
+      api(`/items/${itemId}/reply-target`),
     ]);
 
     state.workbench.match = match;
     state.workbench.drafts = draftData.drafts;
     state.workbench.draft = draftData.drafts[0] || null;
+    state.workbench.replyTarget = replyTarget;
 
     renderQuestion(item);
     renderMatch(match);
     renderDraft();
+    renderReply();
   } catch (err) {
     toast(err.message, true);
   }
@@ -1267,6 +1445,7 @@ async function generateDraft() {
     state.workbench.drafts = [data.draft, ...state.workbench.drafts];
     state.workbench.draft = data.draft;
     renderDraft();
+    renderReply();
     toast('Draft generated — review before using');
   } catch (err) {
     toast(err.message, true);

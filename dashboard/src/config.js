@@ -30,8 +30,26 @@ const config = {
     process.env.USER_AGENT ||
     'amputee-research-dashboard/1.0 (personal research tool)',
 
+  // Where this dashboard is reachable from the internet, used to build OAuth
+  // redirect URIs. On Replit this is the webview URL (https://<slug>.repl.co
+  // or the .replit.dev address shown when the app runs).
+  publicUrl: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
+
   x: {
     bearerToken: process.env.X_BEARER_TOKEN || '',
+    // Separate from the read-only bearer token: posting needs user context.
+    clientId: process.env.X_CLIENT_ID || '',
+    clientSecret: process.env.X_CLIENT_SECRET || '',
+  },
+
+  reddit: {
+    clientId: process.env.REDDIT_CLIENT_ID || '',
+    clientSecret: process.env.REDDIT_CLIENT_SECRET || '',
+  },
+
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   },
 
   youtube: {

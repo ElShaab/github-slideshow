@@ -18,6 +18,7 @@ dashboard/
 │   │                      drafts, researchStore
 │   ├── routes/            /api/keywords, /api/items, /api/settings, /api/sources,
 │   │                      /api/research, /api/drafts
+│   ├── connect/           OAuth account linking and reply posting per platform
 │   ├── sources/           reddit.js, x.js, youtube.js, pubmed.js, websearch.js
 │   ├── research/          term extraction, evidence grading, merge, rank, and
 │   │                      one provider per literature API
@@ -174,6 +175,49 @@ posted anywhere by this application.
 - Without `ANTHROPIC_API_KEY` the button is disabled and the rest of the
   dashboard, including writing drafts by hand, still works.
 
+## Replying from the dashboard
+
+A reviewed draft can be posted straight back to the thread it came from, as
+**your own account**. Link each platform once in **Sources → Linked accounts**:
+
+| Platform | What to register | Scopes requested |
+| -------- | ---------------- | ---------------- |
+| Reddit | reddit.com/prefs/apps → "web app" | `identity submit edit read` |
+| X | developer.x.com → OAuth 2.0, Read and write (PKCE) | `tweet.write`, `offline.access`, … |
+| YouTube | Google Cloud → OAuth client ID (Web application) | `youtube.force-ssl` |
+
+Set `PUBLIC_URL` to the address this dashboard is reachable at, then copy the
+redirect URI each card shows into the platform's app settings — they must match
+exactly. Pressing **Connect** opens that platform's own consent screen; the
+dashboard never sees your password. Tokens are stored encrypted
+(`TOKEN_SECRET`, or a generated key if you don't set one) and refreshed
+automatically when they expire.
+
+Replies go out only on an explicit, confirmed click on one draft:
+
+- The Workbench names the account and the exact thread before you send, and
+  shows the text you are about to post in the confirmation.
+- A thread you have already replied to says so, with a link to that reply.
+- Drafts too long for the platform (X's 280 characters) are caught before
+  anything is sent.
+- Sending marks the draft and the question **Used**. Every attempt, successful
+  or failed, is recorded in the `replies` table with what was sent and where.
+- Nothing posts on a schedule, in bulk, or without the text having been shown.
+  `reply.enabled` switches the whole capability off.
+
+Reddit answers with HTTP 200 and an error array for rate limits, removed
+threads and subreddit rule violations; those are treated as failures and
+surfaced rather than swallowed. A YouTube reply costs 50 quota units (plus one
+to find the parent comment) against the same daily budget the comment polling
+uses.
+
+### Protecting the dashboard
+
+Once an account is linked, anyone who can reach the dashboard's URL can post
+as you. Set `DASHBOARD_PASSWORD` (and optionally `DASHBOARD_USER`) to put the
+whole app, OAuth callbacks included, behind HTTP Basic auth. If an account is
+linked and no password is set, the server says so at boot.
+
 ## Sources
 
 ### Reddit — no credentials
@@ -310,6 +354,13 @@ staggered so every API is not called at once.
 | PATCH  | `/api/drafts/:id` | `{status: "draft" \| "edited" \| "used"}` |
 | DELETE | `/api/drafts/:id` | Delete a draft |
 | GET    | `/api/drafts/status` | Whether the Anthropic key is present, and the model |
+| GET    | `/api/connections` | Linked accounts, redirect URIs, what still needs registering |
+| GET    | `/api/connections/:provider/start` | Begin linking (redirects to the platform) |
+| GET    | `/api/connections/:provider/callback` | OAuth return leg |
+| DELETE | `/api/connections/:provider` | Unlink an account |
+| GET    | `/api/items/:id/reply-target` | Where a reply would go, and as whom |
+| POST   | `/api/drafts/:id/post` | Send the reply (requires `{confirm: true}`) |
+| GET    | `/api/replies` | Everything sent, newest first |
 
 Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
 `/api/sources/youtube/channels`, and web-search domains under
@@ -319,7 +370,8 @@ Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
 
 `keywords`, `keyword_sources`, `items`, `item_keywords`, `seen_items`,
 `source_state`, `settings`, `subreddits`, `youtube_channels`, `search_sites`,
-`api_usage`, `poll_log`, `research_matches`, `drafts`. The schema is created on
+`api_usage`, `poll_log`, `research_matches`, `drafts`, `connections`,
+`oauth_states`, `replies`. The schema is created on
 boot by `src/db.js`; deleting `data/dashboard.db` resets everything. Cached
 research and drafts are removed with their question by foreign key.
 
@@ -340,4 +392,5 @@ and rate-limit/quota behaviour (with a mocked transport), scheduler failure
 isolation, research term extraction, evidence grading, cross-database
 deduplication and ranking, all six research providers and their partial-failure
 behaviour, draft prompt construction and generation (including refusal and
-rate-limit handling), and the HTTP API. No network access is required.
+rate-limit handling), the OAuth connect flows and token encryption, reply
+posting on all three platforms with its safety rails, and the HTTP API. No network access is required.
