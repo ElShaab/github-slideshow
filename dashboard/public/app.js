@@ -17,6 +17,7 @@ const state = {
   settings: {},
   feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0 },
   editingKeyword: null,
+  workbench: { itemId: null, items: [], match: null, draft: null, drafts: [] },
 };
 
 /* ------------------------------------------------------------------ utils */
@@ -142,6 +143,11 @@ function itemCard(item) {
     link.rel = 'noopener noreferrer';
     foot.append(link);
   }
+
+  const research = el('button', 'tiny ghost', 'Research →');
+  research.title = 'Match this question against the research databases';
+  research.addEventListener('click', () => openInWorkbench(item.id));
+  foot.append(research);
 
   const del = el('button', 'tiny danger', 'Dismiss');
   del.title = 'Remove from the feed. It will not come back on the next poll.';
@@ -752,6 +758,57 @@ function websearchControls(source) {
   return wrap;
 }
 
+function researchCard(info) {
+  const card = el('div', 'card');
+  const head = el('div', 'card-head');
+  head.append(el('h2', '', 'Research databases'));
+  head.append(
+    el(
+      'span',
+      'subtle',
+      `${info.cache.matched_items} question(s) matched · ${info.cache.no_strong_matches} with no strong match`
+    )
+  );
+  card.append(head);
+  card.append(
+    el(
+      'p',
+      'subtle',
+      'Queried per question from the Workbench tab, not on a schedule. Results are merged, deduplicated and ranked by evidence quality.'
+    )
+  );
+
+  const list = el('div', 'source-checks');
+  for (const provider of info.providers) {
+    const line = el('label', 'inline');
+    const checkbox = el('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = provider.enabled;
+    checkbox.addEventListener('change', async () => {
+      await saveSettings({ [`research.provider_${provider.id}`]: String(checkbox.checked) });
+      loadSources();
+    });
+    line.prepend(checkbox);
+    line.append(` ${provider.label}`);
+    list.append(line);
+  }
+  card.append(list);
+
+  const emailLabel = el('label', '', 'Contact email (Crossref, OpenAlex and NCBI ask for one)');
+  emailLabel.style.marginTop = '0.75rem';
+  const email = el('input');
+  email.type = 'text';
+  email.placeholder = 'you@example.com';
+  email.value = info.contact_email || '';
+  email.addEventListener('change', async () => {
+    await saveSettings({ 'research.contact_email': email.value });
+    toast('Contact address saved');
+  });
+  emailLabel.append(email);
+  card.append(emailLabel);
+  return card;
+}
+
 async function loadSources() {
   try {
     state.settings = await api('/settings');
@@ -759,6 +816,11 @@ async function loadSources() {
     const container = $('#source-cards');
     container.innerHTML = '';
     for (const source of data.sources) container.append(sourceCard(source));
+    try {
+      container.append(researchCard(await api('/research/providers')));
+    } catch (err) {
+      console.error(err);
+    }
 
     const log = $('#poll-log');
     log.innerHTML = '';
@@ -816,18 +878,449 @@ async function loadResearch() {
   }
 }
 
+/* -------------------------------------------------------------- workbench */
+
+const EVIDENCE_HINT = {
+  1: 'Strongest: pooled trials or an official guideline',
+  2: 'Randomized controlled trial',
+  3: 'Trial or cohort study',
+  4: 'Observational study',
+  5: 'Weakest: single case, opinion, or not peer reviewed',
+};
+
+function openInWorkbench(itemId) {
+  state.workbench.itemId = itemId;
+  showTab('workbench');
+}
+
+async function loadWorkbenchQuestions() {
+  const scope = $('#wb-scope').value;
+  const params = new URLSearchParams({ limit: '100' });
+  if (scope) params.set('status', scope);
+  const data = await api(`/items?${params}`);
+  state.workbench.items = data.items;
+
+  // A question opened from the feed stays selected even when the status
+  // filter would hide it - the click was explicit.
+  const wanted = state.workbench.itemId;
+  if (wanted && !data.items.some((i) => i.id === wanted)) {
+    try {
+      const pinned = await api(`/items/${wanted}`);
+      state.workbench.items = [pinned, ...data.items];
+    } catch {
+      // The item is gone; fall through to the filtered list.
+    }
+  }
+
+  const select = $('#wb-question');
+  select.innerHTML = '';
+  if (!state.workbench.items.length) {
+    const option = el('option', '', 'No questions match this filter');
+    option.value = '';
+    select.append(option);
+  }
+  for (const item of state.workbench.items) {
+    const option = el(
+      'option',
+      '',
+      `${SOURCE_LABELS[item.source] || item.source} · ${item.text.slice(0, 80).replace(/\s+/g, ' ')}`
+    );
+    option.value = String(item.id);
+    select.append(option);
+  }
+  if (
+    !state.workbench.itemId ||
+    !state.workbench.items.some((i) => i.id === state.workbench.itemId)
+  ) {
+    state.workbench.itemId = state.workbench.items.length
+      ? state.workbench.items[0].id
+      : null;
+  }
+  select.value = state.workbench.itemId ? String(state.workbench.itemId) : '';
+}
+
+function renderQuestion(item) {
+  const card = $('#wb-question-card');
+  card.innerHTML = '';
+  if (!item) {
+    card.append(el('div', 'empty', 'Pick a question to get started.'));
+    return;
+  }
+
+  const head = el('div', 'item-head');
+  head.append(el('span', `badge source-${item.source}`, SOURCE_LABELS[item.source] || item.source));
+  if (item.origin && item.origin !== item.author) head.append(el('span', '', item.origin));
+  if (item.author) head.append(el('span', '', item.author));
+  head.append(el('span', '', relativeTime(item.timestamp)));
+  card.append(head);
+
+  card.append(el('p', 'question-text', item.text));
+
+  const foot = el('div', 'item-foot');
+  for (const term of item.keywords_matched || []) {
+    foot.append(el('span', 'badge kw', term));
+  }
+  const group = el('div', 'status-group');
+  for (const status of STATUSES) {
+    const btn = el('button', status === item.status ? 'active' : '', status);
+    btn.addEventListener('click', async () => {
+      try {
+        const updated = await api(`/items/${item.id}`, { method: 'PATCH', body: { status } });
+        [...group.children].forEach((child) =>
+          child.classList.toggle('active', child.textContent === updated.status)
+        );
+        refreshCounts();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    group.append(btn);
+  }
+  foot.append(group);
+  if (item.url) {
+    const link = el('a', '', 'Open original ↗');
+    link.href = item.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    foot.append(link);
+  }
+  card.append(foot);
+}
+
+function resultCard(result) {
+  const card = el('div', 'result');
+  card.dataset.level = String(result.evidence ? result.evidence.level : 4);
+
+  const badges = el('div', 'item-head');
+  if (result.evidence) {
+    const badge = el('span', `badge ev${result.evidence.level}`, result.evidence.label);
+    badge.title = EVIDENCE_HINT[result.evidence.level] || '';
+    badges.append(badge);
+  }
+  for (const source of result.sources || []) {
+    badges.append(el('span', 'badge db', SOURCE_DB_LABELS[source] || source));
+  }
+  if (result.open_access === true) badges.append(el('span', 'badge oa', 'Open access'));
+  else if (result.open_access === false) badges.append(el('span', 'badge paywalled', 'Paywalled'));
+  card.append(badges);
+
+  const title = el('h3');
+  if (result.url) {
+    const link = el('a', '', result.title);
+    link.href = result.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    title.append(link);
+  } else {
+    title.textContent = result.title;
+  }
+  card.append(title);
+
+  const meta = el('div', 'meta');
+  if (result.venue) meta.append(el('span', '', result.venue));
+  if (result.year) meta.append(el('span', '', String(result.year)));
+  if (typeof result.citations === 'number') {
+    meta.append(el('span', '', `${result.citations} citations`));
+  }
+  if (result.registry && result.status) {
+    meta.append(el('span', '', `status: ${result.status.toLowerCase()}`));
+  }
+  if (result.doi) {
+    const doi = el('a', '', `doi:${result.doi}`);
+    doi.href = `https://doi.org/${result.doi}`;
+    doi.target = '_blank';
+    doi.rel = 'noopener noreferrer';
+    meta.append(doi);
+  }
+  if (result.nct_id) meta.append(el('span', '', result.nct_id));
+  card.append(meta);
+
+  if (result.snippet) card.append(el('p', 'snippet', result.snippet));
+  if (result.registry) {
+    card.append(
+      el('p', 'subtle', 'Trial registration — study is planned or under way, no published results.')
+    );
+  }
+  return card;
+}
+
+const SOURCE_DB_LABELS = {
+  pubmed: 'PubMed',
+  europepmc: 'Europe PMC',
+  crossref: 'Crossref',
+  semanticscholar: 'Semantic Scholar',
+  openalex: 'OpenAlex',
+  clinicaltrials: 'ClinicalTrials.gov',
+};
+
+function renderMatch(match) {
+  const terms = $('#wb-terms');
+  const providers = $('#wb-providers');
+  const note = $('#wb-note');
+  const results = $('#wb-results');
+  terms.textContent = '';
+  providers.innerHTML = '';
+  note.innerHTML = '';
+  results.innerHTML = '';
+
+  if (!match || !match.exists) {
+    results.append(
+      el('div', 'empty', 'No research matched yet. Press "Match research" to query the six databases.')
+    );
+    return;
+  }
+
+  terms.textContent = match.terms && match.terms.length
+    ? `Searched for: ${match.terms.join(', ')}${match.cached ? ` · cached ${relativeTime(match.created_at)}` : ''}`
+    : 'No searchable terms were found in this question.';
+
+  for (const provider of match.providers || []) {
+    const chip = el(
+      'span',
+      `chip${provider.status === 'ok' ? '' : ' off'}`,
+      `${SOURCE_DB_LABELS[provider.id] || provider.id}: ${
+        provider.status === 'ok' ? `${provider.count}` : provider.status
+      }`
+    );
+    if (provider.error) chip.title = provider.error;
+    providers.append(chip);
+  }
+
+  if (match.no_strong_matches) {
+    note.append(
+      el(
+        'div',
+        'banner',
+        match.note ||
+          'No strong match was found for this question. Nothing here answers it directly.'
+      )
+    );
+  } else if (match.note) {
+    note.append(el('div', 'banner', match.note));
+  }
+
+  if (!match.results || !match.results.length) {
+    results.append(
+      el('div', 'empty', 'Nothing relevant enough to show. Weak matches are deliberately not listed.')
+    );
+    return;
+  }
+  for (const result of match.results) results.append(resultCard(result));
+}
+
+function renderDraft() {
+  const draft = state.workbench.draft;
+  const text = $('#wb-draft-text');
+  const meta = $('#wb-draft-meta');
+  const statusGroup = $('#wb-draft-status');
+  const citations = $('#wb-draft-citations');
+
+  statusGroup.innerHTML = '';
+  citations.innerHTML = '';
+
+  if (!draft) {
+    text.value = '';
+    meta.textContent = state.workbench.drafts.length
+      ? `${state.workbench.drafts.length} saved draft(s)`
+      : '';
+    $('#wb-draft-saved').textContent = '';
+    return;
+  }
+
+  text.value = draft.content;
+  const usage = draft.usage || {};
+  meta.textContent = [
+    draft.model,
+    usage.output_tokens ? `${usage.output_tokens} output tokens` : null,
+    `saved ${relativeTime(draft.updated_at)}`,
+    state.workbench.drafts.length > 1 ? `${state.workbench.drafts.length} versions` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  for (const status of ['draft', 'edited', 'used']) {
+    const btn = el('button', status === draft.status ? 'active' : '', status);
+    btn.addEventListener('click', async () => {
+      try {
+        const updated = await api(`/drafts/${draft.id}`, { method: 'PATCH', body: { status } });
+        state.workbench.draft = updated;
+        renderDraft();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    statusGroup.append(btn);
+  }
+
+  if (draft.citations && draft.citations.length) {
+    citations.append(el('div', 'subtle', 'Studies given to the model:'));
+    for (const cite of draft.citations) {
+      const line = el('div', 'cite');
+      const label = el('b', '', `[${cite.n}] `);
+      line.append(label);
+      if (cite.url) {
+        const link = el('a', '', cite.title);
+        link.href = cite.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        line.append(link);
+      } else {
+        line.append(document.createTextNode(cite.title));
+      }
+      line.append(
+        document.createTextNode(
+          ` — ${[cite.venue, cite.year, cite.evidence].filter(Boolean).join(', ')}`
+        )
+      );
+      citations.append(line);
+    }
+  }
+}
+
+async function refreshDraftAvailability() {
+  try {
+    const status = await api('/drafts/status');
+    const button = $('#wb-generate');
+    button.disabled = !status.configured;
+    button.title = status.configured
+      ? `Generates with ${status.model}`
+      : 'ANTHROPIC_API_KEY is not set';
+    $('#wb-draft-hint').textContent = status.configured
+      ? 'Drafts are written from the matched research on the right, for your review only. Nothing is posted anywhere.'
+      : 'Set ANTHROPIC_API_KEY (a Replit secret or environment variable) and restart to enable draft generation. You can still write and save drafts by hand here.';
+  } catch {
+    // Non-fatal: the button stays enabled and any failure surfaces on click.
+  }
+}
+
+async function loadWorkbench() {
+  try {
+    await Promise.all([loadWorkbenchQuestions(), refreshDraftAvailability()]);
+    const itemId = state.workbench.itemId;
+    if (!itemId) {
+      renderQuestion(null);
+      renderMatch(null);
+      state.workbench.draft = null;
+      state.workbench.drafts = [];
+      renderDraft();
+      return;
+    }
+
+    const [item, match, draftData] = await Promise.all([
+      api(`/items/${itemId}`),
+      api(`/items/${itemId}/research`),
+      api(`/items/${itemId}/drafts`),
+    ]);
+
+    state.workbench.match = match;
+    state.workbench.drafts = draftData.drafts;
+    state.workbench.draft = draftData.drafts[0] || null;
+
+    renderQuestion(item);
+    renderMatch(match);
+    renderDraft();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function runMatch(refresh) {
+  const itemId = state.workbench.itemId;
+  if (!itemId) return;
+  const buttons = [$('#wb-match'), $('#wb-rematch')];
+  buttons.forEach((b) => {
+    b.disabled = true;
+  });
+  $('#wb-match').textContent = 'Searching…';
+  try {
+    const match = await api(
+      `/items/${itemId}/research${refresh ? '?refresh=true' : ''}`,
+      { method: 'POST' }
+    );
+    state.workbench.match = match;
+    renderMatch(match);
+    toast(
+      match.no_strong_matches
+        ? 'No strong match found for this question'
+        : `${match.results.length} result(s) from ${
+            match.providers.filter((p) => p.status === 'ok').length
+          } databases`
+    );
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    buttons.forEach((b) => {
+      b.disabled = false;
+    });
+    $('#wb-match').textContent = 'Match research';
+  }
+}
+
+async function generateDraft() {
+  const itemId = state.workbench.itemId;
+  if (!itemId) return;
+  const button = $('#wb-generate');
+  button.disabled = true;
+  button.textContent = 'Generating…';
+  try {
+    const data = await api(`/items/${itemId}/drafts`, { method: 'POST' });
+    state.workbench.drafts = [data.draft, ...state.workbench.drafts];
+    state.workbench.draft = data.draft;
+    renderDraft();
+    toast('Draft generated — review before using');
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Generate draft';
+  }
+}
+
+async function saveDraft() {
+  const draft = state.workbench.draft;
+  if (!draft) return;
+  try {
+    const updated = await api(`/drafts/${draft.id}`, {
+      method: 'PUT',
+      body: { content: $('#wb-draft-text').value },
+    });
+    state.workbench.draft = updated;
+    state.workbench.drafts = state.workbench.drafts.map((d) =>
+      d.id === updated.id ? updated : d
+    );
+    renderDraft();
+    $('#wb-draft-saved').textContent = 'Saved';
+    setTimeout(() => {
+      $('#wb-draft-saved').textContent = '';
+    }, 2000);
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function stepQuestion(delta) {
+  const list = state.workbench.items;
+  if (!list.length) return;
+  const index = list.findIndex((i) => i.id === state.workbench.itemId);
+  const next = list[Math.min(Math.max(index + delta, 0), list.length - 1)];
+  if (!next || next.id === state.workbench.itemId) return;
+  state.workbench.itemId = next.id;
+  loadWorkbench();
+}
+
 /* ------------------------------------------------------------------- tabs */
 
 function showTab(tab) {
   state.tab = tab;
   $$('#tabs .tab').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.tab === tab));
-  for (const name of ['feed', 'research', 'keywords', 'sources']) {
+  for (const name of ['feed', 'workbench', 'research', 'keywords', 'sources']) {
     $(`#panel-${name}`).classList.toggle('hidden', name !== tab);
   }
   if (tab === 'feed') {
     refreshCounts();
     loadFeed();
   }
+  if (tab === 'workbench') loadWorkbench();
   if (tab === 'keywords') loadKeywords();
   if (tab === 'sources') loadSources();
   if (tab === 'research') loadResearch();
@@ -882,6 +1375,44 @@ function init() {
   $('#feed-next').addEventListener('click', () => {
     state.feed.offset += state.feed.limit;
     loadFeed();
+  });
+
+  $('#wb-question').addEventListener('change', (e) => {
+    state.workbench.itemId = Number(e.target.value) || null;
+    loadWorkbench();
+  });
+  $('#wb-scope').addEventListener('change', () => {
+    state.workbench.itemId = null;
+    loadWorkbench();
+  });
+  $('#wb-prev').addEventListener('click', () => stepQuestion(-1));
+  $('#wb-next').addEventListener('click', () => stepQuestion(1));
+  $('#wb-match').addEventListener('click', () => runMatch(false));
+  $('#wb-rematch').addEventListener('click', () => runMatch(true));
+  $('#wb-generate').addEventListener('click', generateDraft);
+  $('#wb-draft-save').addEventListener('click', saveDraft);
+  $('#wb-draft-copy').addEventListener('click', async () => {
+    const text = $('#wb-draft-text').value;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Draft copied');
+    } catch {
+      toast('Copy failed — select the text and copy manually', true);
+    }
+  });
+  $('#wb-draft-delete').addEventListener('click', async () => {
+    const draft = state.workbench.draft;
+    if (!draft || !confirm('Delete this draft?')) return;
+    try {
+      await api(`/drafts/${draft.id}`, { method: 'DELETE' });
+      state.workbench.drafts = state.workbench.drafts.filter((d) => d.id !== draft.id);
+      state.workbench.draft = state.workbench.drafts[0] || null;
+      renderDraft();
+      toast('Draft deleted');
+    } catch (err) {
+      toast(err.message, true);
+    }
   });
 
   $('#keyword-form').addEventListener('submit', submitKeyword);

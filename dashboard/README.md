@@ -14,9 +14,14 @@ dashboard/
 │   ├── scheduler.js       Independent per-source poll timers
 │   ├── db.js              SQLite connection, schema, seed data
 │   ├── config.js          Environment / secrets
-│   ├── lib/               keywords, items, matcher, ingest, state, quota, http
-│   ├── routes/            /api/keywords, /api/items, /api/settings, /api/sources
-│   └── sources/           reddit.js, x.js, youtube.js, pubmed.js, websearch.js
+│   ├── lib/               keywords, items, matcher, ingest, state, quota, http,
+│   │                      drafts, researchStore
+│   ├── routes/            /api/keywords, /api/items, /api/settings, /api/sources,
+│   │                      /api/research, /api/drafts
+│   ├── sources/           reddit.js, x.js, youtube.js, pubmed.js, websearch.js
+│   ├── research/          term extraction, evidence grading, merge, rank, and
+│   │                      one provider per literature API
+│   └── drafts/            Anthropic prompt and generation
 ├── public/                index.html, app.js, styles.css
 ├── test/                  node:test suites (no network required)
 └── data/                  SQLite file (gitignored)
@@ -83,6 +88,91 @@ items that matched no keyword. Dismissing an item from the feed deletes the
 `items` row but keeps the ledger entry, so a re-poll never resurfaces it.
 Because the key includes the source, the same ID appearing on two sources is
 still stored twice.
+
+## Research matching
+
+Every captured question can be matched against six research databases at once,
+from the **Workbench** tab: the question sits on the left, the matched research
+on the right.
+
+| Database | Credentials | What it adds |
+| -------- | ----------- | ------------ |
+| PubMed (E-utilities) | none | Biomedical literature, publication types |
+| Europe PMC | none | Preprints, European sources, open-access status |
+| Crossref | none (contact address appreciated) | DOI metadata across essentially all publishers |
+| Semantic Scholar | optional key raises the rate limit | Citation counts and influence |
+| OpenAlex | none (contact address appreciated) | Very broad open catalog, open-access status |
+| ClinicalTrials.gov | none | Ongoing and completed trials |
+
+**Search terms** are extracted from the question rather than sent verbatim:
+the keywords the item already matched come first, then known domain phrases
+("phantom limb pain", "targeted muscle reinnervation"), then forum shorthand
+expanded into clinical language (BKA becomes "below knee amputation"), then the
+most frequent remaining content words. Bare content words are only used when
+the question offers nothing clinical, so "rubbing" and "worst" do not become
+search terms.
+
+**Deduplication** is by normalized DOI first, then PMID or NCT id, then a
+Sørensen-Dice similarity of at least 0.9 on the title. Merging keeps the
+longest abstract, the highest citation count, and any positive open-access
+claim; a trial registration never merges into a published paper of the same
+name. One paper found in four databases shows once, with four source badges.
+
+**Ranking** puts evidence quality first, by a wide margin - the evidence weight
+is multiplied by 1000, so no amount of recency or citation count lifts a case
+report above a systematic review. Recency and citations break ties inside a
+level.
+
+| Level | Covers |
+| ----- | ------ |
+| 1 | Clinical practice guidelines, systematic reviews, meta-analyses |
+| 2 | Randomized controlled trials |
+| 3 | Non-randomized trials, cohort and comparative studies |
+| 4 | Cross-sectional, case-control, registry and survey studies; anything unclassified |
+| 5 | Case reports and series, narrative reviews, editorials, preclinical work |
+
+Preprints are demoted one level and labelled. Trial registrations are graded on
+their own scale and always flagged as having no published results.
+
+**Relevance gating.** Each result is scored on how much of the question it
+actually covers (title hits count more than abstract hits). Anything below
+`research.min_relevance` is dropped rather than padded into the list, and when
+nothing reaches `research.strong_relevance` the dashboard says so explicitly
+instead of presenting weak matches as an answer.
+
+Each result shows title, venue, year, evidence badge, source badges,
+abstract snippet, citation count, open-access or paywalled flag, and a DOI or
+registry link. Results are cached in SQLite per question
+(`research.cache_hours`, default a week); **Re-run** ignores the cache.
+
+Each database is rate-limited independently with a shared politeness queue, and
+`Promise.allSettled` isolates failures - one database timing out or rate
+limiting is reported as a chip on that provider and the rest still merge.
+
+## Draft reply generation
+
+The Workbench's **Generate draft** button sends the question plus the matched
+abstracts to the Anthropic API and returns a draft for review. Nothing is
+posted anywhere by this application.
+
+- Model `claude-opus-5` with adaptive thinking, streamed so a long generation
+  cannot hit an HTTP timeout, with the system prompt cached across drafts and
+  `fallbacks: "default"` so a policy decline re-runs on Anthropic's recommended
+  substitute rather than dead-ending.
+- The system prompt instructs the model to write for amputees and their
+  families rather than clinicians, to carry a citation number on every factual
+  claim and never cite a study outside the supplied list, to be explicit about
+  uncertainty and about evidence strength, never to give individualized medical
+  advice or suggest replacing the reader's care team, and to lead with the fact
+  when the supplied research does not answer the question.
+- Registered trials and preprints are labelled in the prompt so the draft can
+  say what they are.
+- Drafts are stored per question with status **Draft / Edited / Used**. Saving
+  edited text moves a draft from Draft to Edited automatically. The studies
+  handed to the model are stored with the draft, so the citation numbers in the
+  text stay resolvable.
+- Without `ANTHROPIC_API_KEY` the button is disabled and the rest of the
+  dashboard, including writing drafts by hand, still works.
 
 ## Sources
 
@@ -210,6 +300,16 @@ staggered so every API is not called at once.
 | POST   | `/api/sources/:source/clear-backoff` | Clear a rate-limit backoff |
 | GET/PUT| `/api/settings` | Intervals, limits, toggles |
 | GET    | `/api/health` | Liveness plus per-source status |
+| GET    | `/api/items/:id/research` | Cached match for a question (never calls upstream) |
+| POST   | `/api/items/:id/research` | Run the match; `?refresh=true` ignores the cache |
+| DELETE | `/api/items/:id/research` | Drop the cached match |
+| GET    | `/api/research/providers` | Databases, enabled state, cache summary |
+| GET    | `/api/items/:id/drafts` | Drafts for a question, newest first |
+| POST   | `/api/items/:id/drafts` | Generate a draft from the matched research |
+| PUT    | `/api/drafts/:id` | Save edited text (Draft becomes Edited) |
+| PATCH  | `/api/drafts/:id` | `{status: "draft" \| "edited" \| "used"}` |
+| DELETE | `/api/drafts/:id` | Delete a draft |
+| GET    | `/api/drafts/status` | Whether the Anthropic key is present, and the model |
 
 Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
 `/api/sources/youtube/channels`, and web-search domains under
@@ -219,8 +319,9 @@ Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
 
 `keywords`, `keyword_sources`, `items`, `item_keywords`, `seen_items`,
 `source_state`, `settings`, `subreddits`, `youtube_channels`, `search_sites`,
-`api_usage`, `poll_log`. The schema is created on boot by `src/db.js`;
-deleting `data/dashboard.db` resets everything.
+`api_usage`, `poll_log`, `research_matches`, `drafts`. The schema is created on
+boot by `src/db.js`; deleting `data/dashboard.db` resets everything. Cached
+research and drafts are removed with their question by foreign key.
 
 Databases created before the source list grew are migrated on boot: `items`
 and `keyword_sources` are rebuilt without the old `CHECK (source IN …)`
@@ -236,4 +337,7 @@ npm test
 The suites cover keyword validation and scoping, the matcher's word-boundary
 and phrase handling, ingest dedup and status flow, each source's normalization
 and rate-limit/quota behaviour (with a mocked transport), scheduler failure
-isolation, and the HTTP API. No network access is required.
+isolation, research term extraction, evidence grading, cross-database
+deduplication and ranking, all six research providers and their partial-failure
+behaviour, draft prompt construction and generation (including refusal and
+rate-limit handling), and the HTTP API. No network access is required.

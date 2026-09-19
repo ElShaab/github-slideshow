@@ -18,6 +18,7 @@
       </div>
       <nav class="tabs" id="tabs">
         <button class="tab is-active" data-tab="feed">Feed</button>
+        <button class="tab" data-tab="workbench">Workbench</button>
         <button class="tab" data-tab="research">Research</button>
         <button class="tab" data-tab="keywords">Keywords</button>
         <button class="tab" data-tab="sources">Sources</button>
@@ -68,6 +69,75 @@
           <button class="ghost" id="feed-prev">Previous</button>
           <span id="feed-range" class="subtle"></span>
           <button class="ghost" id="feed-next">Next</button>
+        </div>
+      </section>
+
+      <!-- WORKBENCH: question on the left, matched research on the right -->
+      <section class="panel hidden" id="panel-workbench">
+        <div class="filters">
+          <label class="grow">
+            Question
+            <select id="wb-question"></select>
+          </label>
+          <label>
+            Show
+            <select id="wb-scope">
+              <option value="new">New only</option>
+              <option value="">Any status</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="used">Used</option>
+            </select>
+          </label>
+          <button class="ghost" id="wb-prev">Previous</button>
+          <button class="ghost" id="wb-next">Next</button>
+        </div>
+
+        <div class="split">
+          <div class="split-col">
+            <div class="card" id="wb-question-card">
+              <div class="empty">Pick a question to get started.</div>
+            </div>
+
+            <div class="card" id="wb-draft-card">
+              <div class="card-head">
+                <h2>Draft reply</h2>
+                <div class="row">
+                  <span class="subtle" id="wb-draft-meta"></span>
+                  <button id="wb-generate">Generate draft</button>
+                </div>
+              </div>
+              <p class="subtle" id="wb-draft-hint">
+                Drafts are written from the matched research on the right, for
+                your review only. Nothing is posted anywhere.
+              </p>
+              <textarea id="wb-draft-text" rows="14" spellcheck="true"
+                placeholder="No draft yet. Match the research first, then generate a draft you can edit here."></textarea>
+              <div class="row" id="wb-draft-controls">
+                <div class="status-group" id="wb-draft-status"></div>
+                <button class="ghost" id="wb-draft-save">Save</button>
+                <button class="ghost" id="wb-draft-copy">Copy</button>
+                <button class="tiny danger" id="wb-draft-delete">Delete</button>
+                <span class="subtle" id="wb-draft-saved"></span>
+              </div>
+              <div id="wb-draft-citations" class="citations"></div>
+            </div>
+          </div>
+
+          <div class="split-col">
+            <div class="card">
+              <div class="card-head">
+                <h2>Matched research</h2>
+                <div class="row">
+                  <button id="wb-match">Match research</button>
+                  <button class="ghost" id="wb-rematch" title="Ignore the cache and query every database again">Re-run</button>
+                </div>
+              </div>
+              <div id="wb-terms" class="subtle"></div>
+              <div id="wb-providers" class="chips"></div>
+              <div id="wb-note"></div>
+            </div>
+            <div id="wb-results" class="list"></div>
+          </div>
         </div>
       </section>
 

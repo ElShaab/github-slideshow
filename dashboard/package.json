@@ -13,6 +13,7 @@
     "test": "node --test --test-timeout=60000 test/*.test.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
