@@ -120,13 +120,17 @@ describe('the layer and what shows through it', () => {
   });
 
   test('matches the two references it was drawn from', () => {
-    // The 20% render is fully striated; by 40% the surface is smooth. These are
-    // the anchors the whole ramp is fitted to, so they are worth pinning.
+    // The 20% render is fully striated; by 40% the fibre is soft. Both are the
+    // same body seen through a different amount of fat, so neither is bare —
+    // these are the anchors the whole ramp is fitted to.
     const twenty = buildHologramData(input({ bodyFatPercent: 20 }));
     const forty = buildHologramData(input({ bodyFatPercent: 40 }));
 
     assert.ok((twenty.definition ?? 0) > 0.6, `20% should read as defined, got ${twenty.definition}`);
-    assert.equal(forty.definition, 0, '40% should show no muscle detail at all');
+    assert.ok(
+      (forty.definition ?? 0) < (twenty.definition ?? 0) * 0.45,
+      `40% should read much softer than 20%, got ${forty.definition}`,
+    );
     // The layer at 40% is roughly twice the one at 20%, which is about the
     // ratio between the fringes in the two renders.
     const ratio = (forty.adiposity ?? 0) / (twenty.adiposity ?? 1);
@@ -143,7 +147,22 @@ describe('the layer and what shows through it', () => {
     assert.ok(Math.abs((man.definition ?? 0) - (woman.definition ?? 0)) < 0.2);
   });
 
-  test('there is no muscle detail to show on someone who has not trained', () => {
+  test('muscle never disappears, however much fat is over it', () => {
+    // Fat is translucent in both references, and muscle someone has built does
+    // not stop existing at 40% body fat. A figure that erased it would be
+    // telling them it had.
+    for (const sex of ['male', 'female'] as Sex[]) {
+      for (let percent = 0; percent <= 70; percent += 1) {
+        const data = buildHologramData(input({ bodyFatPercent: percent, sex }));
+        assert.ok(
+          (data.definition ?? 0) > 0,
+          `${sex} at ${percent}% lost its muscle definition entirely`,
+        );
+      }
+    }
+  });
+
+  test('there is less muscle detail to show on someone who has not trained', () => {
     const lean = buildHologramData(input({ bodyFatPercent: 12, muscleMassKg: 32 }));
     const leanAndUntrained = buildHologramData(input({ bodyFatPercent: 12, muscleMassKg: 21 }));
     assert.ok((leanAndUntrained.definition ?? 0) < (lean.definition ?? 0));

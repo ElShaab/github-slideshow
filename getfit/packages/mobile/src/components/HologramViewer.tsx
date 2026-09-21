@@ -125,6 +125,13 @@ export const HologramViewer = memo(function HologramViewer({
   // bloom turns green — the difference you notice between the two references
   // before you have looked at either silhouette.
   const bloom = geometry.adiposity > 0.5 ? fatColor : accent;
+  const outerBody = [
+    geometry.leftArmPath,
+    geometry.rightArmPath,
+    geometry.leftLegPath,
+    geometry.rightLegPath,
+    geometry.torsoPath,
+  ];
 
   const label =
     accessibilityLabel ??
@@ -211,48 +218,22 @@ export const HologramViewer = memo(function HologramViewer({
           </Defs>
 
           {/*
-            The subcutaneous layer. Each silhouette is stroked in green first;
-            the body fills over it, so only the half of the stroke outside the
-            outline survives — a rim of exactly the layer's thickness, which is
-            what the reference renders show thickening with body fat.
-          */}
-          <G opacity={geometry.fatLayer.opacity}>
-            {[
-              geometry.leftArmPath,
-              geometry.rightArmPath,
-              geometry.leftLegPath,
-              geometry.rightLegPath,
-              geometry.torsoPath,
-            ].map((d, index) => (
-              <Path
-                key={`fat-${index}`}
-                d={d}
-                fill="none"
-                stroke={fatColor}
-                strokeWidth={geometry.fatLayer.thickness * 2}
-                strokeLinejoin="round"
-              />
-            ))}
-            <Circle
-              cx={geometry.head.cx}
-              cy={geometry.head.cy}
-              r={geometry.head.r}
-              fill="none"
-              stroke={fatColor}
-              strokeWidth={geometry.fatLayer.thickness}
-            />
-          </G>
+            The muscle body, drawn in full at every band.
 
-          {/* Arms sit behind the torso so the shoulder line stays clean. */}
-          <Path d={geometry.leftArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
-          <Path d={geometry.rightArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
-          <Path d={geometry.leftLegPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.3} strokeOpacity={0.75} />
-          <Path d={geometry.rightLegPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.3} strokeOpacity={0.75} />
-          <Path d={geometry.torsoPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.4} strokeOpacity={0.82} />
+            Fat is translucent in both references — the heavier figure is the
+            same body seen through more, not a blank shell — so this is the
+            bottom layer and the fat goes over it, rather than the other way
+            around. Arms sit behind the torso so the shoulder line stays clean.
+          */}
+          <Path d={geometry.muscle.leftArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
+          <Path d={geometry.muscle.rightArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
+          <Path d={geometry.muscle.leftLegPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.3} strokeOpacity={0.75} />
+          <Path d={geometry.muscle.rightLegPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.3} strokeOpacity={0.75} />
+          <Path d={geometry.muscle.torsoPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.4} strokeOpacity={0.82} />
           <Circle
             cx={geometry.head.cx}
             cy={geometry.head.cy}
-            r={geometry.head.r}
+            r={geometry.muscle.headRadius}
             fill="url(#hg-body)"
             stroke={accentBright}
             strokeWidth={1.4}
@@ -297,6 +278,52 @@ export const HologramViewer = memo(function HologramViewer({
               strokeLinecap="round"
             />
           ))}
+
+          {/*
+            The subcutaneous layer, laid over the finished muscle body.
+
+            The fill is translucent, so what is underneath reads through it
+            rather than being replaced by it; the stroke adds the brighter edge
+            where the layer is seen side-on, which is the green fringe in both
+            references. On a lean figure the outer outline sits almost on the
+            muscle one and this is a hairline; on a heavy one the gap between
+            them is the whole layer.
+          */}
+          {/* The ring: fat with nothing but background behind it. Each path
+              carries the outer body and its muscle counterpart as two
+              subpaths, so the even-odd rule leaves only the gap filled. */}
+          <G opacity={geometry.fatLayer.ring}>
+            {geometry.fatRingPaths.map((d, index) => (
+              <Path key={`fat-ring-${index}`} d={d} fill={fatColor} fillRule="evenodd" />
+            ))}
+          </G>
+
+          {/* The wash: a light tint over everything, muscle included, which is
+              what makes the layer read as something you see through. */}
+          <G opacity={geometry.fatLayer.wash}>
+            {outerBody.map((d, index) => (
+              <Path key={`fat-wash-${index}`} d={d} fill={fatColor} />
+            ))}
+            <Circle
+              cx={geometry.head.cx}
+              cy={geometry.head.cy}
+              r={geometry.head.r}
+              fill={fatColor}
+            />
+          </G>
+
+          <G opacity={geometry.fatLayer.rim}>
+            {outerBody.map((d, index) => (
+              <Path
+                key={`fat-rim-${index}`}
+                d={d}
+                fill="none"
+                stroke={fatColor}
+                strokeWidth={1.4}
+                strokeLinejoin="round"
+              />
+            ))}
+          </G>
 
           {/* Wireframe contours wrapping the volume, plus vertical seams. */}
           {geometry.contours.map((contour, index) => (

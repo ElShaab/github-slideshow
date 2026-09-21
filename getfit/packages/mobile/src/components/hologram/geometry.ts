@@ -27,13 +27,36 @@ export const VIEW_WIDTH = 240;
 export const VIEW_HEIGHT = 540;
 const CX = VIEW_WIDTH / 2;
 
-export interface HologramGeometry {
-  /** Head, torso, legs and arms are separate paths so each can be shaped independently. */
+/** One body's outline, as five independently shaped paths. */
+export interface Silhouette {
   torsoPath: string;
   leftLegPath: string;
   rightLegPath: string;
   leftArmPath: string;
   rightArmPath: string;
+  headRadius: number;
+}
+
+export interface HologramGeometry {
+  /**
+   * The outer body — muscle plus the fat over it. This is the outline a tape
+   * measure goes around, and what the fat shell is drawn from.
+   */
+  torsoPath: string;
+  leftLegPath: string;
+  rightLegPath: string;
+  leftArmPath: string;
+  rightArmPath: string;
+  /**
+   * The body underneath: the same person with the fat taken off.
+   *
+   * Fat is translucent in both reference renders — the heavier figure is the
+   * same body seen through more, not a blank shell — so the muscle body is
+   * drawn in full and the fat is laid over it at an opacity that lets it
+   * through. On a lean figure the two outlines nearly coincide and this is
+   * invisible; on a heavy one the gap between them is the layer.
+   */
+  muscle: Silhouette;
   /** Horizontal contour rings that read as a wireframe wrapped around a volume. */
   contours: Array<{ d: string; opacity: number }>;
   /** Vertical seams running down the figure. */
@@ -41,20 +64,37 @@ export interface HologramGeometry {
   /** Muscle-group plates whose brightness tracks estimated development. */
   plates: Array<{ d: string; intensity: number; key: HologramSegment['key'] }>;
   /**
-   * The subcutaneous layer: a green rim stroked around every silhouette path,
-   * under the body fill, so only the half outside the outline shows. Thickness
-   * is the layer's depth in view units.
+   * The subcutaneous layer, in three parts.
+   *
+   * `ring` is the strong one: the band between the muscle body and the outer
+   * body, where there is fat and nothing else behind it. That is the green
+   * fringe in both references, and it is why the heavier one looks green
+   * without ceasing to be a blue figure.
+   *
+   * `wash` is the weak tint laid over the whole body, including the muscle.
+   * It is what makes the layer read as translucent rather than as a gasket
+   * around the outside, and it is kept low deliberately — a wash strong
+   * enough to be obvious turns the whole figure green at every band, which is
+   * neither reference.
+   *
+   * `rim` is the bright edge line, and `thickness` the layer's depth in view
+   * units.
    */
-  fatLayer: { thickness: number; opacity: number };
+  fatLayer: { thickness: number; ring: number; wash: number; rim: number };
+  /**
+   * The ring as drawable paths: each outer part with its muscle counterpart as
+   * a second subpath, to be filled with the even-odd rule so only the gap
+   * between them takes colour.
+   */
+  fatRingPaths: string[];
   /**
    * Soft horizontal bands across the abdomen — the folds a covering layer
    * makes. Absent on a lean figure, which has nothing to fold.
    */
   softBands: Array<{ d: string; opacity: number }>;
   /**
-   * Muscle fibre lines. These are the first thing a layer of fat hides, so they
-   * are the first thing to disappear as body fat rises, and the surface is bare
-   * of them well before the plates fade.
+   * Muscle fibre lines. They soften as the layer over them thickens, but they
+   * are drawn at every band — see `muscle` above.
    */
   striations: Array<{ d: string; opacity: number }>;
   /** 0..1, echoed from the payload so the renderer can tint the outer bloom. */
@@ -76,7 +116,8 @@ export interface HologramGeometry {
 function surface(data: HologramData): { adiposity: number; definition: number } {
   const adiposity = clamp01(data.adiposity ?? data.bodyFatNormalized);
   const definition = clamp01(
-    data.definition ?? (1 - data.bodyFatNormalized) * (0.62 + 0.38 * data.muscleNormalized),
+    data.definition ??
+      (0.25 + 0.75 * (1 - data.bodyFatNormalized)) * (0.62 + 0.38 * data.muscleNormalized),
   );
   return { adiposity, definition };
 }
@@ -145,24 +186,44 @@ function sided(base: number, range: number, segment: HologramSegment | undefined
   };
 }
 
-export function buildGeometry(data: HologramData): HologramGeometry {
-  const segments = segmentMap(data);
+/**
+ * Builds one body at a given amount of fat over it.
+ *
+ * Called twice: once at the user's actual adiposity for the outer body, and
+ * once at zero for the muscle underneath. Passing the same segments both times
+ * is what makes the two outlines the same person — only the fat differs.
+ */
+function widthsAt(
+  data: HologramData,
+  segments: Record<HologramSegment['key'], HologramSegment>,
+  { adiposity, lean }: { adiposity: number; lean: boolean },
+): Widths {
   const female = data.sex === 'female';
-  const { adiposity, definition } = surface(data);
 
   // Fat does not only sit on the abdomen. Limbs thicken too, which is what
   // stops a heavy figure reading as a thin person with a balloon taped on.
   const limb = 1 + adiposity * 0.22;
 
   const chest = sided(female ? 38 : 42, 14, segments.chest);
-  const waist = sided(female ? 27 : 29, 25, segments.waist);
 
-  const widths: Widths = {
+  // The waist and hip are the two measurements fat dominates, so the muscle
+  // body cannot use them: taking the measured girth for both would make the
+  // body underneath as wide as the body on top and leave nothing for the layer
+  // to be. Underneath, the trunk is the frame and what it carries; over it,
+  // the tape reading, unmodified — that is the number the user gave us.
+  const waist = lean
+    ? sided(female ? 26 : 27, 9, segments.chest)
+    : sided(female ? 27 : 29, 25, segments.waist);
+  const hip = lean
+    ? sided(female ? 36 : 32, 9, segments.quads)
+    : sided(female ? 40 : 35, 17, segments.hips);
+
+  return {
     shoulder: sided(female ? 42 : 48, 22, segments.shoulders),
     chest,
     belly: belly(chest, waist, adiposity),
     waist,
-    hip: sided(female ? 40 : 35, 17, segments.hips),
+    hip,
     thigh: scale(sided(female ? 25 : 24, 10, segments.quads), limb),
     knee: scale(sided(15, 4, segments.quads), 1 + adiposity * 0.1),
     calf: scale(sided(15, 7, segments.calves), limb),
@@ -170,29 +231,87 @@ export function buildGeometry(data: HologramData): HologramGeometry {
     upperArm: scale(sided(female ? 10 : 11, 7, segments.arms), limb),
     forearm: scale(sided(female ? 8 : 9, 5, segments.arms), 1 + adiposity * 0.16),
   };
+}
+
+function silhouette(w: Widths, headRadius: number): Silhouette {
+  return {
+    torsoPath: buildTorso(w),
+    leftLegPath: buildLeg(w, 'left'),
+    rightLegPath: buildLeg(w, 'right'),
+    leftArmPath: buildArm(w, 'left'),
+    rightArmPath: buildArm(w, 'right'),
+    headRadius,
+  };
+}
+
+export function buildGeometry(data: HologramData): HologramGeometry {
+  const segments = segmentMap(data);
+  const female = data.sex === 'female';
+  const { adiposity, definition } = surface(data);
+
+  // The same person with the fat taken off. Everything that describes muscle —
+  // the plates, the fibre, the contour rings — is built against this one, so
+  // the detail sits on the body it belongs to rather than floating on the
+  // outer surface.
+  const lean = widthsAt(data, segments, { adiposity: 0, lean: true });
+  // `atLeast` guarantees the outer body encloses it. Almost always it does by
+  // construction, but a measured waist can come in under the frame it sits on,
+  // and an inner outline poking through the outer one turns the even-odd ring
+  // inside out — a hole in the figure where the layer should be.
+  const outer = atLeast(widthsAt(data, segments, { adiposity, lean: false }), lean);
+
+  const headRadius = female ? 21 : 22;
+  const body = silhouette(outer, headRadius);
+  const muscle = silhouette(lean, headRadius);
 
   return {
-    torsoPath: buildTorso(widths),
-    leftLegPath: buildLeg(widths, 'left'),
-    rightLegPath: buildLeg(widths, 'right'),
-    leftArmPath: buildArm(widths, 'left'),
-    rightArmPath: buildArm(widths, 'right'),
-    contours: buildContours(widths),
-    seams: buildSeams(widths),
-    plates: buildPlates(widths, segments, definition),
+    torsoPath: body.torsoPath,
+    leftLegPath: body.leftLegPath,
+    rightLegPath: body.rightLegPath,
+    leftArmPath: body.leftArmPath,
+    rightArmPath: body.rightArmPath,
+    muscle,
+    contours: buildContours(lean),
+    seams: buildSeams(lean),
+    plates: buildPlates(lean, segments, definition),
     fatLayer: {
       // A lean figure still has a hairline of it — nobody is at zero.
       thickness: round2(1.2 + adiposity * 8),
-      opacity: round2(0.34 + adiposity * 0.46),
+      ring: round2(0.34 + adiposity * 0.32),
+      // Capped well short of opaque: past about a quarter the muscle stops
+      // reading through and the figure becomes the blank shell this whole
+      // arrangement exists to avoid.
+      wash: round2(0.05 + adiposity * 0.17),
+      rim: round2(0.4 + adiposity * 0.45),
     },
-    softBands: buildSoftBands(widths, adiposity),
-    striations: buildStriations(widths, segments, definition),
+    fatRingPaths: [
+      `${body.leftArmPath} ${muscle.leftArmPath}`,
+      `${body.rightArmPath} ${muscle.rightArmPath}`,
+      `${body.leftLegPath} ${muscle.leftLegPath}`,
+      `${body.rightLegPath} ${muscle.rightLegPath}`,
+      `${body.torsoPath} ${muscle.torsoPath}`,
+    ],
+    softBands: buildSoftBands(outer, adiposity),
+    striations: buildStriations(lean, segments, definition),
     adiposity: round2(adiposity),
     definition: round2(definition),
-    head: { cx: CX, cy: Y.headCenter, r: female ? 21 : 22 },
+    head: { cx: CX, cy: Y.headCenter, r: headRadius },
     width: VIEW_WIDTH,
     height: VIEW_HEIGHT,
   };
+}
+
+/** Widens `body` wherever `floor` is wider, so the first encloses the second. */
+function atLeast(body: Widths, floor: Widths): Widths {
+  const widest = (a: Side, b: Side): Side => ({
+    left: Math.max(a.left, b.left),
+    right: Math.max(a.right, b.right),
+  });
+  const result = {} as Widths;
+  for (const key of Object.keys(body) as Array<keyof Widths>) {
+    result[key] = widest(body[key], floor[key]);
+  }
+  return result;
 }
 
 /**
@@ -521,20 +640,23 @@ function buildSoftBands(w: Widths, adiposity: number): Array<{ d: string; opacit
  *
  * These are the texture covering the reference figure at 20% — the fan across
  * the pecs, the obliques under the ribs, the long fibres down the quads and the
- * upper arms. They are the finest detail on the figure and the first thing a
- * layer of fat hides.
+ * upper arms.
  *
- * Each group has its own threshold, so they go out one at a time in the order a
- * body actually loses them as fat is gained: the obliques first, then the
- * quads, then the pecs, with the arms last. Fading them together instead would
- * put a cliff between two neighbouring bands, where a figure that was fully
- * striated at 35% is bare at 40%.
+ * Every group is drawn at every band. Fat is translucent, so fibre under it
+ * softens rather than disappearing, and the fade is carried entirely by
+ * opacity. An earlier version dropped groups one at a time as fat rose, which
+ * looked plausible on a chart and wrong on the figure: it took a body apart
+ * limb by limb as its owner gained weight.
+ *
+ * The weights below are relative, not thresholds — the pec fan reads strongest
+ * because it sits on the flattest, most forward surface, and the deeper
+ * structures sit back from it.
  */
-const STRIATION_THRESHOLDS = {
-  obliques: 0.7,
-  quads: 0.52,
-  pecs: 0.34,
-  arms: 0.12,
+const STRIATION_WEIGHTS = {
+  pecs: 0.9,
+  obliques: 0.72,
+  quads: 0.66,
+  arms: 0.6,
 } as const;
 
 function buildStriations(
@@ -542,63 +664,58 @@ function buildStriations(
   segments: Record<HologramSegment['key'], HologramSegment>,
   definition: number,
 ): Array<{ d: string; opacity: number }> {
-  if (definition < STRIATION_THRESHOLDS.arms) return [];
-
   const lines: Array<{ d: string; opacity: number }> = [];
   const opacity = round2(0.12 + definition * 0.34);
-  const push = (d: string, weight = 1): void =>
+  const push = (d: string, weight: number): void =>
     void lines.push({ d, opacity: round2(opacity * weight) });
 
   // Pec fan: fibres running from the sternum out to the shoulder.
-  if (definition >= STRIATION_THRESHOLDS.pecs) {
-    for (const side of [-1, 1] as const) {
-      const chest = side === 1 ? w.chest.right : w.chest.left;
-      const x = (value: number): number => CX + side * value;
-      for (let index = 0; index < 3; index += 1) {
-        const t = index / 2;
-        const startY = Y.chest - 22 + t * 24;
-        const endY = Y.chest - 18 + t * 10;
-        push(`M ${x(6)} ${startY} Q ${x(chest * 0.45)} ${startY - 2} ${x(chest * 0.74)} ${endY}`, 0.9);
-      }
+  for (const side of [-1, 1] as const) {
+    const chest = side === 1 ? w.chest.right : w.chest.left;
+    const x = (value: number): number => CX + side * value;
+    for (let index = 0; index < 3; index += 1) {
+      const t = index / 2;
+      const startY = Y.chest - 22 + t * 24;
+      const endY = Y.chest - 18 + t * 10;
+      push(
+        `M ${x(6)} ${startY} Q ${x(chest * 0.45)} ${startY - 2} ${x(chest * 0.74)} ${endY}`,
+        STRIATION_WEIGHTS.pecs,
+      );
     }
   }
 
   // Obliques and serratus: short diagonals under the ribs, down onto the waist.
-  if (definition >= STRIATION_THRESHOLDS.obliques) {
-    for (const side of [-1, 1] as const) {
-      const belly = side === 1 ? w.belly.right : w.belly.left;
-      const x = (value: number): number => CX + side * value;
-      for (let index = 0; index < 3; index += 1) {
-        const y = Y.chest + 18 + index * 14;
-        push(
-          `M ${x(belly * 0.28)} ${y} Q ${x(belly * 0.6)} ${y + 3} ${x(belly * 0.82)} ${y - 6}`,
-          0.72,
-        );
-      }
+  for (const side of [-1, 1] as const) {
+    const belly = side === 1 ? w.belly.right : w.belly.left;
+    const x = (value: number): number => CX + side * value;
+    for (let index = 0; index < 3; index += 1) {
+      const y = Y.chest + 18 + index * 14;
+      push(
+        `M ${x(belly * 0.28)} ${y} Q ${x(belly * 0.6)} ${y + 3} ${x(belly * 0.82)} ${y - 6}`,
+        STRIATION_WEIGHTS.obliques,
+      );
     }
   }
 
   // Quads: long fibres down the front of each thigh.
-  if (definition >= STRIATION_THRESHOLDS.quads) {
-    for (const side of [-1, 1] as const) {
-      const hip = side === 1 ? w.hip.right : w.hip.left;
-      const thigh = side === 1 ? w.thigh.right : w.thigh.left;
-      const legCenter = hip * 0.48;
-      const x = (value: number): number => CX + side * value;
-      for (const offset of [-0.42, 0, 0.42]) {
-        push(
-          `M ${x(legCenter + thigh * offset * 0.5)} ${Y.crotch + 16} C ${x(
-            legCenter + thigh * offset,
-          )} ${Y.thigh} ${x(legCenter + thigh * offset * 0.9)} ${Y.knee - 44} ${x(
-            legCenter + thigh * offset * 0.4,
-          )} ${Y.knee - 18}`,
-          0.66,
-        );
-      }
+  for (const side of [-1, 1] as const) {
+    const hip = side === 1 ? w.hip.right : w.hip.left;
+    const thigh = side === 1 ? w.thigh.right : w.thigh.left;
+    const legCenter = hip * 0.48;
+    const x = (value: number): number => CX + side * value;
+    for (const offset of [-0.42, 0, 0.42]) {
+      push(
+        `M ${x(legCenter + thigh * offset * 0.5)} ${Y.crotch + 16} C ${x(
+          legCenter + thigh * offset,
+        )} ${Y.thigh} ${x(legCenter + thigh * offset * 0.9)} ${Y.knee - 44} ${x(
+          legCenter + thigh * offset * 0.4,
+        )} ${Y.knee - 18}`,
+        STRIATION_WEIGHTS.quads,
+      );
     }
   }
 
-  // Biceps and triceps: one fibre down each upper arm, the last detail to go.
+  // Biceps and triceps, on arms with enough on them to show anything.
   const armsDeveloped = (segments.arms?.development ?? 0.5) > 0.3;
   if (armsDeveloped) {
     for (const side of [-1, 1] as const) {
@@ -611,7 +728,7 @@ function buildStriations(
         } ${x(shoulder + upper * 0.4)} ${Y.chest + 36} ${x(shoulder + upper * 0.15)} ${
           Y.chest + 54
         }`,
-        0.6,
+        STRIATION_WEIGHTS.arms,
       );
     }
   }

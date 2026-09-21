@@ -54,17 +54,28 @@ function adiposityFromBand(band: number, sex: Sex): number {
 }
 
 /**
- * How much muscle detail survives the layer over it.
+ * How sharply the muscle reads through the layer over it.
  *
- * Anchored to the two references this was drawn from: at 20% a man reads as
- * fully striated, and by 40% the surface is smooth. Definition is scaled by
- * muscle mass afterwards, because there is nothing to see through the skin of
- * someone lean who has not trained.
+ * It never reaches zero, and that is the point. Fat is translucent in both
+ * reference renders: the heavier figure is not a blank shell, it is the same
+ * body seen through more. Muscle a user has built does not stop existing at
+ * 40% body fat, and a hologram that erased it would be telling them it had —
+ * which is both wrong and the opposite of encouraging. So the floor is a
+ * quarter of full definition, and the figure keeps its shoulders, its quads
+ * and its arms at every band on the scale.
+ *
+ * Anchored to the two references: at 20% a man reads as fully striated, and by
+ * 40% the fibre is soft rather than gone. Scaled by muscle mass afterwards,
+ * because there is nothing to see through the skin of someone lean who has
+ * never trained either.
  */
+const DEFINITION_FLOOR = 0.25;
+
 function definitionFromBand(band: number, sex: Sex, muscleNormalized: number): number {
   const full = sex === 'male' ? 20 : 28;
   const gone = sex === 'male' ? 40 : 48;
-  const visible = clamp01((gone - band) / (gone - full));
+  const sharp = clamp01((gone - band) / (gone - full));
+  const visible = DEFINITION_FLOOR + (1 - DEFINITION_FLOOR) * sharp;
   return round3(visible * (0.62 + 0.38 * clamp01(muscleNormalized)));
 }
 
@@ -74,8 +85,9 @@ function definitionFromBand(band: number, sex: Sex, muscleNormalized: number): n
  * Body is cyan-blue (hue ~205), which is where both references sit; the fat
  * layer is the green-cyan fringe around the outside of them (hue ~160). The
  * fringe colour does not change with body fat — in the references it is the
- * same green at 20% and 40%, just far thicker at 40%, and the extra green in
- * the heavier figure is that thickness rather than a different hue.
+ * same green at 20% and 40%, just far thicker and covering more at 40%, and
+ * the extra green in the heavier figure is that depth rather than a different
+ * hue.
  */
 function palette(): string[] {
   return ['#22E3F2', '#0FB9D6', '#7CF6FF', '#5BEBB8'];

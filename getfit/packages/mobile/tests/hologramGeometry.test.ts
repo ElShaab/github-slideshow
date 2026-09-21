@@ -36,6 +36,12 @@ function allPaths(geometry: ReturnType<typeof buildGeometry>): string[] {
     geometry.rightLegPath,
     geometry.leftArmPath,
     geometry.rightArmPath,
+    geometry.muscle.torsoPath,
+    geometry.muscle.leftLegPath,
+    geometry.muscle.rightLegPath,
+    geometry.muscle.leftArmPath,
+    geometry.muscle.rightArmPath,
+    ...geometry.fatRingPaths,
     ...geometry.contours.map((c) => c.d),
     ...geometry.seams,
     ...geometry.plates.map((p) => p.d),
@@ -79,7 +85,9 @@ describe('every figure is drawable', () => {
     for (let percent = 3; percent <= 65; percent += 1) {
       const geometry = buildGeometry(dataAt(percent));
       const opacities = [
-        geometry.fatLayer.opacity,
+        geometry.fatLayer.ring,
+        geometry.fatLayer.wash,
+        geometry.fatLayer.rim,
         ...geometry.contours.map((c) => c.opacity),
         ...geometry.softBands.map((b) => b.opacity),
         ...geometry.striations.map((s) => s.opacity),
@@ -129,48 +137,93 @@ describe('the silhouette says what the composition says', () => {
     }
   });
 
+  test('the layer stays translucent at every band', () => {
+    // The whole arrangement — muscle body underneath, fat over it — only
+    // works while the fat lets the muscle through. An opaque wash is a blank
+    // shell with extra steps, and a wash strong enough to be obvious turns a
+    // lean figure green, which is neither reference.
+    for (let band = 5; band <= 60; band += 5) {
+      const { wash, ring } = buildGeometry(dataAt(band)).fatLayer;
+      assert.ok(wash > 0, `band ${band} drew no layer over the muscle`);
+      assert.ok(wash <= 0.25, `band ${band} washed out the muscle at ${wash}`);
+      assert.ok(ring > wash, `band ${band}: the ring should read stronger than the wash`);
+    }
+  });
+
+  test('the ring is a gap between two outlines, not a solid shape', () => {
+    // Filled with the even-odd rule, a ring path needs exactly two subpaths:
+    // the outer body and the muscle body inside it. One subpath fills solid
+    // and paints over the whole figure.
+    const geometry = buildGeometry(dataAt(35));
+    assert.equal(geometry.fatRingPaths.length, 5, 'torso, two arms, two legs');
+    for (const path of geometry.fatRingPaths) {
+      assert.equal(
+        (path.match(/Z/g) ?? []).length,
+        2,
+        `a ring path should close twice: ${path.slice(0, 60)}`,
+      );
+    }
+  });
+
+  test('the muscle body is inside the outer body, and the gap is the layer', () => {
+    for (const band of [10, 20, 30, 40, 50]) {
+      const geometry = buildGeometry(dataAt(band));
+      const outer = bellyWidth(geometry);
+      const inner = spanAt(geometry.muscle.torsoPath, 180, 216);
+      assert.ok(
+        inner <= outer,
+        `band ${band}: the muscle body (${inner}) is wider than the body over it (${outer})`,
+      );
+    }
+
+    const gapAt = (band: number): number => {
+      const geometry = buildGeometry(dataAt(band));
+      return bellyWidth(geometry) - spanAt(geometry.muscle.torsoPath, 180, 216);
+    };
+    assert.ok(gapAt(40) > gapAt(20), 'the layer should be thicker at 40% than at 20%');
+    assert.ok(gapAt(20) > gapAt(10), 'and thicker at 20% than at 10%');
+  });
+
   test('limbs thicken too, so a heavy figure is not a thin one with a belly', () => {
     assert.ok(armSpan(buildGeometry(dataAt(40))) > armSpan(buildGeometry(dataAt(12))));
   });
 });
 
 describe('detail appears and disappears with the layer over it', () => {
-  test('a defined figure is striated and a covered one is bare', () => {
-    assert.ok(buildGeometry(dataAt(12)).striations.length > 8, 'a lean figure should show fibre');
-    assert.equal(buildGeometry(dataAt(40)).striations.length, 0, '40% should show none');
-    assert.equal(buildGeometry(dataAt(50)).striations.length, 0);
+  test('muscle is drawn at every band, however much fat is over it', () => {
+    // This is the rule the whole layering exists to serve. Muscle someone has
+    // built does not stop existing at 40% body fat, and a figure that erased
+    // it would be telling them it had.
+    for (const sex of ['male', 'female'] as const) {
+      for (let band = 5; band <= 60; band += 5) {
+        const geometry = buildGeometry(
+          dataAt(band, {
+            sex,
+            measurements:
+              sex === 'female'
+                ? { waistCm: 74, neckCm: 32, hipCm: 96 }
+                : { waistCm: 82, neckCm: 38 },
+          }),
+        );
+        assert.ok(
+          geometry.striations.length > 0,
+          `${sex} at ${band}% lost its muscle fibre entirely`,
+        );
+        assert.ok(
+          Math.max(...geometry.plates.map((p) => p.intensity)) > 0,
+          `${sex} at ${band}% lost its muscle plates entirely`,
+        );
+      }
+    }
   });
 
-  test('striations thin out group by group rather than vanishing at once', () => {
-    // Fading every group together puts a cliff between two neighbouring bands,
-    // where a figure that was fully striated at 35% is bare at 40%. They should
-    // go out one at a time, so each 5-point step has something to show.
-    const counts: number[] = [];
-    for (let band = 5; band <= 60; band += 5) {
-      counts.push(buildGeometry(dataAt(band)).striations.length);
-    }
+  test('fibre softens as the layer thickens, rather than vanishing', () => {
+    const brightest = (band: number): number =>
+      Math.max(...buildGeometry(dataAt(band)).striations.map((s) => s.opacity));
 
-    for (let index = 1; index < counts.length; index += 1) {
-      assert.ok(
-        counts[index] <= counts[index - 1],
-        `striations went up: ${counts.join(', ')}`,
-      );
-    }
-
-    const distinct = new Set(counts.filter((count) => count > 0));
-    assert.ok(
-      distinct.size >= 3,
-      `fibre should thin through at least three stages, saw ${counts.join(', ')}`,
-    );
-
-    const biggestDrop = Math.max(
-      ...counts.slice(1).map((count, index) => counts[index] - count),
-    );
-    const mostFibre = Math.max(...counts);
-    assert.ok(
-      biggestDrop < mostFibre * 0.6,
-      `one band dropped ${biggestDrop} of ${mostFibre} fibres at once: ${counts.join(', ')}`,
-    );
+    assert.ok(brightest(12) > brightest(25));
+    assert.ok(brightest(25) > brightest(40));
+    assert.ok(brightest(40) > 0, '40% should still show fibre, only softer');
   });
 
   test('soft folds are the mirror image: none when lean, more as fat rises', () => {
@@ -181,7 +234,7 @@ describe('detail appears and disappears with the layer over it', () => {
     );
   });
 
-  test('abs fade out rather than shrinking', () => {
+  test('abs fade out rather than shrinking, and never to nothing', () => {
     // The muscle is still there under the fat; you just cannot see its shape.
     const absAt = (percent: number): number => {
       const plates = buildGeometry(dataAt(percent)).plates.filter((p) => p.key === 'waist');
@@ -189,7 +242,7 @@ describe('detail appears and disappears with the layer over it', () => {
     };
     assert.ok(absAt(12) > absAt(25));
     assert.ok(absAt(25) > absAt(35));
-    assert.equal(absAt(45), 0);
+    assert.ok(absAt(45) > 0, 'even at 45% the abs are under there somewhere');
   });
 });
 

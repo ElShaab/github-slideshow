@@ -528,19 +528,27 @@ figure that redraws itself on that noise invites someone to read a change into
 it. The precise percentage is still what they read; only the picture is
 quantised.
 
-Two things move in opposite directions as the band rises:
+**Fat is translucent, and the muscle is always drawn.** The figure is built as
+two bodies: the muscle underneath, and the outer body a tape measure would go
+around. The gap between the two outlines is the layer. It is painted as a
+strong green ring where there is fat and nothing behind it, plus a light wash
+over the whole figure so the layer reads as something seen through rather than
+a gasket fitted around the outside.
+
+That is why the body stays blue at every band and only the layer is green — and
+why muscle someone has built never disappears. A figure that erased it at 40%
+would be telling them it had.
 
 | | Lean band | Heavy band |
 | --- | --- | --- |
-| Subcutaneous layer | a green hairline | a thick green rim |
+| Subcutaneous layer | a green hairline | a thick green ring |
 | Widest point of the torso | the shoulders | the belly |
-| Muscle fibre | obliques, quads, pecs, arms | none |
+| Muscle fibre | crisp | soft, never absent |
 | Soft folds across the abdomen | none | up to three |
 
-Muscle detail thins group by group rather than switching off, in the order a
-body loses it: the obliques first, then the quads, then the pecs, with the arms
-last. Plates fade rather than shrinking, because the muscle is still there —
-you just cannot see its shape through what is over it.
+Fibre and plates fade by opacity, floored at a quarter of full definition.
+Plates fade rather than shrinking, because the muscle is still there — you just
+cannot see its shape through what is over it.
 
 Women's bands sit about 8 points higher at every equivalent level, which is
 essential fat rather than a difference in condition, so a woman at 28% draws
