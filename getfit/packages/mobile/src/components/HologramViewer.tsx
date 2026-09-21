@@ -2,9 +2,11 @@ import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
-  Circle,
+  ClipPath,
   Defs,
   Ellipse,
+  FeGaussianBlur,
+  Filter,
   G,
   LinearGradient as SvgLinearGradient,
   Path,
@@ -32,14 +34,17 @@ export interface HologramViewerProps {
 /**
  * HologramViewer
  *
- * Renders a stylised athletic hologram of the user's CURRENT estimated body
+ * Renders a stylised anatomical hologram of the user's CURRENT estimated body
  * composition. It never displays the user's photograph and never projects a
  * future physique — the geometry comes entirely from the stored estimate.
  *
+ * The stack, bottom to top: the stage, the outer bloom, the muscle body with
+ * its bellies and fibres, the scanned-surface point cloud clipped to it, and
+ * finally the subcutaneous layer laid over the lot. Fat goes on top and stays
+ * translucent, which is why the anatomy reads through it at every band.
+ *
  * The renderer sits behind the HologramData contract, so a real 3D model can
  * replace this SVG implementation without touching any screen that uses it.
- * Layers are stacked as separate SVGs so every animation can run on the native
- * driver rather than re-rendering vector props each frame.
  */
 export const HologramViewer = memo(function HologramViewer({
   data,
@@ -125,12 +130,21 @@ export const HologramViewer = memo(function HologramViewer({
   // bloom turns green — the difference you notice between the two references
   // before you have looked at either silhouette.
   const bloom = geometry.adiposity > 0.5 ? fatColor : accent;
+
   const outerBody = [
     geometry.leftArmPath,
     geometry.rightArmPath,
     geometry.leftLegPath,
     geometry.rightLegPath,
     geometry.torsoPath,
+  ];
+  const muscleBody = [
+    geometry.muscle.leftArmPath,
+    geometry.muscle.rightArmPath,
+    geometry.muscle.leftLegPath,
+    geometry.muscle.rightLegPath,
+    geometry.muscle.torsoPath,
+    geometry.muscle.neckPath,
   ];
 
   const label =
@@ -167,7 +181,7 @@ export const HologramViewer = memo(function HologramViewer({
           </RadialGradient>
         </Defs>
         <Rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="url(#hg-stage)" />
-        <Ellipse cx={VIEW_WIDTH / 2} cy={VIEW_HEIGHT - 20} rx={74} ry={12} fill={accent} opacity={0.16} />
+        <Ellipse cx={VIEW_WIDTH / 2} cy={VIEW_HEIGHT - 16} rx={80} ry={12} fill={accent} opacity={0.16} />
       </Svg>
 
       <Animated.View
@@ -179,26 +193,24 @@ export const HologramViewer = memo(function HologramViewer({
             the difference between the two reference renders at a glance. */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: glowOpacity }]}>
           <Svg width={width} height={size} viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}>
-            <Path
-              d={geometry.torsoPath}
-              stroke={bloom}
-              strokeWidth={7 + geometry.fatLayer.thickness}
-              fill="none"
-              opacity={0.16}
-            />
-            <Path d={geometry.leftLegPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.14} />
-            <Path d={geometry.rightLegPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.14} />
-            <Path d={geometry.leftArmPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.13} />
-            <Path d={geometry.rightArmPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.13} />
-            <Circle
-              cx={geometry.head.cx}
-              cy={geometry.head.cy}
-              r={geometry.head.r + 3}
-              stroke={accent}
-              strokeWidth={6}
-              fill="none"
-              opacity={0.13}
-            />
+            <Defs>
+              <Filter id="hg-bloom" x="-30%" y="-15%" width="160%" height="130%">
+                <FeGaussianBlur stdDeviation={5} />
+              </Filter>
+            </Defs>
+            <G filter="url(#hg-bloom)">
+              {outerBody.map((d, index) => (
+                <Path
+                  key={`bloom-${index}`}
+                  d={d}
+                  stroke={bloom}
+                  strokeWidth={4 + geometry.fatLayer.thickness * 0.6}
+                  fill="none"
+                  opacity={0.34}
+                />
+              ))}
+              <Path d={geometry.headPath} stroke={accentBright} strokeWidth={5} fill="none" opacity={0.4} />
+            </G>
           </Svg>
         </Animated.View>
 
@@ -211,10 +223,24 @@ export const HologramViewer = memo(function HologramViewer({
         >
           <Defs>
             <SvgLinearGradient id="hg-body" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor={accentBright} stopOpacity={0.3} />
-              <Stop offset="45%" stopColor={accent} stopOpacity={0.2} />
-              <Stop offset="100%" stopColor={accent} stopOpacity={0.1} />
+              <Stop offset="0%" stopColor={accentBright} stopOpacity={0.34} />
+              <Stop offset="45%" stopColor={accent} stopOpacity={0.22} />
+              <Stop offset="100%" stopColor={accent} stopOpacity={0.12} />
             </SvgLinearGradient>
+            <SvgLinearGradient id="hg-head" x1="0.2" y1="0" x2="0.8" y2="1">
+              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.9} />
+              <Stop offset="45%" stopColor={accentBright} stopOpacity={0.62} />
+              <Stop offset="100%" stopColor={accent} stopOpacity={0.38} />
+            </SvgLinearGradient>
+            {/* The point cloud is scattered over the whole frame and clipped
+                to the body, which is simpler and more accurate than testing
+                each dot against a dozen curves. */}
+            <ClipPath id="hg-skin">
+              {muscleBody.map((d, index) => (
+                <Path key={`clip-${index}`} d={d} />
+              ))}
+              <Path d={geometry.headPath} />
+            </ClipPath>
           </Defs>
 
           {/*
@@ -225,70 +251,80 @@ export const HologramViewer = memo(function HologramViewer({
             bottom layer and the fat goes over it, rather than the other way
             around. Arms sit behind the torso so the shoulder line stays clean.
           */}
-          <Path d={geometry.muscle.leftArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
-          <Path d={geometry.muscle.rightArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
-          <Path d={geometry.muscle.leftLegPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.3} strokeOpacity={0.75} />
-          <Path d={geometry.muscle.rightLegPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.3} strokeOpacity={0.75} />
-          <Path d={geometry.muscle.torsoPath} fill="url(#hg-body)" stroke={accentBright} strokeWidth={1.4} strokeOpacity={0.82} />
-          <Circle
-            cx={geometry.head.cx}
-            cy={geometry.head.cy}
-            r={geometry.muscle.headRadius}
-            fill="url(#hg-body)"
-            stroke={accentBright}
-            strokeWidth={1.4}
-            strokeOpacity={0.82}
-          />
-
-          {/* Muscle plates, brightened by estimated development. */}
-          {geometry.plates.map((plate, index) => (
+          {muscleBody.map((d, index) => (
             <Path
-              key={`plate-${index}`}
-              d={plate.d}
-              fill={accentBright}
-              opacity={0.06 + plate.intensity * 0.2}
+              key={`muscle-${index}`}
+              d={d}
+              fill="url(#hg-body)"
               stroke={accentBright}
-              strokeWidth={0.7}
-              strokeOpacity={0.22 + plate.intensity * 0.3}
+              strokeWidth={1.1}
+              strokeOpacity={0.62}
             />
           ))}
 
-          {/* Muscle fibre, visible only while there is little covering it. */}
-          {geometry.striations.map((line, index) => (
+          {/* Muscle bellies: each group filled at its own development. */}
+          {geometry.bellies.map((belly, index) => (
             <Path
-              key={`striation-${index}`}
-              d={line.d}
+              key={`belly-${index}`}
+              d={belly.d}
+              fill={accentBright}
+              opacity={0.05 + belly.intensity * 0.22}
+              stroke={accentBright}
+              strokeWidth={0.6}
+              strokeOpacity={0.2 + belly.intensity * 0.34}
+            />
+          ))}
+
+          {/* Fibre, running the way each muscle pulls. */}
+          {geometry.fibres.map((fibre, index) => (
+            <Path
+              key={`fibre-${index}`}
+              d={fibre.d}
+              stroke={accentBright}
+              strokeWidth={0.55}
+              fill="none"
+              opacity={fibre.opacity}
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* The scanned surface: a point cloud clipped to the body. */}
+          <G clipPath="url(#hg-skin)">
+            <Path d={geometry.stipple.d} fill="#FFFFFF" opacity={geometry.stipple.opacity} />
+          </G>
+
+          {/* Contour rings wrapping the volume. */}
+          {geometry.contours.map((contour, index) => (
+            <Path
+              key={`contour-${index}`}
+              d={contour.d}
+              stroke={accentBright}
+              strokeWidth={0.8}
+              fill="none"
+              opacity={contour.opacity}
+            />
+          ))}
+
+          {/* The head is the brightest thing in the frame, as in both renders. */}
+          <Path
+            d={geometry.headPath}
+            fill="url(#hg-head)"
+            stroke="#FFFFFF"
+            strokeWidth={1.3}
+            strokeOpacity={0.7}
+          />
+          {geometry.facePaths.map((d, index) => (
+            <Path
+              key={`face-${index}`}
+              d={d}
               stroke={accentBright}
               strokeWidth={0.6}
               fill="none"
-              opacity={line.opacity}
+              opacity={0.5}
               strokeLinecap="round"
             />
           ))}
 
-          {/* Soft folds, which only a covering layer can make. */}
-          {geometry.softBands.map((band, index) => (
-            <Path
-              key={`band-${index}`}
-              d={band.d}
-              stroke={fatColor}
-              strokeWidth={2.2}
-              fill="none"
-              opacity={band.opacity}
-              strokeLinecap="round"
-            />
-          ))}
-
-          {/*
-            The subcutaneous layer, laid over the finished muscle body.
-
-            The fill is translucent, so what is underneath reads through it
-            rather than being replaced by it; the stroke adds the brighter edge
-            where the layer is seen side-on, which is the green fringe in both
-            references. On a lean figure the outer outline sits almost on the
-            muscle one and this is a hairline; on a heavy one the gap between
-            them is the whole layer.
-          */}
           {/* The ring: fat with nothing but background behind it. Each path
               carries the outer body and its muscle counterpart as two
               subpaths, so the even-odd rule leaves only the gap filled. */}
@@ -304,12 +340,6 @@ export const HologramViewer = memo(function HologramViewer({
             {outerBody.map((d, index) => (
               <Path key={`fat-wash-${index}`} d={d} fill={fatColor} />
             ))}
-            <Circle
-              cx={geometry.head.cx}
-              cy={geometry.head.cy}
-              r={geometry.head.r}
-              fill={fatColor}
-            />
           </G>
 
           <G opacity={geometry.fatLayer.rim}>
@@ -325,26 +355,16 @@ export const HologramViewer = memo(function HologramViewer({
             ))}
           </G>
 
-          {/* Wireframe contours wrapping the volume, plus vertical seams. */}
-          {geometry.contours.map((contour, index) => (
+          {/* Soft folds, which only a covering layer can make. */}
+          {geometry.softBands.map((band, index) => (
             <Path
-              key={`contour-${index}`}
-              d={contour.d}
-              stroke={accentBright}
-              strokeWidth={0.9}
+              key={`band-${index}`}
+              d={band.d}
+              stroke={fatColor}
+              strokeWidth={2.2}
               fill="none"
-              opacity={contour.opacity * 0.8}
-            />
-          ))}
-          {geometry.seams.map((seam, index) => (
-            <Path
-              key={`seam-${index}`}
-              d={seam}
-              stroke={accent}
-              strokeWidth={0.7}
-              fill="none"
-              opacity={0.32}
-              strokeDasharray="3 5"
+              opacity={band.opacity}
+              strokeLinecap="round"
             />
           ))}
         </Svg>

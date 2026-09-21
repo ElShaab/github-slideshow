@@ -528,6 +528,16 @@ figure that redraws itself on that noise invites someone to read a change into
 it. The precise percentage is still what they read; only the picture is
 quantised.
 
+The figure is an anatomical one: a cranium and jaw with a face on it, arms
+carried clear of the body with open hands, feet with toes, and a muscle map of
+about twenty bellies — deltoids, pecs with their fan, serratus, an eight-block
+rectus abdominis, obliques, biceps and triceps, forearm groups, quadriceps with
+the sartorius crossing them, and gastrocnemius. Each belly carries fibre lines
+running the way that muscle actually pulls, which is the part that makes it
+read as a body rather than as decoration. Over the top is a point cloud
+scattered from the stored seed and clipped to the skin, which is what gives the
+reference renders their scanned-surface look.
+
 **Fat is translucent, and the muscle is always drawn.** The figure is built as
 two bodies: the muscle underneath, and the outer body a tape measure would go
 around. The gap between the two outlines is the layer. It is painted as a
@@ -546,9 +556,19 @@ would be telling them it had.
 | Muscle fibre | crisp | soft, never absent |
 | Soft folds across the abdomen | none | up to three |
 
-Fibre and plates fade by opacity, floored at a quarter of full definition.
-Plates fade rather than shrinking, because the muscle is still there — you just
-cannot see its shape through what is over it.
+Fibre and bellies fade by opacity, floored at a quarter of full definition,
+rather than shrinking — the muscle is still there, you just cannot see its
+shape through what is over it.
+
+The abdominals are the one group not driven by a measurement. Nothing in a tape
+reading describes how developed someone's abs are: the waist measures the fat
+sitting on top of them. So they read from definition instead, or they would
+glow brighter as their owner gained weight.
+
+The figure is vector art, not a render. It will not reach a ray-traced
+anatomical model — that would need licensed artwork or a real 3D mesh, and
+neither belongs in a procedural figure that has to reshape itself to every
+user's measurements.
 
 Women's bands sit about 8 points higher at every equivalent level, which is
 essential fat rather than a difference in condition, so a woman at 28% draws

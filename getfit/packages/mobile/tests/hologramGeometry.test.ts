@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { buildHologramData, type HologramData } from '@getfit/shared';
 import { buildGeometry } from '../src/components/hologram/geometry';
+import { Y } from '../src/components/hologram/figure';
 
 function dataAt(bodyFatPercent: number, overrides: Partial<Parameters<typeof buildHologramData>[0]> = {}): HologramData {
   return buildHologramData({
@@ -41,12 +42,14 @@ function allPaths(geometry: ReturnType<typeof buildGeometry>): string[] {
     geometry.muscle.rightLegPath,
     geometry.muscle.leftArmPath,
     geometry.muscle.rightArmPath,
+    geometry.muscle.neckPath,
     ...geometry.fatRingPaths,
     ...geometry.contours.map((c) => c.d),
-    ...geometry.seams,
-    ...geometry.plates.map((p) => p.d),
+    geometry.headPath,
+    ...geometry.facePaths,
+    ...geometry.bellies.map((b) => b.d),
     ...geometry.softBands.map((b) => b.d),
-    ...geometry.striations.map((s) => s.d),
+    ...geometry.fibres.map((f) => f.d),
   ];
 }
 
@@ -90,8 +93,9 @@ describe('every figure is drawable', () => {
         geometry.fatLayer.rim,
         ...geometry.contours.map((c) => c.opacity),
         ...geometry.softBands.map((b) => b.opacity),
-        ...geometry.striations.map((s) => s.opacity),
-        ...geometry.plates.map((p) => p.intensity),
+        ...geometry.fibres.map((f) => f.opacity),
+        ...geometry.bellies.map((b) => b.intensity),
+        geometry.stipple.opacity,
       ];
       for (const opacity of opacities) {
         assert.ok(opacity >= 0 && opacity <= 1, `${percent}% produced an opacity of ${opacity}`);
@@ -169,7 +173,7 @@ describe('the silhouette says what the composition says', () => {
     for (const band of [10, 20, 30, 40, 50]) {
       const geometry = buildGeometry(dataAt(band));
       const outer = bellyWidth(geometry);
-      const inner = spanAt(geometry.muscle.torsoPath, 180, 216);
+      const inner = spanAt(geometry.muscle.torsoPath, Y.belly - 14, Y.waist + 4);
       assert.ok(
         inner <= outer,
         `band ${band}: the muscle body (${inner}) is wider than the body over it (${outer})`,
@@ -178,7 +182,7 @@ describe('the silhouette says what the composition says', () => {
 
     const gapAt = (band: number): number => {
       const geometry = buildGeometry(dataAt(band));
-      return bellyWidth(geometry) - spanAt(geometry.muscle.torsoPath, 180, 216);
+      return bellyWidth(geometry) - spanAt(geometry.muscle.torsoPath, Y.belly - 14, Y.waist + 4);
     };
     assert.ok(gapAt(40) > gapAt(20), 'the layer should be thicker at 40% than at 20%');
     assert.ok(gapAt(20) > gapAt(10), 'and thicker at 20% than at 10%');
@@ -206,12 +210,12 @@ describe('detail appears and disappears with the layer over it', () => {
           }),
         );
         assert.ok(
-          geometry.striations.length > 0,
+          geometry.fibres.length > 0,
           `${sex} at ${band}% lost its muscle fibre entirely`,
         );
         assert.ok(
-          Math.max(...geometry.plates.map((p) => p.intensity)) > 0,
-          `${sex} at ${band}% lost its muscle plates entirely`,
+          Math.max(...geometry.bellies.map((p) => p.intensity)) > 0,
+          `${sex} at ${band}% lost its muscle bellies entirely`,
         );
       }
     }
@@ -219,7 +223,7 @@ describe('detail appears and disappears with the layer over it', () => {
 
   test('fibre softens as the layer thickens, rather than vanishing', () => {
     const brightest = (band: number): number =>
-      Math.max(...buildGeometry(dataAt(band)).striations.map((s) => s.opacity));
+      Math.max(...buildGeometry(dataAt(band)).fibres.map((s) => s.opacity));
 
     assert.ok(brightest(12) > brightest(25));
     assert.ok(brightest(25) > brightest(40));
@@ -237,8 +241,8 @@ describe('detail appears and disappears with the layer over it', () => {
   test('abs fade out rather than shrinking, and never to nothing', () => {
     // The muscle is still there under the fat; you just cannot see its shape.
     const absAt = (percent: number): number => {
-      const plates = buildGeometry(dataAt(percent)).plates.filter((p) => p.key === 'waist');
-      return Math.max(...plates.map((p) => p.intensity));
+      const bellies = buildGeometry(dataAt(percent)).bellies.filter((p) => p.key === 'waist');
+      return Math.max(...bellies.map((p) => p.intensity));
     };
     assert.ok(absAt(12) > absAt(25));
     assert.ok(absAt(25) > absAt(35));
@@ -267,14 +271,21 @@ describe('older stored assessments still draw', () => {
   });
 });
 
-/** The widest point across the shoulders, read back out of the torso path. */
+/**
+ * The widest point across the shoulders, read back out of the torso path.
+ *
+ * Both of these read the landmark heights by name rather than by number. An
+ * earlier version hardcoded them, and when the figure was redrawn at new
+ * proportions the tests went on passing while measuring the wrong parts of the
+ * body — the shoulder check was reading the neck.
+ */
 function shoulderWidth(geometry: ReturnType<typeof buildGeometry>): number {
-  return spanAt(geometry.torsoPath, 96, 112);
+  return spanAt(geometry.torsoPath, Y.shoulder - 10, Y.shoulder + 10);
 }
 
 /** The widest point across the abdomen. */
 function bellyWidth(geometry: ReturnType<typeof buildGeometry>): number {
-  return spanAt(geometry.torsoPath, 180, 216);
+  return spanAt(geometry.torsoPath, Y.belly - 14, Y.waist + 4);
 }
 
 function armSpan(geometry: ReturnType<typeof buildGeometry>): number {
