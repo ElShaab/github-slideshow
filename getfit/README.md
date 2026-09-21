@@ -335,36 +335,81 @@ so `npm test` is safe in any environment.
 
 ## Mobile builds
 
-The app is an Expo project using the managed workflow with native modules.
+The app is an Expo project (SDK 52) using the managed workflow with native
+modules. It needs no server and no API URL — everything runs on the device.
 
 ```bash
 cd packages/mobile
 
-npm start                 # Expo dev server
-npx expo run:ios          # Debug build on a simulator or device
+npm start                 # Metro, for an already-installed dev build
+npx expo run:ios          # Build and run (simulator, or --device for a phone)
 npx expo run:android
 npx expo prebuild         # Generate the native ios/ and android/ projects
 ```
 
+### Seeing it on a real phone
+
+**Expo Go will not open this project.** Expo Go ships only the newest SDK, and
+`react-native-iap` is native code it does not carry. You need a development
+build — a small custom client with this project's native modules in it, which
+then loads your JavaScript over the network like Expo Go does.
+
+With the platform toolchain installed locally (Xcode, or Android Studio):
+
+```bash
+cd packages/mobile
+npx expo run:ios --device      # pick the plugged-in iPhone; needs a Mac
+npx expo run:android           # phone in USB-debugging mode
+```
+
+Without local native tooling, build it in the cloud and install the result:
+
+```bash
+npm install -g eas-cli && eas login
+eas build --platform android --profile development   # APK, no account needed
+eas build --platform ios     --profile development   # needs your Apple team
+```
+
+Then `npx expo start --dev-client` and scan the QR code. Edits reload live.
+
+Android's development build is the cheapest route to real hardware: the APK
+installs directly, with no developer account and no Mac. iOS needs a Mac for
+`run:ios`, or a paid Apple Developer account for EAS to sign an internal
+build and register the device.
+
+### What only a device can tell you
+
+The simulator gets the layout right and the materials wrong. Worth looking at
+on hardware, in daylight:
+
+- **Blur.** `expo-blur` is a true backdrop blur on iOS. On Android it is
+  weaker, and on older devices it can degrade to a flat tint — the glass
+  surfaces are built to still read as panels if that happens, but check.
+- **Glow.** The cyan glow on the primary button, a focused input and a selected
+  segment is a coloured `shadow*`, which iOS honours. Android draws shadows
+  from `elevation` alone, in grey — so expect depth there, not colour.
+- **Contrast.** The palette is tuned for 4.5:1 body text on glass over the
+  brightest stop of the field, which is a number on a screen until you read
+  it outdoors.
+- **Dynamic Type.** Sizes scale with the OS font setting, capped so layouts
+  survive the largest accessibility sizes.
+
 ### Production builds
 
 ```bash
-npm install -g eas-cli
-eas login
 eas build --platform ios      --profile production
 eas build --platform android  --profile production
 ```
 
-Set `EXPO_PUBLIC_API_URL` to your deployed API before building. On a simulator
-against a local server, Android reaches the host at `http://10.0.2.2:4000`,
-which the client already handles.
+`npm run preflight --workspace @getfit/mobile` checks the release
+prerequisites first and names what is missing.
 
 ### In-app purchases and Expo Go
 
-Store billing needs native code, so purchases do not work in Expo Go. The
-client resolves its billing module at runtime: install
-`expo-in-app-purchases` and build a development or production client to test
-real purchases. Without it, the mock store is used when the server allows it.
+Store billing needs native code. The app resolves `react-native-iap` at
+runtime, so the bundle still runs where it is absent — it falls back to the
+mock store instead of crashing. Real purchases need a development or
+production build; see RELEASE.md.
 
 ---
 

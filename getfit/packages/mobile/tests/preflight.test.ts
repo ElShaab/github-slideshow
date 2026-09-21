@@ -38,7 +38,7 @@ function readyConfig() {
     },
     eas: {
       ...realEas,
-      build: { ...realEas.build, production: { env: { EXPO_PUBLIC_API_URL: 'https://api.getfit.app' } } },
+      build: { ...realEas.build, production: { autoIncrement: true } },
       submit: {
         production: {
           ios: { appleId: 'dev@getfit.app', ascAppId: '1234567890', appleTeamId: 'ABCDE12345' },
