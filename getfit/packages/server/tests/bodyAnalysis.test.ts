@@ -160,9 +160,15 @@ test('hologram geometry describes the current body only', async () => {
     profile: { ...maleProfile, weightKg: 105 },
   });
 
-  assert.equal(lean.hologramData.version, 1);
+  assert.equal(lean.hologramData.version, 2);
   assert.equal(lean.hologramData.segments.length, 8);
   assert.equal(lean.hologramData.sex, 'male');
+
+  // The figure is drawn at a 5-point band, and the heavier body draws with a
+  // thicker layer and less of its muscle showing through it.
+  assert.equal((lean.hologramData.bodyFatBand ?? 0) % 5, 0);
+  assert.ok((lean.hologramData.adiposity ?? 1) < (heavier.hologramData.adiposity ?? 0));
+  assert.ok((lean.hologramData.definition ?? 0) > (heavier.hologramData.definition ?? 1));
 
   for (const segment of lean.hologramData.segments) {
     assert.ok(segment.development >= 0 && segment.development <= 1, `${segment.key} out of range`);

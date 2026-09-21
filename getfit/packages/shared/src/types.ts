@@ -168,7 +168,8 @@ export interface HologramSegment {
 }
 
 export interface HologramData {
-  version: 1;
+  /** 1 predates the fat layer; 2 carries `bodyFatBand`, `adiposity`, `definition`. */
+  version: 1 | 2;
   /** Overall build descriptor derived from the estimate. */
   shoulderToWaist: number;
   bodyFatNormalized: number;
@@ -179,7 +180,20 @@ export interface HologramData {
   segments: HologramSegment[];
   /** Deterministic seed so the same assessment always renders the same hologram. */
   seed: number;
+  /** `[body, bodyDeep, bodyBright, fatLayer]`. The last is the green rim. */
   accentPalette: string[];
+  /**
+   * The 5-point body-fat band the figure is drawn at.
+   *
+   * The figure changes in 5% steps rather than continuously, so two
+   * assessments a week apart do not produce a subtly different body the user
+   * has to squint at. The precise percentage is still what they read.
+   */
+  bodyFatBand?: number;
+  /** 0..1 thickness of the subcutaneous layer drawn around the figure. */
+  adiposity?: number;
+  /** 0..1 how much muscle detail shows through that layer. */
+  definition?: number;
 }
 
 /**

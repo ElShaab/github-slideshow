@@ -8,6 +8,19 @@ import type { HologramData, HologramSegment } from '@getfit/shared';
  * in a real 3D model later means replacing the renderer, not the contract.
  * The geometry describes the user's CURRENT estimate — there is no projection
  * of a future physique anywhere in here.
+ *
+ * Two things move with body fat, and they move in opposite directions. The
+ * subcutaneous layer — the green rim around the outside — thickens, and the
+ * belly swells past the ribcage until the widest point of the torso is below
+ * the chest rather than at the shoulders. Meanwhile the muscle detail under it
+ * disappears: striations fade, then the plates, until the surface is smooth and
+ * only soft horizontal bands remain. A figure at 40% and the same figure at 20%
+ * are not the same drawing at two opacities; they are built from different
+ * parts.
+ *
+ * Body fat arrives already rounded to a 5-point band (see `bodyFatBand` in
+ * @getfit/shared), so nothing here needs to guard against a figure that
+ * redraws itself on tape noise.
  */
 
 export const VIEW_WIDTH = 240;
@@ -27,9 +40,53 @@ export interface HologramGeometry {
   seams: string[];
   /** Muscle-group plates whose brightness tracks estimated development. */
   plates: Array<{ d: string; intensity: number; key: HologramSegment['key'] }>;
+  /**
+   * The subcutaneous layer: a green rim stroked around every silhouette path,
+   * under the body fill, so only the half outside the outline shows. Thickness
+   * is the layer's depth in view units.
+   */
+  fatLayer: { thickness: number; opacity: number };
+  /**
+   * Soft horizontal bands across the abdomen — the folds a covering layer
+   * makes. Absent on a lean figure, which has nothing to fold.
+   */
+  softBands: Array<{ d: string; opacity: number }>;
+  /**
+   * Muscle fibre lines. These are the first thing a layer of fat hides, so they
+   * are the first thing to disappear as body fat rises, and the surface is bare
+   * of them well before the plates fade.
+   */
+  striations: Array<{ d: string; opacity: number }>;
+  /** 0..1, echoed from the payload so the renderer can tint the outer bloom. */
+  adiposity: number;
+  /** 0..1, echoed for the same reason. */
+  definition: number;
   head: { cx: number; cy: number; r: number };
   width: number;
   height: number;
+}
+
+/**
+ * How thick the layer is, and how much detail survives underneath it.
+ *
+ * Version 2 payloads carry both, already banded. Version 1 predates the layer,
+ * so they are derived from the one fat figure it did store — an older stored
+ * assessment still draws, just without the benefit of the banding.
+ */
+function surface(data: HologramData): { adiposity: number; definition: number } {
+  const adiposity = clamp01(data.adiposity ?? data.bodyFatNormalized);
+  const definition = clamp01(
+    data.definition ?? (1 - data.bodyFatNormalized) * (0.62 + 0.38 * data.muscleNormalized),
+  );
+  return { adiposity, definition };
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function lerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
 }
 
 /** Vertical landmarks, tuned so the figure reads at roughly human proportions. */
@@ -38,6 +95,10 @@ const Y = {
   neck: 80,
   shoulder: 102,
   chest: 150,
+  // The belly sits between the ribs and the waist. At low body fat it is the
+  // narrowest part of the torso; at high body fat it is the widest part of the
+  // whole figure, which is what changes the silhouette's read.
+  belly: 186,
   waist: 212,
   hip: 252,
   crotch: 272,
@@ -56,6 +117,7 @@ interface Side {
 interface Widths {
   shoulder: Side;
   chest: Side;
+  belly: Side;
   waist: Side;
   hip: Side;
   thigh: Side;
@@ -86,18 +148,27 @@ function sided(base: number, range: number, segment: HologramSegment | undefined
 export function buildGeometry(data: HologramData): HologramGeometry {
   const segments = segmentMap(data);
   const female = data.sex === 'female';
+  const { adiposity, definition } = surface(data);
+
+  // Fat does not only sit on the abdomen. Limbs thicken too, which is what
+  // stops a heavy figure reading as a thin person with a balloon taped on.
+  const limb = 1 + adiposity * 0.22;
+
+  const chest = sided(female ? 38 : 42, 14, segments.chest);
+  const waist = sided(female ? 27 : 29, 25, segments.waist);
 
   const widths: Widths = {
     shoulder: sided(female ? 42 : 48, 22, segments.shoulders),
-    chest: sided(female ? 38 : 42, 14, segments.chest),
-    waist: sided(female ? 27 : 29, 25, segments.waist),
+    chest,
+    belly: belly(chest, waist, adiposity),
+    waist,
     hip: sided(female ? 40 : 35, 17, segments.hips),
-    thigh: sided(female ? 25 : 24, 10, segments.quads),
-    knee: sided(15, 4, segments.quads),
-    calf: sided(15, 7, segments.calves),
-    ankle: sided(9, 1.5, segments.calves),
-    upperArm: sided(female ? 10 : 11, 7, segments.arms),
-    forearm: sided(female ? 8 : 9, 5, segments.arms),
+    thigh: scale(sided(female ? 25 : 24, 10, segments.quads), limb),
+    knee: scale(sided(15, 4, segments.quads), 1 + adiposity * 0.1),
+    calf: scale(sided(15, 7, segments.calves), limb),
+    ankle: scale(sided(9, 1.5, segments.calves), 1 + adiposity * 0.08),
+    upperArm: scale(sided(female ? 10 : 11, 7, segments.arms), limb),
+    forearm: scale(sided(female ? 8 : 9, 5, segments.arms), 1 + adiposity * 0.16),
   };
 
   return {
@@ -108,11 +179,42 @@ export function buildGeometry(data: HologramData): HologramGeometry {
     rightArmPath: buildArm(widths, 'right'),
     contours: buildContours(widths),
     seams: buildSeams(widths),
-    plates: buildPlates(widths, segments),
+    plates: buildPlates(widths, segments, definition),
+    fatLayer: {
+      // A lean figure still has a hairline of it — nobody is at zero.
+      thickness: round2(1.2 + adiposity * 8),
+      opacity: round2(0.34 + adiposity * 0.46),
+    },
+    softBands: buildSoftBands(widths, adiposity),
+    striations: buildStriations(widths, segments, definition),
+    adiposity: round2(adiposity),
+    definition: round2(definition),
     head: { cx: CX, cy: Y.headCenter, r: female ? 21 : 22 },
     width: VIEW_WIDTH,
     height: VIEW_HEIGHT,
   };
+}
+
+/**
+ * The abdomen.
+ *
+ * On a lean figure this is just the taper between the ribs and the waist, so it
+ * sits between the two. As fat is added it swells past both, until it is the
+ * widest point of the whole figure — which is the single change that makes a
+ * silhouette read as heavy rather than as a large athlete.
+ */
+function belly(chest: Side, waist: Side, adiposity: number): Side {
+  const swell = (chestWidth: number, waistWidth: number): number =>
+    lerp((chestWidth + waistWidth) / 2, waistWidth * 1.34, adiposity);
+  return { left: swell(chest.left, waist.left), right: swell(chest.right, waist.right) };
+}
+
+function scale(side: Side, factor: number): Side {
+  return { left: side.left * factor, right: side.right * factor };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 /** Neck, shoulders, torso and pelvis as one closed shape. */
@@ -126,8 +228,11 @@ function buildTorso(w: Widths): string {
     `C ${r(20)} ${Y.neck + 4} ${r(w.shoulder.right - 16)} ${Y.shoulder - 14} ${r(w.shoulder.right)} ${Y.shoulder + 2}`,
     // Deltoid down into the ribcage.
     `C ${r(w.shoulder.right + 1)} ${Y.shoulder + 20} ${r(w.chest.right + 2)} ${Y.chest - 26} ${r(w.chest.right)} ${Y.chest}`,
-    // Ribcage taper to the waist.
-    `C ${r(w.chest.right - 1)} ${Y.chest + 28} ${r(w.waist.right + 1)} ${Y.waist - 26} ${r(w.waist.right)} ${Y.waist}`,
+    // Ribcage into the abdomen. On a lean figure this is a taper; on a heavy
+    // one the belly is wider than the ribs and the curve bows outward instead.
+    `C ${r(w.chest.right)} ${Y.chest + 20} ${r(w.belly.right)} ${Y.belly - 22} ${r(w.belly.right)} ${Y.belly}`,
+    // Abdomen down to the waist.
+    `C ${r(w.belly.right)} ${Y.belly + 14} ${r(w.waist.right + 1)} ${Y.waist - 14} ${r(w.waist.right)} ${Y.waist}`,
     // Waist flaring into the hip.
     `C ${r(w.waist.right + 1)} ${Y.waist + 16} ${r(w.hip.right)} ${Y.hip - 18} ${r(w.hip.right)} ${Y.hip}`,
     // Pelvic arch: the torso closes in an inverted V so the legs read as
@@ -136,7 +241,8 @@ function buildTorso(w: Widths): string {
     `C ${l(3)} ${Y.crotch + 2} ${l(w.hip.left * 0.55)} ${Y.crotch + 4} ${l(w.hip.left - 1)} ${Y.hip + 14}`,
     `L ${l(w.hip.left)} ${Y.hip}`,
     `C ${l(w.hip.left)} ${Y.hip - 18} ${l(w.waist.left + 1)} ${Y.waist + 16} ${l(w.waist.left)} ${Y.waist}`,
-    `C ${l(w.waist.left + 1)} ${Y.waist - 26} ${l(w.chest.left - 1)} ${Y.chest + 28} ${l(w.chest.left)} ${Y.chest}`,
+    `C ${l(w.waist.left + 1)} ${Y.waist - 14} ${l(w.belly.left)} ${Y.belly + 14} ${l(w.belly.left)} ${Y.belly}`,
+    `C ${l(w.belly.left)} ${Y.belly - 22} ${l(w.chest.left)} ${Y.chest + 20} ${l(w.chest.left)} ${Y.chest}`,
     `C ${l(w.chest.left + 2)} ${Y.chest - 26} ${l(w.shoulder.left + 1)} ${Y.shoulder + 20} ${l(w.shoulder.left)} ${Y.shoulder + 2}`,
     `C ${l(w.shoulder.left - 16)} ${Y.shoulder - 14} ${l(20)} ${Y.neck + 4} ${l(9)} ${Y.neck}`,
     'Z',
@@ -228,13 +334,7 @@ function buildContours(w: Widths): Array<{ d: string; opacity: number }> {
   const rings: Array<{ y: number; left: number; right: number; opacity: number; bow: number }> = [
     { y: Y.shoulder + 10, left: w.shoulder.left * 0.94, right: w.shoulder.right * 0.94, opacity: 0.5, bow: 9 },
     { y: Y.chest, left: w.chest.left * 0.96, right: w.chest.right * 0.96, opacity: 0.46, bow: 9 },
-    {
-      y: (Y.chest + Y.waist) / 2,
-      left: (w.chest.left + w.waist.left) / 2,
-      right: (w.chest.right + w.waist.right) / 2,
-      opacity: 0.3,
-      bow: 8,
-    },
+    { y: Y.belly, left: w.belly.left * 0.96, right: w.belly.right * 0.96, opacity: 0.3, bow: 8 },
     { y: Y.waist, left: w.waist.left * 0.98, right: w.waist.right * 0.98, opacity: 0.46, bow: 8 },
     { y: Y.hip - 4, left: w.hip.left * 0.97, right: w.hip.right * 0.97, opacity: 0.38, bow: 8 },
   ];
@@ -276,26 +376,34 @@ function buildSeams(w: Widths): string[] {
     // Sternum and linea alba down the centre of the torso.
     `M ${CX} ${Y.neck + 10} L ${CX} ${Y.hip - 6}`,
     // Lateral lines tracing the outside of the torso.
-    `M ${CX - w.chest.left * 0.7} ${Y.chest - 8} C ${CX - w.waist.left * 0.86} ${Y.waist - 34} ${
+    `M ${CX - w.chest.left * 0.7} ${Y.chest - 8} C ${CX - w.belly.left * 0.82} ${Y.belly - 10} ${
       CX - w.waist.left * 0.78
     } ${Y.waist} ${CX - w.hip.left * 0.72} ${Y.hip - 8}`,
-    `M ${CX + w.chest.right * 0.7} ${Y.chest - 8} C ${CX + w.waist.right * 0.86} ${Y.waist - 34} ${
+    `M ${CX + w.chest.right * 0.7} ${Y.chest - 8} C ${CX + w.belly.right * 0.82} ${Y.belly - 10} ${
       CX + w.waist.right * 0.78
     } ${Y.waist} ${CX + w.hip.right * 0.72} ${Y.hip - 8}`,
   ];
 }
 
-/** Stylised muscle plates — delts, pecs, abs, quads — brightened by development. */
+/**
+ * Stylised muscle plates — delts, pecs, abs, quads.
+ *
+ * Brightness is development scaled by how much of it is visible through the
+ * layer on top. A well-developed muscle under 40% body fat is still there; you
+ * just cannot see its shape, so the plate dims rather than shrinking.
+ */
 function buildPlates(
   w: Widths,
   segments: Record<HologramSegment['key'], HologramSegment>,
+  definition: number,
 ): Array<{ d: string; intensity: number; key: HologramSegment['key'] }> {
-  const chest = segments.chest?.development ?? 0.5;
-  // Visible abs track low body fat, which is what the waist segment measures.
-  const abs = 1 - (segments.waist?.development ?? 0.5);
-  const quads = segments.quads?.development ?? 0.5;
-  const shoulders = segments.shoulders?.development ?? 0.5;
-  const calves = segments.calves?.development ?? 0.5;
+  const visible = 0.2 + 0.8 * definition;
+  const chest = (segments.chest?.development ?? 0.5) * visible;
+  // Abs are the first thing to go, so they track definition alone.
+  const abs = definition;
+  const quads = (segments.quads?.development ?? 0.5) * visible;
+  const shoulders = (segments.shoulders?.development ?? 0.5) * visible;
+  const calves = (segments.calves?.development ?? 0.5) * visible;
 
   /** A rounded cap over the deltoid rather than an angular wedge. */
   const delt = (side: -1 | 1, shoulderWidth: number): string => {
@@ -371,4 +479,142 @@ function buildPlates(
     { d: calfPlate(-1, w.hip.left, w.calf.left), intensity: calves, key: 'calves' },
     { d: calfPlate(1, w.hip.right, w.calf.right), intensity: calves, key: 'calves' },
   ];
+}
+
+/**
+ * The folds a covering layer makes across the abdomen.
+ *
+ * A lean figure has none — there is nothing to fold — so this returns an empty
+ * list below the threshold rather than drawing faint ones nobody asked for.
+ * Bands appear one at a time as the layer thickens, which is what gives the
+ * 5-point steps something visible to do in the upper bands, where the outline
+ * has already stopped changing much.
+ */
+function buildSoftBands(w: Widths, adiposity: number): Array<{ d: string; opacity: number }> {
+  if (adiposity < 0.26) return [];
+
+  const count = adiposity > 0.62 ? 3 : adiposity > 0.42 ? 2 : 1;
+  const bands: Array<{ d: string; opacity: number }> = [];
+
+  for (let index = 0; index < count; index += 1) {
+    // Spread the bands across the belly, the widest first.
+    const t = count === 1 ? 0.5 : index / (count - 1);
+    const y = lerp(Y.chest + 26, Y.waist + 6, t);
+    const spread = lerp(0.72, 0.86, 1 - Math.abs(t - 0.5) * 2);
+    const left = w.belly.left * spread;
+    const right = w.belly.right * spread;
+    const bow = 9 + adiposity * 5;
+
+    bands.push({
+      opacity: round2(0.14 + adiposity * 0.3),
+      d: `M ${CX - left} ${y} C ${CX - left * 0.5} ${y + bow} ${CX + right * 0.5} ${y + bow} ${
+        CX + right
+      } ${y}`,
+    });
+  }
+
+  return bands;
+}
+
+/**
+ * Muscle fibre lines.
+ *
+ * These are the texture covering the reference figure at 20% — the fan across
+ * the pecs, the obliques under the ribs, the long fibres down the quads and the
+ * upper arms. They are the finest detail on the figure and the first thing a
+ * layer of fat hides.
+ *
+ * Each group has its own threshold, so they go out one at a time in the order a
+ * body actually loses them as fat is gained: the obliques first, then the
+ * quads, then the pecs, with the arms last. Fading them together instead would
+ * put a cliff between two neighbouring bands, where a figure that was fully
+ * striated at 35% is bare at 40%.
+ */
+const STRIATION_THRESHOLDS = {
+  obliques: 0.7,
+  quads: 0.52,
+  pecs: 0.34,
+  arms: 0.12,
+} as const;
+
+function buildStriations(
+  w: Widths,
+  segments: Record<HologramSegment['key'], HologramSegment>,
+  definition: number,
+): Array<{ d: string; opacity: number }> {
+  if (definition < STRIATION_THRESHOLDS.arms) return [];
+
+  const lines: Array<{ d: string; opacity: number }> = [];
+  const opacity = round2(0.12 + definition * 0.34);
+  const push = (d: string, weight = 1): void =>
+    void lines.push({ d, opacity: round2(opacity * weight) });
+
+  // Pec fan: fibres running from the sternum out to the shoulder.
+  if (definition >= STRIATION_THRESHOLDS.pecs) {
+    for (const side of [-1, 1] as const) {
+      const chest = side === 1 ? w.chest.right : w.chest.left;
+      const x = (value: number): number => CX + side * value;
+      for (let index = 0; index < 3; index += 1) {
+        const t = index / 2;
+        const startY = Y.chest - 22 + t * 24;
+        const endY = Y.chest - 18 + t * 10;
+        push(`M ${x(6)} ${startY} Q ${x(chest * 0.45)} ${startY - 2} ${x(chest * 0.74)} ${endY}`, 0.9);
+      }
+    }
+  }
+
+  // Obliques and serratus: short diagonals under the ribs, down onto the waist.
+  if (definition >= STRIATION_THRESHOLDS.obliques) {
+    for (const side of [-1, 1] as const) {
+      const belly = side === 1 ? w.belly.right : w.belly.left;
+      const x = (value: number): number => CX + side * value;
+      for (let index = 0; index < 3; index += 1) {
+        const y = Y.chest + 18 + index * 14;
+        push(
+          `M ${x(belly * 0.28)} ${y} Q ${x(belly * 0.6)} ${y + 3} ${x(belly * 0.82)} ${y - 6}`,
+          0.72,
+        );
+      }
+    }
+  }
+
+  // Quads: long fibres down the front of each thigh.
+  if (definition >= STRIATION_THRESHOLDS.quads) {
+    for (const side of [-1, 1] as const) {
+      const hip = side === 1 ? w.hip.right : w.hip.left;
+      const thigh = side === 1 ? w.thigh.right : w.thigh.left;
+      const legCenter = hip * 0.48;
+      const x = (value: number): number => CX + side * value;
+      for (const offset of [-0.42, 0, 0.42]) {
+        push(
+          `M ${x(legCenter + thigh * offset * 0.5)} ${Y.crotch + 16} C ${x(
+            legCenter + thigh * offset,
+          )} ${Y.thigh} ${x(legCenter + thigh * offset * 0.9)} ${Y.knee - 44} ${x(
+            legCenter + thigh * offset * 0.4,
+          )} ${Y.knee - 18}`,
+          0.66,
+        );
+      }
+    }
+  }
+
+  // Biceps and triceps: one fibre down each upper arm, the last detail to go.
+  const armsDeveloped = (segments.arms?.development ?? 0.5) > 0.3;
+  if (armsDeveloped) {
+    for (const side of [-1, 1] as const) {
+      const shoulder = side === 1 ? w.shoulder.right : w.shoulder.left;
+      const upper = side === 1 ? w.upperArm.right : w.upperArm.left;
+      const x = (value: number): number => CX + side * value;
+      push(
+        `M ${x(shoulder + upper * 0.1)} ${Y.shoulder + 28} C ${x(shoulder + upper * 0.45)} ${
+          Y.chest + 10
+        } ${x(shoulder + upper * 0.4)} ${Y.chest + 36} ${x(shoulder + upper * 0.15)} ${
+          Y.chest + 54
+        }`,
+        0.6,
+      );
+    }
+  }
+
+  return lines;
 }

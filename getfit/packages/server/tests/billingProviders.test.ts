@@ -198,7 +198,10 @@ describe('hologram seeding (#13)', () => {
     assert.equal(result.method, 'vision', 'a photo reading must not claim the measured method');
     // The user's own tape reading wins over anything the endpoint says about it.
     assert.equal(result.waistBodyRatio, 0.472);
-    assert.equal(result.hologramData.version, 1);
+    assert.equal(result.hologramData.version, 2);
     assert.equal(result.hologramData.segments.length, 8);
+    // Version 2 carries the fat layer, and it is banded even when the figure
+    // came back from a vision endpoint rather than a tape measure.
+    assert.equal(result.hologramData.bodyFatBand, 20);
   });
 });

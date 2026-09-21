@@ -5,6 +5,7 @@ import Svg, {
   Circle,
   Defs,
   Ellipse,
+  G,
   LinearGradient as SvgLinearGradient,
   Path,
   RadialGradient,
@@ -117,14 +118,24 @@ export const HologramViewer = memo(function HologramViewer({
 
   const accent = data.accentPalette?.[0] ?? colors.accent;
   const accentBright = data.accentPalette?.[2] ?? colors.accentStrong;
+  // The green fringe. Version 1 payloads have no fourth entry, so they fall
+  // back to the body colour, which draws a rim that simply is not green.
+  const fatColor = data.accentPalette?.[3] ?? accent;
+  // Once the layer is more than a rim it is what the halo is made of, so the
+  // bloom turns green — the difference you notice between the two references
+  // before you have looked at either silhouette.
+  const bloom = geometry.adiposity > 0.5 ? fatColor : accent;
 
   const label =
     accessibilityLabel ??
-    `Body hologram of your current estimated composition: ${Math.round(
-      data.bodyFatNormalized * 100,
-    )} percent relative body fat, ${Math.round(
-      data.muscleNormalized * 100,
-    )} percent relative muscle development.`;
+    (data.bodyFatBand !== undefined
+      ? `Body hologram of your current estimate: drawn at about ${data.bodyFatBand} percent body fat, ` +
+        `with ${Math.round(data.muscleNormalized * 100)} percent relative muscle development.`
+      : `Body hologram of your current estimated composition: ${Math.round(
+          data.bodyFatNormalized * 100,
+        )} percent relative body fat, ${Math.round(
+          data.muscleNormalized * 100,
+        )} percent relative muscle development.`);
 
   return (
     <View
@@ -156,14 +167,22 @@ export const HologramViewer = memo(function HologramViewer({
         style={[StyleSheet.absoluteFill, { transform: [{ scaleX }] }]}
         pointerEvents="none"
       >
-        {/* Outer bloom, gently pulsing. */}
+        {/* Outer bloom, gently pulsing. It takes the layer's colour, so the
+            halo around a heavy figure is green and a lean one's is cyan —
+            the difference between the two reference renders at a glance. */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: glowOpacity }]}>
           <Svg width={width} height={size} viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}>
-            <Path d={geometry.torsoPath} stroke={accent} strokeWidth={7} fill="none" opacity={0.16} />
-            <Path d={geometry.leftLegPath} stroke={accent} strokeWidth={6} fill="none" opacity={0.14} />
-            <Path d={geometry.rightLegPath} stroke={accent} strokeWidth={6} fill="none" opacity={0.14} />
-            <Path d={geometry.leftArmPath} stroke={accent} strokeWidth={6} fill="none" opacity={0.13} />
-            <Path d={geometry.rightArmPath} stroke={accent} strokeWidth={6} fill="none" opacity={0.13} />
+            <Path
+              d={geometry.torsoPath}
+              stroke={bloom}
+              strokeWidth={7 + geometry.fatLayer.thickness}
+              fill="none"
+              opacity={0.16}
+            />
+            <Path d={geometry.leftLegPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.14} />
+            <Path d={geometry.rightLegPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.14} />
+            <Path d={geometry.leftArmPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.13} />
+            <Path d={geometry.rightArmPath} stroke={bloom} strokeWidth={6} fill="none" opacity={0.13} />
             <Circle
               cx={geometry.head.cx}
               cy={geometry.head.cy}
@@ -191,6 +210,39 @@ export const HologramViewer = memo(function HologramViewer({
             </SvgLinearGradient>
           </Defs>
 
+          {/*
+            The subcutaneous layer. Each silhouette is stroked in green first;
+            the body fills over it, so only the half of the stroke outside the
+            outline survives — a rim of exactly the layer's thickness, which is
+            what the reference renders show thickening with body fat.
+          */}
+          <G opacity={geometry.fatLayer.opacity}>
+            {[
+              geometry.leftArmPath,
+              geometry.rightArmPath,
+              geometry.leftLegPath,
+              geometry.rightLegPath,
+              geometry.torsoPath,
+            ].map((d, index) => (
+              <Path
+                key={`fat-${index}`}
+                d={d}
+                fill="none"
+                stroke={fatColor}
+                strokeWidth={geometry.fatLayer.thickness * 2}
+                strokeLinejoin="round"
+              />
+            ))}
+            <Circle
+              cx={geometry.head.cx}
+              cy={geometry.head.cy}
+              r={geometry.head.r}
+              fill="none"
+              stroke={fatColor}
+              strokeWidth={geometry.fatLayer.thickness}
+            />
+          </G>
+
           {/* Arms sit behind the torso so the shoulder line stays clean. */}
           <Path d={geometry.leftArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
           <Path d={geometry.rightArmPath} fill="url(#hg-body)" stroke={accent} strokeWidth={1.1} strokeOpacity={0.6} />
@@ -217,6 +269,32 @@ export const HologramViewer = memo(function HologramViewer({
               stroke={accentBright}
               strokeWidth={0.7}
               strokeOpacity={0.22 + plate.intensity * 0.3}
+            />
+          ))}
+
+          {/* Muscle fibre, visible only while there is little covering it. */}
+          {geometry.striations.map((line, index) => (
+            <Path
+              key={`striation-${index}`}
+              d={line.d}
+              stroke={accentBright}
+              strokeWidth={0.6}
+              fill="none"
+              opacity={line.opacity}
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* Soft folds, which only a covering layer can make. */}
+          {geometry.softBands.map((band, index) => (
+            <Path
+              key={`band-${index}`}
+              d={band.d}
+              stroke={fatColor}
+              strokeWidth={2.2}
+              fill="none"
+              opacity={band.opacity}
+              strokeLinecap="round"
             />
           ))}
 

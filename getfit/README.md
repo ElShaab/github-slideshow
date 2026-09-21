@@ -518,6 +518,39 @@ configured.
 To add a provider, implement the interface in `packages/server/src/ai/` and
 return it from `getBodyAnalysisProvider()`.
 
+### The hologram
+
+The figure on the results screen is built from the same numbers, and it is
+drawn at a **5-point body-fat band** rather than at the exact reading. A tape
+measure moves a point or two between weeks for reasons that have nothing to do
+with the body — where it sat, time of day, how hard it was pulled — and a
+figure that redraws itself on that noise invites someone to read a change into
+it. The precise percentage is still what they read; only the picture is
+quantised.
+
+Two things move in opposite directions as the band rises:
+
+| | Lean band | Heavy band |
+| --- | --- | --- |
+| Subcutaneous layer | a green hairline | a thick green rim |
+| Widest point of the torso | the shoulders | the belly |
+| Muscle fibre | obliques, quads, pecs, arms | none |
+| Soft folds across the abdomen | none | up to three |
+
+Muscle detail thins group by group rather than switching off, in the order a
+body loses it: the obliques first, then the quads, then the pecs, with the arms
+last. Plates fade rather than shrinking, because the muscle is still there —
+you just cannot see its shape through what is over it.
+
+Women's bands sit about 8 points higher at every equivalent level, which is
+essential fat rather than a difference in condition, so a woman at 28% draws
+with about the definition of a man at 20%.
+
+`packages/shared/tests/hologram.test.ts` holds the band boundaries and
+`packages/mobile/tests/hologramGeometry.test.ts` holds the silhouette rules —
+including that every path is free of `NaN`, which SVG would otherwise swallow
+by silently dropping a limb.
+
 ---
 
 ## Look and feel
