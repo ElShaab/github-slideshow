@@ -51,7 +51,13 @@ function usePressAnimation(disabled: boolean, reduceMotion: boolean) {
   };
 }
 
-/** The single strongest call to action on a screen. */
+/**
+ * The single strongest call to action on a screen.
+ *
+ * It is glass like everything else, but lit: a brighter fill, a cyan rim and a
+ * cyan glow underneath it. That is what separates it from a secondary action,
+ * so the two never have to be told apart by colour alone.
+ */
 export const PrimaryButton = memo(function PrimaryButton({
   label,
   onPress,
@@ -87,27 +93,38 @@ export const PrimaryButton = memo(function PrimaryButton({
         accessibilityState={{ disabled: isInactive, busy: loading }}
         style={[
           styles.base,
+          styles.glow,
           {
             minHeight: size === 'large' ? 56 : MIN_TOUCH_TARGET,
-            borderRadius: radius.md,
+            borderRadius: radius.pill,
+            borderWidth: StyleSheet.hairlineWidth * 3,
+            borderColor: colors.glassEdge,
             opacity: disabled ? 0.42 : 1,
             shadowColor: colors.accent,
           },
         ]}
       >
         <LinearGradient
-          colors={[colors.accentStrong, colors.accent]}
+          colors={[colors.glassStrong, colors.glass]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
+        {/* The lit top edge, the same one the cards carry. */}
+        <LinearGradient
+          colors={['transparent', colors.glassEdge, 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.topEdge}
+          pointerEvents="none"
+        />
         <View style={[styles.content, { gap: spacing.sm }]}>
           {loading ? (
-            <ActivityIndicator color={colors.onAccent} />
+            <ActivityIndicator color={colors.text} />
           ) : (
             <>
               {icon}
-              <Text variant="subheading" color="onAccent" numberOfLines={1}>
+              <Text variant="subheading" numberOfLines={1}>
                 {label}
               </Text>
             </>
@@ -150,10 +167,10 @@ export const SecondaryButton = memo(function SecondaryButton({
           styles.base,
           {
             minHeight: size === 'large' ? 56 : MIN_TOUCH_TARGET,
-            borderRadius: radius.md,
+            borderRadius: radius.pill,
             borderWidth: StyleSheet.hairlineWidth * 2,
             borderColor: colors.glassBorder,
-            backgroundColor: colors.glassStrong,
+            backgroundColor: colors.glass,
             opacity: disabled ? 0.42 : 1,
           },
         ]}
@@ -224,10 +241,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
   },
+  glow: {
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1 },
   content: {
     flexDirection: 'row',
     alignItems: 'center',

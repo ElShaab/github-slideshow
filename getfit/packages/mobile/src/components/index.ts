@@ -10,13 +10,15 @@ export { RestTimer } from './RestTimer';
 export { WorkoutSetCard } from './WorkoutSetCard';
 export { GoalCard } from './GoalCard';
 export { OnboardingHeader, OnboardingProgress } from './OnboardingChrome';
-export { Choice, ChoicePill } from './Choice';
+export { Choice, ChoicePill, Segmented } from './Choice';
+export type { SegmentedOption } from './Choice';
 export { Screen, LoadingScreen, ErrorState, EmptyState, SectionHeader } from './Screen';
 export { SettingsRow, SettingsGroup } from './SettingsRow';
 export { PlanOptionCard } from './PlanOptionCard';
 export { SubscriptionCard } from './SubscriptionCard';
 export { WorkoutSummaryCard } from './WorkoutSummaryCard';
 export { NumberField } from './NumberField';
+export { TextField } from './TextField';
 export { MeasurementsForm } from './MeasurementsForm';
 export {
   EMPTY_MEASUREMENTS,

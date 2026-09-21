@@ -23,8 +23,11 @@ import os
 from PIL import Image, ImageDraw
 
 # The product palette, matching packages/mobile/src/theme/palette.ts.
-BACKGROUND = (5, 7, 12)
-BACKGROUND_LIFT = (12, 22, 34)
+# BACKGROUND is AZURE[700] and BACKGROUND_LIFT is AZURE[500] — the deep and
+# bright ends of the field the app is painted on, so the icon and the splash
+# are the same blue the first screen fades up from.
+BACKGROUND = (6, 42, 102)
+BACKGROUND_LIFT = (10, 70, 147)
 ACCENT = (34, 227, 242)
 ACCENT_DEEP = (10, 147, 172)  # reserved for future marks
 
@@ -33,7 +36,7 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "assets")
 
 
 def radial_background(size: int) -> Image.Image:
-    """Dark ground with a soft lift behind the mark, so it is not flat black."""
+    """Deep azure ground with a bloom behind the mark, so it is not flat."""
     image = Image.new("RGB", (size, size), BACKGROUND)
     pixels = image.load()
     centre = size / 2

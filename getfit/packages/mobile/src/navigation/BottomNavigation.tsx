@@ -27,15 +27,17 @@ export const BottomNavigation = memo(function BottomNavigation({
         {
           paddingBottom: Math.max(insets.bottom, spacing.sm),
           borderTopColor: colors.glassBorder,
-          backgroundColor: Platform.OS === 'android' ? colors.backgroundElevated : 'transparent',
+          backgroundColor: 'transparent',
         },
       ]}
       accessibilityRole="tablist"
     >
-      {Platform.OS !== 'android' ? (
-        <BlurView intensity={40} tint={colors.blurTint} style={StyleSheet.absoluteFill} />
-      ) : null}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glass }]} />
+      <BlurView
+        intensity={Platform.OS === 'android' ? 24 : 40}
+        tint={colors.blurTint}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} />
 
       <View style={styles.row}>
         {state.routes.map((route, index) => {

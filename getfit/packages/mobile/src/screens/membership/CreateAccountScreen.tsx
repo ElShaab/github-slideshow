@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
-import { PrimaryButton, Screen, Text } from '../../components';
+import { View } from 'react-native';
+import { PrimaryButton, Screen, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
 import { authApi } from '../../api/endpoints';
 import { useSession } from '../../state/SessionProvider';
@@ -13,7 +13,7 @@ import { useTheme } from '../../theme';
  * stays attached to the same person.
  */
 export function CreateAccountScreen(): React.ReactElement {
-  const { colors, spacing, radius } = useTheme();
+  const { spacing } = useTheme();
   const { refresh } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,16 +37,6 @@ export function CreateAccountScreen(): React.ReactElement {
       setBusy(false);
     }
   }, [email, password, refresh]);
-
-  const inputStyle = [
-    styles.input,
-    {
-      color: colors.text,
-      borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
-      borderRadius: radius.md,
-    },
-  ];
 
   return (
     <Screen
@@ -78,54 +68,27 @@ export function CreateAccountScreen(): React.ReactElement {
       </Text>
 
       <View style={{ marginTop: spacing.xxxl, gap: spacing.lg }}>
-        <View>
-          <Text variant="micro" color="muted" uppercase>
-            Email
-          </Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            accessibilityLabel="Email address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.textMuted}
-            style={inputStyle}
-          />
-        </View>
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          placeholder="you@example.com"
+        />
 
-        <View>
-          <Text variant="micro" color="muted" uppercase>
-            Password
-          </Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="new-password"
-            accessibilityLabel="Password"
-            accessibilityHint="At least 8 characters"
-            placeholder="At least 8 characters"
-            placeholderTextColor={colors.textMuted}
-            style={inputStyle}
-          />
-          <Text variant="caption" color="muted" style={{ marginTop: spacing.xs }}>
-            At least 8 characters.
-          </Text>
-        </View>
+        <TextField
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          accessibilityHint="At least 8 characters"
+          placeholder="At least 8 characters"
+          hint="At least 8 characters."
+        />
       </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  input: {
-    marginTop: 8,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 17,
-    minHeight: 56,
-  },
-});

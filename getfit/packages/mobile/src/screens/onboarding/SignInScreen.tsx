@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { GlassButton, PrimaryButton, Screen, Text } from '../../components';
+import { GlassButton, PrimaryButton, Screen, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
 import { authApi } from '../../api/endpoints';
 import { useSession } from '../../state/SessionProvider';
@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'SignIn'>;
 
 /** Sign-in for returning users on a new device. */
 export function SignInScreen({ navigation }: Props): React.ReactElement {
-  const { colors, spacing, radius } = useTheme();
+  const { spacing } = useTheme();
   const { refresh } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,16 +31,6 @@ export function SignInScreen({ navigation }: Props): React.ReactElement {
       setBusy(false);
     }
   }, [email, password, refresh]);
-
-  const inputStyle = [
-    styles.input,
-    {
-      color: colors.text,
-      borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
-      borderRadius: radius.md,
-    },
-  ];
 
   return (
     <Screen
@@ -69,50 +59,25 @@ export function SignInScreen({ navigation }: Props): React.ReactElement {
       </Text>
 
       <View style={{ marginTop: spacing.xxxl, gap: spacing.lg }}>
-        <View>
-          <Text variant="micro" color="muted" uppercase>
-            Email
-          </Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            accessibilityLabel="Email address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.textMuted}
-            style={inputStyle}
-          />
-        </View>
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          placeholder="you@example.com"
+        />
 
-        <View>
-          <Text variant="micro" color="muted" uppercase>
-            Password
-          </Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="current-password"
-            accessibilityLabel="Password"
-            placeholder="••••••••"
-            placeholderTextColor={colors.textMuted}
-            style={inputStyle}
-          />
-        </View>
+        <TextField
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="current-password"
+          placeholder="••••••••"
+        />
       </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  input: {
-    marginTop: 8,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 17,
-    minHeight: 56,
-  },
-});

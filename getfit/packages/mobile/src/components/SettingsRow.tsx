@@ -59,7 +59,7 @@ export const SettingsRow = memo(function SettingsRow({
           onValueChange={toggle.onChange}
           accessibilityLabel={label}
           trackColor={{ false: colors.glassBorder, true: colors.accent }}
-          thumbColor={colors.background}
+          thumbColor={colors.text}
         />
       ) : (
         <View style={styles.valueBlock}>

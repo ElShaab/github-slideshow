@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,8 +30,11 @@ export interface ScreenProps {
 }
 
 /**
- * The page shell: themed background, the ambient cyan wash behind everything,
- * safe-area handling and an optional pinned footer.
+ * The page shell: the blue field, the cyan blooms that light it, safe-area
+ * handling and an optional pinned footer.
+ *
+ * The field is painted here and nowhere else, which is why every screen shares
+ * one continuous gradient instead of each one owning a background colour.
  */
 export const Screen = memo(function Screen({
   children,
@@ -40,7 +45,7 @@ export const Screen = memo(function Screen({
   footer,
   padded = true,
 }: ScreenProps): React.ReactElement {
-  const { colors, spacing, isDark } = useTheme();
+  const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
 
   const padding = {
@@ -71,16 +76,29 @@ export const Screen = memo(function Screen({
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.statusBar} />
 
-      {/* Ambient wash: a soft cyan bloom behind the whole page. */}
+      {/* The field: azure, brightest at the top, deepening down the page. */}
       <LinearGradient
-        colors={
-          isDark
-            ? ['rgba(34,227,242,0.16)', 'rgba(10,147,172,0.05)', 'transparent']
-            : ['rgba(10,147,172,0.14)', 'rgba(10,147,172,0.04)', 'transparent']
-        }
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 0.6 }}
-        style={styles.wash}
+        colors={colors.backgroundGradient}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
+      {/* Two cyan blooms light the field from the top and the bottom corner.
+          Nothing is read against them, which is why they can be this bright. */}
+      <LinearGradient
+        colors={colors.bloomTop}
+        start={{ x: 0.05, y: 0 }}
+        end={{ x: 0.95, y: 1 }}
+        style={styles.bloomTop}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={colors.bloomBottom}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.bloomBottom}
         pointerEvents="none"
       />
 
@@ -94,11 +112,18 @@ export const Screen = memo(function Screen({
               paddingHorizontal: spacing.xl,
               paddingTop: spacing.lg,
               paddingBottom: insets.bottom + spacing.lg,
-              backgroundColor: colors.background,
-              borderTopColor: colors.divider,
+              borderTopColor: colors.glassBorder,
             },
           ]}
         >
+          {/* The footer floats on the field rather than covering it: blurred
+              glass over the gradient, so the page reads as one pane. */}
+          <BlurView
+            intensity={Platform.OS === 'android' ? 24 : 40}
+            tint={colors.blurTint}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} />
           {footer}
         </View>
       ) : null}
@@ -206,8 +231,9 @@ export const SectionHeader = memo(function SectionHeader({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: 420 },
+  bloomTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 460 },
+  bloomBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 360 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { borderTopWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

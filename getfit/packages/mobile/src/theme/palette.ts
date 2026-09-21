@@ -1,9 +1,21 @@
 /**
  * GetFit palette.
  *
- * Dark is the default surface. Cyan is the single accent — used for emphasis,
- * never as the only way to convey meaning (state always pairs colour with a
- * label or icon so the UI stays readable for colour-blind users).
+ * The app is one continuous pane of electric blue glass: a saturated azure
+ * field, a cyan bloom behind it, and frosted surfaces with a bright cyan rim
+ * floating on top. Every colour in the product comes from here — no screen
+ * hardcodes a hex value — so the whole app moves together.
+ *
+ * The blues are tuned, not sampled. A design comp can sit a white label on a
+ * pale frosted panel and look wonderful; on a phone in daylight that is around
+ * 3:1 and unreadable. So the field's brightest stop is held at a luminance
+ * where white body text on a frosted card still clears 4.5:1, and the vivid
+ * end of the blue lives in the bloom and the rim, where nothing has to be read.
+ * `tests/palette.test.ts` asserts those ratios, so the look cannot drift back
+ * into being pretty and illegible.
+ *
+ * Cyan is the single accent, and it is never the only carrier of meaning:
+ * selected states pair it with a border, a fill and an explicit mark.
  */
 
 export const CYAN = {
@@ -19,16 +31,50 @@ export const CYAN = {
   900: '#0F4956',
 } as const;
 
+/** The azure field. 500 is the brightest stop content is ever read against. */
+export const AZURE = {
+  50: '#F2F8FE',
+  100: '#DCEDFB',
+  200: '#BBDCF6',
+  300: '#8CC3EE',
+  400: '#2F7FD0',
+  500: '#0A4693',
+  600: '#0A3B85',
+  700: '#062A66',
+  800: '#05224F',
+  900: '#03152F',
+} as const;
+
+/** Three stops, light to dark, painted down the page behind everything. */
+export type Gradient = readonly [string, string, string];
+
 export interface ThemeColors {
-  /** Page background. */
+  /** Flat page colour. Used where a gradient cannot go — navigator roots, the
+   *  space behind a modal — so it must match the field's mid stop. */
   background: string;
   /** Secondary background used behind grouped content. */
   backgroundElevated: string;
+  /** The field itself: the gradient every screen is painted on. */
+  backgroundGradient: Gradient;
+  /** Cyan bloom across the top of the page. */
+  bloomTop: Gradient;
+  /** The second, cooler bloom that lifts the bottom corner. */
+  bloomBottom: Gradient;
+
   /** Glass surface fill. */
   glass: string;
   glassStrong: string;
   glassBorder: string;
   glassHighlight: string;
+  /** The bright cyan-white rim on a focal surface. */
+  glassEdge: string;
+  /** Translucent tint for chrome that floats over the field — tab bar, footer. */
+  scrim: string;
+
+  /** Text input fill and rim. Inputs read as recessed wells in the glass. */
+  field: string;
+  fieldBorder: string;
+  fieldBorderFocused: string;
 
   text: string;
   textSecondary: string;
@@ -36,6 +82,9 @@ export interface ThemeColors {
   textInverse: string;
 
   accent: string;
+  /** The accent as *text*. Brighter than `accent`, which is tuned for strokes
+   *  and fills; a cyan that looks right as a 2px rim is too dim to read. */
+  accentText: string;
   accentSoft: string;
   accentStrong: string;
   accentGlow: string;
@@ -57,66 +106,90 @@ export interface ThemeColors {
   skeleton: string;
 }
 
+/** Deep: the product default — the comp's blue at night. */
 export const darkColors: ThemeColors = {
-  background: '#05070C',
-  backgroundElevated: '#090D15',
-  glass: 'rgba(255, 255, 255, 0.045)',
-  glassStrong: 'rgba(255, 255, 255, 0.075)',
-  glassBorder: 'rgba(255, 255, 255, 0.10)',
-  glassHighlight: 'rgba(255, 255, 255, 0.16)',
+  background: AZURE[600],
+  backgroundElevated: '#0B3F8C',
+  backgroundGradient: [AZURE[500], AZURE[600], AZURE[700]],
+  bloomTop: ['rgba(60, 206, 232, 0.30)', 'rgba(34, 227, 242, 0.09)', 'transparent'],
+  bloomBottom: ['transparent', 'rgba(34, 227, 242, 0.08)', 'rgba(70, 214, 236, 0.26)'],
 
-  text: '#F5FAFF',
-  textSecondary: 'rgba(228, 240, 252, 0.72)',
-  textMuted: 'rgba(210, 226, 244, 0.46)',
-  textInverse: '#05070C',
+  glass: 'rgba(255, 255, 255, 0.12)',
+  glassStrong: 'rgba(255, 255, 255, 0.16)',
+  glassBorder: 'rgba(196, 232, 255, 0.28)',
+  glassHighlight: 'rgba(255, 255, 255, 0.24)',
+  glassEdge: 'rgba(160, 248, 255, 0.85)',
+  scrim: 'rgba(6, 42, 102, 0.72)',
+
+  field: 'rgba(3, 21, 47, 0.24)',
+  fieldBorder: 'rgba(216, 241, 255, 0.72)',
+  fieldBorderFocused: CYAN[200],
+
+  text: '#F2F8FF',
+  textSecondary: 'rgba(230, 243, 255, 0.92)',
+  textMuted: 'rgba(214, 232, 251, 0.78)',
+  textInverse: AZURE[700],
 
   accent: CYAN[400],
-  accentSoft: 'rgba(34, 227, 242, 0.14)',
-  accentStrong: CYAN[300],
-  accentGlow: 'rgba(34, 227, 242, 0.34)',
-  onAccent: '#02141A',
+  accentText: CYAN[100],
+  accentSoft: 'rgba(10, 113, 134, 0.34)',
+  accentStrong: CYAN[200],
+  accentGlow: 'rgba(124, 246, 255, 0.55)',
+  onAccent: '#04223A',
 
-  success: '#4FE3A1',
-  warning: '#FFC46B',
-  danger: '#FF7A7A',
+  success: '#6FF2C0',
+  warning: '#FFD089',
+  danger: '#FFA3A3',
 
-  divider: 'rgba(255, 255, 255, 0.07)',
-  overlay: 'rgba(3, 6, 11, 0.86)',
-  stage: 'rgba(10, 147, 172, 0.10)',
+  divider: 'rgba(196, 232, 255, 0.20)',
+  overlay: 'rgba(4, 26, 62, 0.88)',
+  stage: 'rgba(124, 246, 255, 0.10)',
   blurTint: 'dark',
   statusBar: 'light',
-  chartGrid: 'rgba(255, 255, 255, 0.07)',
-  skeleton: 'rgba(255, 255, 255, 0.06)',
+  chartGrid: 'rgba(196, 232, 255, 0.20)',
+  skeleton: 'rgba(255, 255, 255, 0.12)',
 };
 
+/** Daylight: the same blue seen in the sun. Dark type on pale azure glass. */
 export const lightColors: ThemeColors = {
-  background: '#F3F7FB',
+  background: AZURE[100],
   backgroundElevated: '#FFFFFF',
-  glass: 'rgba(255, 255, 255, 0.70)',
-  glassStrong: 'rgba(255, 255, 255, 0.88)',
-  glassBorder: 'rgba(9, 30, 48, 0.09)',
-  glassHighlight: 'rgba(255, 255, 255, 0.95)',
+  backgroundGradient: [AZURE[200], AZURE[100], AZURE[50]],
+  bloomTop: ['rgba(15, 185, 214, 0.26)', 'rgba(15, 185, 214, 0.08)', 'transparent'],
+  bloomBottom: ['transparent', 'rgba(15, 185, 214, 0.07)', 'rgba(15, 185, 214, 0.22)'],
 
-  text: '#0A1722',
-  textSecondary: 'rgba(12, 30, 45, 0.70)',
-  textMuted: 'rgba(12, 30, 45, 0.48)',
+  glass: 'rgba(255, 255, 255, 0.72)',
+  glassStrong: 'rgba(255, 255, 255, 0.88)',
+  glassBorder: 'rgba(6, 42, 102, 0.14)',
+  glassHighlight: 'rgba(255, 255, 255, 0.96)',
+  glassEdge: 'rgba(10, 147, 172, 0.70)',
+  scrim: 'rgba(242, 248, 254, 0.82)',
+
+  field: 'rgba(255, 255, 255, 0.86)',
+  fieldBorder: 'rgba(6, 42, 102, 0.55)',
+  fieldBorderFocused: CYAN[700],
+
+  text: AZURE[700],
+  textSecondary: 'rgba(6, 42, 102, 0.82)',
+  textMuted: 'rgba(6, 42, 102, 0.66)',
   textInverse: '#FFFFFF',
 
   accent: CYAN[600],
-  accentSoft: 'rgba(10, 147, 172, 0.12)',
+  accentText: CYAN[700],
+  accentSoft: 'rgba(10, 147, 172, 0.14)',
   accentStrong: CYAN[700],
-  accentGlow: 'rgba(10, 147, 172, 0.22)',
-  onAccent: '#FFFFFF',
+  accentGlow: 'rgba(10, 147, 172, 0.34)',
+  onAccent: '#02161E',
 
-  success: '#15916A',
-  warning: '#A96B12',
-  danger: '#C0392F',
+  success: '#12805E',
+  warning: '#8F5A0B',
+  danger: '#B32D24',
 
-  divider: 'rgba(9, 30, 48, 0.08)',
-  overlay: 'rgba(243, 247, 251, 0.90)',
-  stage: 'rgba(10, 147, 172, 0.07)',
+  divider: 'rgba(6, 42, 102, 0.12)',
+  overlay: 'rgba(236, 245, 253, 0.92)',
+  stage: 'rgba(10, 147, 172, 0.09)',
   blurTint: 'light',
   statusBar: 'dark',
-  chartGrid: 'rgba(9, 30, 48, 0.08)',
-  skeleton: 'rgba(9, 30, 48, 0.06)',
+  chartGrid: 'rgba(6, 42, 102, 0.12)',
+  skeleton: 'rgba(6, 42, 102, 0.08)',
 };

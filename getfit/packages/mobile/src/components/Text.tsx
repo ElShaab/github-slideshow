@@ -32,7 +32,7 @@ export const Text = memo(function Text({
     primary: colors.text,
     secondary: colors.textSecondary,
     muted: colors.textMuted,
-    accent: colors.accent,
+    accent: colors.accentText,
     success: colors.success,
     danger: colors.danger,
     warning: colors.warning,

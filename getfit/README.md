@@ -26,6 +26,7 @@ with no external service in the loop.
 - [Apple subscription configuration](#apple-subscription-configuration)
 - [Google subscription configuration](#google-subscription-configuration)
 - [Body analysis](#body-analysis)
+- [Look and feel](#look-and-feel)
 - [Photo storage configuration](#photo-storage-configuration)
 - [Development mode](#development-mode)
 - [Security model](#security-model)
@@ -145,13 +146,13 @@ getfit/
 │       ├── App.tsx
 │       └── src/
 │           ├── api/              Typed client with offline caching
-│           ├── components/       20 reusable components + illustrations
+│           ├── components/       34 exported components + illustrations
 │           ├── navigation/       Stage-driven root navigator, bottom tabs
 │           ├── screens/          Onboarding, analysis, membership,
 │           │                     preferences, main tabs, workout, history,
 │           │                     settings
 │           ├── state/            Session, onboarding draft, billing adapters
-│           └── theme/            Palette, tokens, ThemeProvider
+│           └── theme/            Palette, tokens, contrast maths, provider
 ```
 
 ### Why the packages are split this way
@@ -471,6 +472,45 @@ configured.
 
 To add a provider, implement the interface in `packages/server/src/ai/` and
 return it from `getBodyAnalysisProvider()`.
+
+---
+
+## Look and feel
+
+The app is one continuous pane of electric blue glass: a saturated azure field
+painted by `Screen`, two cyan blooms lighting it from the top and the bottom
+corner, and frosted surfaces with a lit top edge floating on it. Cyan is the
+only accent.
+
+Every colour lives in `packages/mobile/src/theme/palette.ts`. No screen and no
+component hardcodes a hex value, so the whole product moves together when a
+token changes — including the app icon and the launch screen, whose artwork is
+regenerated from the same blues by `scripts/generate-icons.py`.
+
+### Two themes, one scheme
+
+| Theme | Field | Type |
+| --- | --- | --- |
+| Deep (default) | `#0A4693` → `#062A66` | Near-white on frosted blue |
+| Daylight | `#BBDCF6` → `#F2F8FE` | Deep azure on frosted white |
+
+Daylight is the same blue seen in the sun, not a different identity. The
+preference lives in Settings and resolves to the OS setting on `system`.
+
+### Why the blues are tuned rather than sampled
+
+Every surface is translucent, so the colour behind a label is the glass
+composited over whatever stop of the field is behind it — a number that appears
+nowhere in the tokens. A comp can put white text on a pale frosted panel and
+look wonderful at desk brightness while landing near 3:1 on a phone outdoors.
+
+So the field's brightest stop is held at a luminance where white body text on a
+frosted card still clears 4.5:1, and the vivid end of the blue lives in the
+blooms and the rims, where nothing has to be read. `tests/palette.test.ts`
+composites the real stack of layers and asserts WCAG 2.1 AA ratios — 4.5:1 for
+body text, 3:1 for large text and control boundaries — against the worst stop
+of the field, in both themes. Painting the field with the comp's literal blue
+fails four of those tests, which is the point of having them.
 
 ---
 

@@ -36,7 +36,7 @@ export const LegalLinks = memo(function LegalLinks({
   includeSupport = false,
   align = 'left',
 }: LegalLinksProps): React.ReactElement {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
 
   const open = useCallback((url: string, label: string) => {
     void openExternal(url, label);
@@ -66,10 +66,9 @@ export const LegalLinks = memo(function LegalLinks({
           accessibilityHint={`Opens ${item.label.toLowerCase()} in your browser`}
           hitSlop={8}
         >
-          <Text
-            variant="caption"
-            style={{ color: colors.accent, textDecorationLine: 'underline' }}
-          >
+          {/* `accentText`, not `accent`: these are required disclosure links
+              and have to be readable, not just visibly a link. */}
+          <Text variant="caption" color="accent" style={styles.link}>
             {item.label}
           </Text>
         </Pressable>
@@ -80,4 +79,5 @@ export const LegalLinks = memo(function LegalLinks({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  link: { textDecorationLine: 'underline' },
 });

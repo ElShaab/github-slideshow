@@ -92,9 +92,9 @@ export const WorkoutSetCard = memo(function WorkoutSetCard({
                 styles.input,
                 {
                   color: colors.text,
-                  borderColor: colors.glassBorder,
-                  backgroundColor: colors.glass,
-                  borderRadius: radius.md,
+                  borderColor: colors.fieldBorder,
+                  backgroundColor: colors.field,
+                  borderRadius: radius.pill,
                 },
               ]}
             />
@@ -140,9 +140,9 @@ export const WorkoutSetCard = memo(function WorkoutSetCard({
               styles.input,
               {
                 color: colors.text,
-                borderColor: colors.glassBorder,
-                backgroundColor: colors.glass,
-                borderRadius: radius.md,
+                borderColor: colors.fieldBorder,
+                backgroundColor: colors.field,
+                borderRadius: radius.pill,
               },
             ]}
           />

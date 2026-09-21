@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '../theme';
 import { MIN_TOUCH_TARGET } from '../theme/tokens';
@@ -34,6 +34,7 @@ export const NumberField = memo(function NumberField({
   hint,
 }: NumberFieldProps): React.ReactElement {
   const { colors, spacing, radius } = useTheme();
+  const [focused, setFocused] = useState(false);
 
   const nudge = useCallback(
     (delta: number) => {
@@ -64,39 +65,56 @@ export const NumberField = memo(function NumberField({
         {label}
       </Text>
 
+      {/* The glow lives on a wrapper: the row itself clips its children to the
+          pill, and a clipped view cannot cast a shadow outside itself. */}
       <View
-        style={[
-          styles.row,
-          {
-            marginTop: spacing.sm,
-            borderRadius: radius.md,
-            borderColor: colors.glassBorder,
-            backgroundColor: colors.glass,
-          },
-        ]}
+        style={{
+          marginTop: spacing.sm,
+          borderRadius: radius.pill,
+          shadowColor: colors.accent,
+          shadowOpacity: focused ? 0.4 : 0,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: focused ? 5 : 0,
+        }}
       >
-        <Stepper label="−" onPress={() => nudge(-step)} accessibilityLabel={`Decrease ${label}`} />
+        <View
+          style={[
+            styles.row,
+            {
+              borderRadius: radius.pill,
+              borderColor: focused ? colors.fieldBorderFocused : colors.fieldBorder,
+              backgroundColor: colors.field,
+            },
+          ]}
+        >
+          <Stepper label="−" onPress={() => nudge(-step)} accessibilityLabel={`Decrease ${label}`} />
 
-        <View style={styles.inputWrap}>
-          <TextInput
-            value={value}
-            onChangeText={sanitise}
-            onBlur={clampOnBlur}
-            keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
-            placeholder={placeholder}
-            placeholderTextColor={colors.textMuted}
-            selectTextOnFocus
-            accessibilityLabel={label}
-            style={[styles.input, { color: colors.text }]}
-          />
-          {unit ? (
-            <Text variant="body" color="muted" style={{ marginLeft: 4 }}>
-              {unit}
-            </Text>
-          ) : null}
+          <View style={styles.inputWrap}>
+            <TextInput
+              value={value}
+              onChangeText={sanitise}
+              onFocus={() => setFocused(true)}
+              onBlur={() => {
+                setFocused(false);
+                clampOnBlur();
+              }}
+              keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
+              placeholder={placeholder}
+              placeholderTextColor={colors.textMuted}
+              selectTextOnFocus
+              accessibilityLabel={label}
+              style={[styles.input, { color: colors.text }]}
+            />
+            {unit ? (
+              <Text variant="body" color="muted" style={{ marginLeft: 4 }}>
+                {unit}
+              </Text>
+            ) : null}
+          </View>
+
+          <Stepper label="+" onPress={() => nudge(step)} accessibilityLabel={`Increase ${label}`} />
         </View>
-
-        <Stepper label="+" onPress={() => nudge(step)} accessibilityLabel={`Increase ${label}`} />
       </View>
 
       {hint ? (
@@ -139,7 +157,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderWidth: StyleSheet.hairlineWidth * 3,
     overflow: 'hidden',
     minHeight: 62,
   },

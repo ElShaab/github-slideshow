@@ -39,8 +39,20 @@ export const OnboardingProgress = memo(function OnboardingProgress({
       accessibilityLabel={`Step ${step} of ${total}`}
       accessibilityValue={{ min: 0, max: total, now: step }}
     >
-      <View style={[styles.track, { backgroundColor: colors.glassBorder, marginTop: spacing.md }]}>
-        <Animated.View style={[styles.fill, { width, backgroundColor: colors.accent }]} />
+      <View style={[styles.track, { backgroundColor: colors.field, marginTop: spacing.md }]}>
+        <Animated.View
+          style={[
+            styles.fill,
+            {
+              width,
+              backgroundColor: colors.accent,
+              shadowColor: colors.accent,
+              shadowOpacity: 0.7,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 0 },
+            },
+          ]}
+        />
       </View>
       <Text variant="micro" color="muted" uppercase style={{ marginTop: spacing.sm }}>
         Step {step} of {total}
@@ -75,7 +87,11 @@ export const OnboardingHeader = memo(function OnboardingHeader({
           hitSlop={10}
           style={({ pressed }) => [
             styles.back,
-            { borderColor: colors.glassBorder, opacity: pressed ? 0.6 : 1 },
+            {
+              borderColor: colors.glassBorder,
+              backgroundColor: colors.glass,
+              opacity: pressed ? 0.6 : 1,
+            },
           ]}
         >
           <Text variant="bodyStrong" color="secondary">
@@ -101,7 +117,7 @@ export const OnboardingHeader = memo(function OnboardingHeader({
 });
 
 const styles = StyleSheet.create({
-  track: { height: 4, borderRadius: 999, overflow: 'hidden' },
+  track: { height: 4, borderRadius: 999 },
   fill: { height: '100%', borderRadius: 999 },
   back: {
     width: MIN_TOUCH_TARGET,

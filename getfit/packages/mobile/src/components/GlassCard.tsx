@@ -17,8 +17,12 @@ export interface GlassCardProps {
 }
 
 /**
- * The glass surface every card in the app is built from: a blurred backdrop, a
- * translucent fill, a hairline border and a soft highlight along the top edge.
+ * The glass surface every card in the app is built from.
+ *
+ * Five layers, bottom to top: a blurred backdrop, a translucent fill, a
+ * diagonal sheen, a bright line along the top edge, and the border. The lit
+ * top edge is what makes a card read as a physical pane catching the light
+ * rather than a rectangle with a lower opacity — it is the whole effect.
  */
 export const GlassCard = memo(function GlassCard({
   children,
@@ -31,37 +35,48 @@ export const GlassCard = memo(function GlassCard({
 }: GlassCardProps): React.ReactElement {
   const { colors, radius, spacing, isDark } = useTheme();
 
-  const fill =
-    emphasis === 'strong' ? colors.glassStrong : emphasis === 'soft' ? colors.glass : colors.glass;
+  const fill = emphasis === 'strong' ? colors.glassStrong : colors.glass;
 
   return (
     <View
       style={[
         styles.container,
         {
-          borderRadius: radius.lg,
-          borderColor: accented ? colors.accentGlow : colors.glassBorder,
-          shadowColor: accented ? colors.accent : '#000',
-          shadowOpacity: accented ? (isDark ? 0.45 : 0.22) : isDark ? 0.35 : 0.08,
-          shadowRadius: accented ? 22 : 16,
-          elevation: accented ? 8 : 3,
+          borderRadius: radius.xl,
+          borderColor: accented ? colors.glassEdge : colors.glassBorder,
+          shadowColor: accented ? colors.accent : isDark ? '#01122B' : '#0A3B85',
+          shadowOpacity: accented ? (isDark ? 0.55 : 0.28) : isDark ? 0.4 : 0.12,
+          shadowRadius: accented ? 26 : 18,
+          elevation: accented ? 10 : 4,
         },
         style,
       ]}
     >
       <BlurView
-        intensity={intensity ?? (Platform.OS === 'android' ? 24 : emphasis === 'strong' ? 44 : 30)}
+        intensity={intensity ?? (Platform.OS === 'android' ? 24 : emphasis === 'strong' ? 48 : 34)}
         tint={colors.blurTint}
         style={StyleSheet.absoluteFill}
       />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: fill }]} />
+
+      {/* The sheen: light falling across the pane from the top left. */}
       <LinearGradient
         colors={[colors.glassHighlight, 'transparent']}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 0.7 }}
-        style={[StyleSheet.absoluteFill, { opacity: isDark ? 0.5 : 0.8 }]}
+        start={{ x: 0.05, y: 0 }}
+        end={{ x: 0.85, y: 0.75 }}
+        style={[StyleSheet.absoluteFill, { opacity: emphasis === 'soft' ? 0.5 : 0.85 }]}
         pointerEvents="none"
       />
+
+      {/* The lit top edge, brighter in the middle where the light lands. */}
+      <LinearGradient
+        colors={['transparent', accented ? colors.glassEdge : colors.glassHighlight, 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.topEdge}
+        pointerEvents="none"
+      />
+
       <View style={[padded && { padding: spacing.xl }, contentStyle]}>{children}</View>
     </View>
   );
@@ -71,6 +86,7 @@ const styles = StyleSheet.create({
   container: {
     borderWidth: StyleSheet.hairlineWidth * 2,
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 10 },
   },
+  topEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1 },
 });

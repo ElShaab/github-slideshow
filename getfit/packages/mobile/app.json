@@ -7,9 +7,9 @@
     "scheme": "getfit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "backgroundColor": "#05070C",
+    "backgroundColor": "#0A3B85",
     "splash": {
-      "backgroundColor": "#05070C",
+      "backgroundColor": "#0A3B85",
       "resizeMode": "contain",
       "image": "./assets/splash.png"
     },
@@ -104,7 +104,7 @@
     "android": {
       "package": "com.getfit.app",
       "adaptiveIcon": {
-        "backgroundColor": "#05070C",
+        "backgroundColor": "#062A66",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "permissions": [
