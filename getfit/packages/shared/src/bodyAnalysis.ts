@@ -2,6 +2,7 @@ import {
   estimateBodyFat,
   estimateSkeletalMuscleKg,
   estimateSymmetry,
+  typicalSymmetry,
   waistToHeightRatio,
 } from './bodyComposition';
 import { buildHologramData } from './hologram';
@@ -32,11 +33,18 @@ export function analyzeBody(input: BodyAnalysisInput): BodyAnalysisResult {
     ? waistToHeightRatio(measurements.waistCm, profile.heightCm)
     : inferredWaistRatio(bodyFatPercent, profile.sex);
 
+  // Measured when both sides of a limb pair went round a tape; otherwise the
+  // population figure, flagged as an estimate. The same trade the waist ratio
+  // above already makes: a number the user can act on beats a dash, as long as
+  // the app is straight about where it came from.
+  const measuredSymmetry = estimateSymmetry(measurements);
+
   return {
     bodyFatPercent,
     estimatedMuscleMassKg,
     waistBodyRatio,
-    symmetryPercent: estimateSymmetry(measurements),
+    symmetryPercent: measuredSymmetry ?? typicalSymmetry(profile),
+    symmetryMethod: measuredSymmetry === null ? 'estimated' : 'measured',
     method,
     confidence,
     provider: 'measurement-v1',

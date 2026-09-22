@@ -222,15 +222,29 @@ export interface BodyMeasurements {
  */
 export type BodyFatMethod = 'navy' | 'bmi' | 'vision';
 
+/**
+ * Where a balance score came from.
+ *
+ * `measured` means both sides of at least one limb pair went round a tape.
+ * `estimated` means nobody measured anything and the figure is what a typical
+ * adult of that age looks like — useful, but not a fact about this body.
+ */
+export type SymmetryMethod = 'measured' | 'estimated';
+
 export interface BodyAnalysisResult {
   bodyFatPercent: number;
   estimatedMuscleMassKg: number;
   waistBodyRatio: number;
   /**
-   * Left/right balance. Null when neither limb pair was measured — an
-   * unmeasured body is not a symmetrical one.
+   * Left/right balance.
+   *
+   * Nullable only for assessments stored before the estimate existed; anything
+   * produced now carries a figure, with `symmetryMethod` saying whether it was
+   * read off this body or taken from the population.
    */
   symmetryPercent: number | null;
+  /** Whether the balance score was measured or estimated. */
+  symmetryMethod?: SymmetryMethod;
   /** How the body-fat figure was derived. */
   method: BodyFatMethod;
   /** 0..1 confidence in the reading. Never presented as a medical claim. */

@@ -469,7 +469,7 @@ anthropometric formulas, on the server, with no network call:
 | Body fat, fallback | Deurenberg BMI formula, when there is no tape reading. Reported as `method: 'bmi'` with markedly lower confidence. |
 | Muscle mass | Skeletal muscle as a share of fat-free mass, which follows exactly from body fat and weight. |
 | Waist-to-height | The measured waist over the measured height. |
-| Symmetry | The difference between the measured left and right limbs — **null** when neither pair was measured, never a default 100%. |
+| Symmetry | The difference between the measured left and right limbs. With no limb pair measured it falls back to the figure for a typical adult that age and is labelled **Estimated**, the same way body fat falls back to BMI — never a default 100%, and never presented as a reading off that body. |
 
 The same inputs always produce the same reading, and a user can check the
 arithmetic. The photo is optional: it is stored privately as the user's own

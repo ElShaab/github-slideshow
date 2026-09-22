@@ -610,6 +610,7 @@ describe('GetFit end-to-end journey', () => {
         bodyFatPercent: number;
         method: string;
         symmetryPercent: number | null;
+        symmetryMethod: string;
         sourcePhotoId: string | null;
       };
     }>('POST', '/api/assessments/weekly', { token: state.token, form });
@@ -620,9 +621,14 @@ describe('GetFit end-to-end journey', () => {
     assert.equal(response.body.assessment.sourcePhotoId, null, 'a photo must not be required');
     // A 2 cm smaller waist at the same neck reads leaner than week one.
     assert.ok(response.body.assessment.bodyFatPercent < 16, 'a smaller waist should read leaner');
-    assert.equal(
+    // Week one measured both arms evenly and scored a perfect 100. This week
+    // nobody measured anything, so the score has to be the population estimate
+    // computed fresh — not last week's reading carried forward, which is the
+    // failure this assertion has always been here to catch.
+    assert.equal(response.body.assessment.symmetryMethod, 'estimated');
+    assert.notEqual(
       response.body.assessment.symmetryPercent,
-      null,
+      100,
       'unmeasured arms this week must not carry last week\'s balance forward',
     );
 

@@ -17,8 +17,11 @@ import {
   leanMassKg,
   limbBalance,
   shoulderToWaistRatio,
+  symmetryScore,
+  typicalSymmetry,
   waistToHeightRatio,
 } from '../src/bodyComposition';
+import { analyzeBody } from '../src/bodyAnalysis';
 
 const male = { sex: 'male' as const, heightCm: 180 };
 const female = { sex: 'female' as const, heightCm: 165 };
@@ -220,5 +223,88 @@ describe('shoulderToWaistRatio', () => {
 
   test('is the measured ratio when both are given', () => {
     assert.equal(shoulderToWaistRatio({ shoulderCm: 120, waistCm: 80 }), 1.5);
+  });
+});
+
+describe('typicalSymmetry', () => {
+  test('lands on the same scale as a measurement of the same difference', () => {
+    // This is the whole reason both go through `symmetryScore`. An estimate on
+    // its own scale would make the week someone first measures look like a
+    // change in their body rather than a change in the method.
+    const estimated = typicalSymmetry({ age: 20 });
+    const measured = symmetryScore(0.015);
+    assert.equal(estimated, measured);
+  });
+
+  test('is a plausible score, not a perfect one', () => {
+    // 100% would claim a body nobody has measured is perfectly even, which is
+    // the invention this estimate exists to avoid making.
+    for (const age of [18, 30, 45, 60, 80]) {
+      const score = typicalSymmetry({ age });
+      assert.ok(score < 100, `age ${age} reported a perfect ${score}`);
+      assert.ok(score > 88, `age ${age} reported an implausibly low ${score}`);
+    }
+  });
+
+  test('never improves with age', () => {
+    let previous = 101;
+    for (let age = 18; age <= 90; age += 1) {
+      const score = typicalSymmetry({ age });
+      assert.ok(score <= previous, `age ${age} scored ${score}, above ${previous}`);
+      previous = score;
+    }
+  });
+
+  test('a measured body still overrides it', () => {
+    // The estimate is a fallback, never a substitute: a real pair of readings
+    // has to win, even when it is worse than the population figure.
+    const lopsided = estimateSymmetry({ leftArmCm: 34, rightArmCm: 38 });
+    assert.ok(lopsided !== null && lopsided < typicalSymmetry({ age: 30 }));
+  });
+});
+
+describe('analyzeBody reports a balance score either way', () => {
+  const profile = { age: 34, sex: 'male' as const, heightCm: 178, weightKg: 82 };
+
+  test('measured limbs give a measured score', () => {
+    const result = analyzeBody({
+      profile,
+      measurements: {
+        waistCm: 86,
+        neckCm: 39,
+        leftArmCm: 35,
+        rightArmCm: 36,
+      },
+    });
+    assert.equal(result.symmetryMethod, 'measured');
+    assert.equal(result.symmetryPercent, estimateSymmetry({ leftArmCm: 35, rightArmCm: 36 }));
+  });
+
+  test('no limb measurements still give a score, flagged as an estimate', () => {
+    const result = analyzeBody({ profile, measurements: { waistCm: 86, neckCm: 39 } });
+    assert.equal(result.symmetryMethod, 'estimated');
+    assert.equal(result.symmetryPercent, typicalSymmetry(profile));
+    assert.notEqual(result.symmetryPercent, null);
+  });
+
+  test('an estimate is never passed off as a measurement', () => {
+    // The label is the whole basis for showing a number nobody measured. If it
+    // ever says `measured` without a limb pair behind it, the app is claiming
+    // to know something it does not.
+    for (const measurements of [
+      {},
+      { waistCm: 86 },
+      { waistCm: 86, neckCm: 39 },
+      // One side of a pair is not a pair.
+      { waistCm: 86, neckCm: 39, leftArmCm: 35 },
+      { waistCm: 86, neckCm: 39, rightThighCm: 58 },
+    ]) {
+      const result = analyzeBody({ profile, measurements });
+      assert.equal(
+        result.symmetryMethod,
+        'estimated',
+        `${JSON.stringify(measurements)} was reported as measured`,
+      );
+    }
   });
 });

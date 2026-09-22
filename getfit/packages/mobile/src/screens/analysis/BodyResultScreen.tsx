@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import {
   BODY_FAT_METHOD_COPY,
+  SYMMETRY_METHOD_COPY,
   formatPercent,
   formatRatio,
   formatWeight,
@@ -66,6 +67,17 @@ export function BodyResultScreen({
       ? null
       : { value: Math.round((current - before) * 10) / 10, goodDirection };
 
+  const symmetry = assessment.symmetryMethod ?? 'measured';
+  const previousSymmetry = previous?.symmetryMethod ?? 'measured';
+  // Comparing this week's measurement against last week's population estimate
+  // would report a change in a body that has not changed — the first real
+  // measurement almost always lands below the estimate, which would read as
+  // having got worse by measuring. Only compare like with like.
+  const symmetryDelta =
+    symmetry === previousSymmetry
+      ? delta(assessment.symmetryPercent, previous?.symmetryPercent, 'up')
+      : null;
+
   return (
     <Screen
       footer={<PrimaryButton label={continueLabel} onPress={onContinue} />}
@@ -112,15 +124,15 @@ export function BodyResultScreen({
             style={styles.half}
             delta={delta(assessment.waistBodyRatio, previous?.waistBodyRatio, 'down')}
           />
-          {/* Symmetry only exists when both sides were measured. An unmeasured
-              body is shown as unmeasured, never as a perfect 100%. */}
+          {/* Measured when both sides went round a tape, otherwise the figure
+              for a typical adult that age — labelled below either way. */}
           <StatCard
-            label="Symmetry"
+            label={symmetry === 'estimated' ? 'Symmetry (est.)' : 'Symmetry'}
             value={assessment.symmetryPercent ?? '—'}
             unit={assessment.symmetryPercent === null ? undefined : '%'}
             precision={0}
             style={styles.half}
-            delta={delta(assessment.symmetryPercent, previous?.symmetryPercent, 'up')}
+            delta={symmetryDelta}
           />
         </View>
 
@@ -162,12 +174,10 @@ export function BodyResultScreen({
               {formatPercent(assessment.bodyFatPercent)} body fat ·{' '}
               {formatRatio(assessment.waistBodyRatio)} waist-to-height. {method.detail}
             </Text>
-            {assessment.symmetryPercent === null ? (
-              <Text variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
-                Symmetry is unreported because neither arm nor thigh pair was
-                measured. Measure both sides next week to get a balance score.
-              </Text>
-            ) : null}
+            <Text variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
+              Symmetry {SYMMETRY_METHOD_COPY[symmetry].label.toLowerCase()} ·{' '}
+              {SYMMETRY_METHOD_COPY[symmetry].detail}
+            </Text>
           </View>
         </GlassCard>
       </Animated.View>

@@ -1,9 +1,4 @@
-import type {
-  BodyAnalysisResult,
-  BodyAssessment,
-  BodyMeasurements,
-  TrendPoint,
-} from '@getfit/shared';
+import type { BodyAnalysisResult, BodyAssessment, BodyMeasurements, SymmetryMethod, TrendPoint } from '@getfit/shared';
 import { query, transaction } from '../db/pool';
 
 export const assessmentRepository = {
@@ -45,9 +40,9 @@ export const assessmentRepository = {
       );
       const row = inserted.rows[0];
 
-      // A symmetry reading only exists when a limb pair was measured. An
-      // unmeasured week is left out of the trend rather than charted as a
-      // number nobody produced.
+      // Every assessment now carries a balance score, so symmetry is charted
+      // like the rest. A week where nobody measured carries the population
+      // estimate, which the assessment labels as such.
       const metrics: Array<[string, number, string]> = [
         ['weight_kg', args.weightKg, 'kg'],
         ['body_fat_percent', args.analysis.bodyFatPercent, '%'],
@@ -57,6 +52,7 @@ export const assessmentRepository = {
       if (args.analysis.symmetryPercent !== null) {
         metrics.push(['symmetry_percent', args.analysis.symmetryPercent, '%']);
       }
+
       for (const [key, value, unit] of metrics) {
         await client.query(
           `INSERT INTO body_metrics (user_id, assessment_id, metric_key, metric_value, unit, recorded_at)
@@ -127,6 +123,14 @@ export const assessmentRepository = {
   },
 };
 
+/** Measured when both sides of a limb pair were taken; estimated otherwise. */
+function symmetryMethodFor(measurements: BodyMeasurements): SymmetryMethod {
+  const measuredPair =
+    (measurements.leftArmCm && measurements.rightArmCm) ||
+    (measurements.leftThighCm && measurements.rightThighCm);
+  return measuredPair ? 'measured' : 'estimated';
+}
+
 export function mapAssessment(row: Record<string, unknown>): BodyAssessment {
   return {
     id: row.id as string,
@@ -138,6 +142,11 @@ export function mapAssessment(row: Record<string, unknown>): BodyAssessment {
     estimatedMuscleMassKg: Number(row.muscle_mass_kg),
     waistBodyRatio: Number(row.waist_body_ratio),
     symmetryPercent: row.symmetry_percent === null ? null : Number(row.symmetry_percent),
+    // Derived on read rather than stored: a balance score was measured exactly
+    // when both sides of a limb pair are in the measurements beside it, so a
+    // column would be a second copy of a fact already in the row — and one
+    // that could disagree with it.
+    symmetryMethod: symmetryMethodFor((row.measurements as BodyMeasurements) ?? {}),
     method: (row.method as BodyAssessment['method']) ?? 'bmi',
     confidence: Number(row.confidence),
     provider: row.provider as string,

@@ -136,11 +136,26 @@ export function waistToHeightRatio(waistCm: number, heightCm: number): number {
 }
 
 /**
+ * Turns a left/right girth difference into the 0-100 balance score.
+ *
+ * A difference of about 1% between sides is normal and costs nothing; beyond
+ * that each further 1% costs about 4 points. Both the measured score and the
+ * estimate go through here, which is what keeps them on one scale — an
+ * estimate that read differently from a measurement of the same body would be
+ * worse than no estimate at all.
+ */
+export function symmetryScore(differenceFraction: number): number {
+  const score = 100 - Math.max(0, differenceFraction * 100 - 1) * 4;
+  return round1(clamp(score, 50, 100));
+}
+
+/**
  * Left/right balance from limb measurements.
  *
- * Returns null when neither pair was measured — an unmeasured body is not a
- * symmetrical one, and reporting 100% would be an invention. A 1% difference
- * between sides is normal, so the score only falls off beyond that.
+ * Returns null when neither pair was measured. Callers decide what to do with
+ * that — `analyzeBody` falls back to `typicalSymmetry` and says so — but this
+ * function never invents a reading, so anything downstream can still tell a
+ * measured body from an unmeasured one.
  */
 export function estimateSymmetry(measurements: BodyMeasurements): number | null {
   const pairs: Array<[number | undefined, number | undefined]> = [
@@ -158,9 +173,26 @@ export function estimateSymmetry(measurements: BodyMeasurements): number | null 
   if (differences.length === 0) return null;
 
   const averageDifference = differences.reduce((sum, d) => sum + d, 0) / differences.length;
-  // 0% difference reads as 100; each further 1% costs about 4 points.
-  const score = 100 - Math.max(0, averageDifference * 100 - 1) * 4;
-  return round1(clamp(score, 50, 100));
+  return symmetryScore(averageDifference);
+}
+
+/**
+ * The balance score of a typical adult who has not measured their limbs.
+ *
+ * This is a population figure, not a reading off this person's body: nobody
+ * can tell from a waist and a neck whether one arm is bigger than the other.
+ * It is here because a dash tells a user nothing, and "the typical person
+ * looks like this" is more use than silence — the same trade the body-fat
+ * estimate already makes when there is no tape reading.
+ *
+ * Dominant-side limb girth runs about 1.5% above the other side in adults who
+ * do not train one side deliberately, and the gap widens slowly with age as
+ * the sides atrophy at different rates. That is the whole basis for the number,
+ * which is why it is reported as an estimate and never as a measurement.
+ */
+export function typicalSymmetry(profile: { age: number }): number {
+  const ageing = clamp((profile.age - 20) / 50, 0, 1);
+  return symmetryScore((1.5 + ageing) / 100);
 }
 
 function round1(value: number): number {

@@ -234,7 +234,8 @@ renewals then stop.
 - [ ] Settings → Health disclaimer opens and reads correctly
 - [ ] An assessment completes with **measurements only and no photo**
 - [ ] An assessment with no tape reading is labelled **Estimated**, not Measured
-- [ ] Symmetry reads **Not measured** when no limb pair was entered
+- [ ] Symmetry reads a figure marked **Estimated** when no limb pair was
+      entered, and **Measured** once both sides of one are
 - [ ] Camera and photo-library permission prompts appear with our wording
 - [ ] Account deletion empties the device and returns you to onboarding
 

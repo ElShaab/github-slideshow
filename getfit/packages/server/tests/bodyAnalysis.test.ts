@@ -133,12 +133,20 @@ test('muscle mass never exceeds lean mass', async () => {
   }
 });
 
-test('symmetry is measured, or null — never invented', async () => {
+test('symmetry is estimated when unmeasured, and never mislabelled', async () => {
   const unmeasured = await provider.analyze({
     measurements: { waistCm: 85, neckCm: 38 },
     profile: maleProfile,
   });
-  assert.equal(unmeasured.symmetryPercent, null, 'an unmeasured body is not a symmetrical one');
+  // A figure is reported either way, but the label is what makes that honest:
+  // nothing in a waist and a neck says whether one arm is bigger than the
+  // other, so an unmeasured body must never come back as `measured`.
+  assert.equal(unmeasured.symmetryMethod, 'estimated');
+  assert.ok(unmeasured.symmetryPercent !== null, 'an estimate should still be reported');
+  assert.ok(
+    unmeasured.symmetryPercent !== null && unmeasured.symmetryPercent < 100,
+    'a body nobody measured is not a perfectly even one',
+  );
 
   const even = await provider.analyze({
     measurements: { ...maleTape, leftArmCm: 36, rightArmCm: 36 },
@@ -150,7 +158,9 @@ test('symmetry is measured, or null — never invented', async () => {
   });
 
   assert.equal(even.symmetryPercent, 100);
+  assert.equal(even.symmetryMethod, 'measured');
   assert.ok(uneven.symmetryPercent !== null && uneven.symmetryPercent < 90, 'an 11% arm gap should score poorly');
+  assert.equal(uneven.symmetryMethod, 'measured');
 });
 
 test('hologram geometry describes the current body only', async () => {

@@ -1,11 +1,4 @@
-import type {
-  BodyFatMethod,
-  GoalType,
-  SessionDuration,
-  SubscriptionPlan,
-  TrainingDays,
-  TrainingLevel,
-} from './types';
+import type { BodyFatMethod, GoalType, SessionDuration, SubscriptionPlan, SymmetryMethod, TrainingDays, TrainingLevel } from './types';
 
 /** Maximum exercises a user may pick per muscle group in Exercise Preferences. */
 export const MAX_EXERCISES_PER_MUSCLE = 3;
@@ -125,6 +118,28 @@ export const WEEKLY_PHOTO_INSTRUCTIONS: string[] = [
  * one produced the number on screen, so an estimate is never mistaken for a
  * measurement.
  */
+/**
+ * How a balance score is described, mirroring BODY_FAT_METHOD_COPY so the two
+ * read the same way on screen.
+ */
+export const SYMMETRY_METHOD_COPY: Record<
+  SymmetryMethod,
+  { label: string; short: string; detail: string }
+> = {
+  measured: {
+    label: 'Measured',
+    short: 'From both sides of your limbs',
+    detail:
+      'Calculated from the difference between your left and right arm and thigh. Around 1% between sides is normal; beyond that is worth training out.',
+  },
+  estimated: {
+    label: 'Estimated',
+    short: 'Typical for your age',
+    detail:
+      'Nothing in a waist or neck reading describes whether one arm is bigger than the other, so this is what a typical adult your age looks like rather than a reading off your body. Measure both arms or both thighs to replace it with yours.',
+  },
+};
+
 export const BODY_FAT_METHOD_COPY: Record<
   BodyFatMethod,
   { label: string; short: string; detail: string }

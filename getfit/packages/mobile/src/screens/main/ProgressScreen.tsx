@@ -140,14 +140,17 @@ export function ProgressScreen(): React.ReactElement {
           <Trend title="Body fat" points={trends.bodyFatPercent} unit="%" lowerIsBetter />
           <Trend title="Muscle mass" points={trends.muscleMassKg} unit=" kg" />
           <Trend title="Waist / body" points={trends.waistBodyRatio} unit="" precision={2} lowerIsBetter />
-          {/* Symmetry is only recorded for weeks where both sides were
-              measured, so say what is actually missing. */}
+          {/* Every assessment carries a balance score now, so the empty state
+              is about having no assessments rather than no limb measurements.
+              A line that mixes estimated and measured weeks is still worth
+              plotting: the step when someone first measures is real
+              information, not noise. */}
           <Trend
             title="Symmetry"
             points={trends.symmetryPercent}
             unit="%"
             precision={0}
-            emptyMessage="No balance readings yet — measure both arms or both thighs at your next assessment."
+            emptyMessage="No assessments yet — your balance score appears after your first one."
           />
 
           <SecondaryButton
