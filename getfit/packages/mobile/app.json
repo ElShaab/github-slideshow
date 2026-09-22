@@ -96,9 +96,6 @@
             ]
           }
         ]
-      },
-      "config": {
-        "usesNonExemptEncryption": false
       }
     },
     "android": {

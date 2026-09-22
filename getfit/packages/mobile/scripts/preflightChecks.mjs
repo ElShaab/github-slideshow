@@ -13,7 +13,7 @@ export const isHttpsUrl = (value) =>
 const isPlaceholderUrl = (value) =>
   /\.example($|[/:])/.test(value) || value.includes('localhost') || value.includes('10.0.2.2');
 
-export function checkRelease({ app, eas, profile = 'production' }) {
+export function checkRelease({ app, eas, profile = 'production', dependencies = {} }) {
   const problems = [];
   const warnings = [];
 
@@ -61,6 +61,15 @@ export function checkRelease({ app, eas, profile = 'production' }) {
   if (app.ios?.infoPlist?.ITSAppUsesNonExemptEncryption === undefined) {
     warnings.push(
       'ITSAppUsesNonExemptEncryption is unset, so every upload will ask for an export-compliance answer.',
+    );
+  }
+
+  // `backgroundColor` is applied by expo-system-ui and silently ignored
+  // without it — prebuild says so once and is never read again, and the
+  // result is a white root view flashing behind a very dark app.
+  if (app.backgroundColor && !dependencies['expo-system-ui']) {
+    warnings.push(
+      `app.json backgroundColor is set to ${app.backgroundColor} but expo-system-ui is not installed, so it does nothing and the root view stays white.`,
     );
   }
 

@@ -16,6 +16,8 @@ import { checkRelease, isHttpsUrl } from '../scripts/preflightChecks.mjs';
 const root = path.resolve(__dirname, '..');
 const realApp = JSON.parse(readFileSync(path.join(root, 'app.json'), 'utf8')).expo;
 const realEas = JSON.parse(readFileSync(path.join(root, 'eas.json'), 'utf8'));
+const realDependencies = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
+  .dependencies as Record<string, string>;
 
 /**
  * A configuration with nothing wrong with it.
@@ -45,6 +47,7 @@ function readyConfig() {
         },
       },
     },
+    dependencies: { ...realDependencies },
     profile: 'production',
   };
 }
@@ -54,6 +57,45 @@ const run = (mutate: (config: ReturnType<typeof readyConfig>) => void = () => {}
   mutate(config);
   return checkRelease(config) as { problems: string[]; warnings: string[] };
 };
+
+describe('the root view background colour', () => {
+  test('a colour with nothing to apply it is called out', () => {
+    const { problems, warnings } = run((c) => {
+      c.app.backgroundColor = '#0A3B85';
+      delete c.dependencies['expo-system-ui'];
+    });
+    assert.ok(
+      warnings.some((w) => w.includes('expo-system-ui')),
+      'a background colour that silently does nothing should be reported',
+    );
+    // A white flash is ugly, not a rejection.
+    assert.deepEqual(problems, []);
+  });
+
+  test('silent when the module that applies it is installed', () => {
+    const { warnings } = run((c) => {
+      c.app.backgroundColor = '#0A3B85';
+      c.dependencies['expo-system-ui'] = '~4.0.9';
+    });
+    assert.ok(!warnings.some((w) => w.includes('expo-system-ui')));
+  });
+
+  test('no colour, nothing to warn about', () => {
+    const { warnings } = run((c) => {
+      delete c.app.backgroundColor;
+      delete c.dependencies['expo-system-ui'];
+    });
+    assert.ok(!warnings.some((w) => w.includes('expo-system-ui')));
+  });
+
+  test('the real config has both, so the colour actually applies', () => {
+    const { warnings } = run();
+    assert.ok(
+      !warnings.some((w) => w.includes('expo-system-ui')),
+      'app.json sets backgroundColor but nothing installed applies it',
+    );
+  });
+});
 
 describe('isHttpsUrl', () => {
   test('accepts a real https URL', () => {

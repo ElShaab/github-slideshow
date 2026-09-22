@@ -19,6 +19,7 @@ const profile = profileArg === -1 ? 'production' : process.argv[profileArg + 1];
 const { problems, warnings } = checkRelease({
   app: JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8')).expo,
   eas: JSON.parse(readFileSync(resolve(root, 'eas.json'), 'utf8')),
+  dependencies: JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).dependencies,
   profile,
 });
 
