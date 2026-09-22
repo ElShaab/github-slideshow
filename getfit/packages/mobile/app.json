@@ -127,7 +127,8 @@
         {
           "paymentProvider": "Play Store"
         }
-      ]
+      ],
+      "./plugins/withStoreKitConfiguration"
     ],
     "extra": {
       "legal": {

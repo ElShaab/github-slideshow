@@ -145,33 +145,53 @@ Answer these to match what the app does:
 
 ---
 
-## 4. Test purchases in the simulator, free
+## 4. Test purchases locally, free
 
-Before any of the Apple setup above, you can run real purchase flows in the
-iOS Simulator with **no Apple Developer account and nothing in App Store
-Connect**, using `packages/mobile/GetFit.storekit`. It carries both plans at
-their real ids and prices.
+Before any of the Apple setup above, you can run real purchase flows on a
+simulator **or your own iPhone** with **no Apple Developer account and nothing
+in App Store Connect**, using `packages/mobile/GetFit.storekit`. It carries
+both plans at their real ids and prices.
 
 ```bash
 cd packages/mobile
-npx expo prebuild --platform ios      # once, to create the Xcode project
+npx expo prebuild --platform ios      # regenerates ios/ from app.json
 open ios/GetFit.xcworkspace
 ```
 
-In Xcode: **Product → Scheme → Edit Scheme → Run → Options**, and set
-**StoreKit Configuration** to `GetFit.storekit`. Run on a simulator and the
-paywall shows both plans; buying one opens a real StoreKit sheet and completes.
+**Nothing to configure in Xcode.** `plugins/withStoreKitConfiguration.js` runs
+during prebuild and points the Run scheme at `GetFit.storekit` for you. Press
+Run and the paywall opens a real StoreKit sheet that completes.
+
+That is a plugin rather than a line in this file because **prebuild regenerates
+`ios/` wholesale** — a scheme edited by hand through *Product → Scheme → Edit
+Scheme → Run → Options* survives exactly until the next prebuild, and the
+symptom when it is lost is the paywall failing with "That membership is not
+available on this device". `ios/` is gitignored for the same reason: it is
+output, not source.
 
 The **Debug → StoreKit** menu then drives the cases that are painful to reach
 any other way: expire a subscription, force a renewal, decline a purchase, turn
-on Ask to Buy, or simulate an interrupted purchase. A test keeps the file's
-product ids and prices matching `SUBSCRIPTION_PLANS`, because a drifted id
-fails silently — the paywall simply shows nothing to buy.
+on Ask to Buy, or simulate an interrupted purchase. Tests keep the file's
+product ids and prices matching `SUBSCRIPTION_PLANS` and keep the scheme XML
+valid, because a drifted id fails silently — the paywall simply shows nothing
+to buy.
+
+### When you want the real sandbox instead
 
 This is not a substitute for a sandbox purchase on a device. StoreKit
 Configuration never talks to Apple, so it cannot tell you that your products
 are live, that your Paid Applications agreement is active, or that your bundle
 id matches. It tells you the app handles what StoreKit sends.
+
+So when you are ready to test against Apple, take the file back off:
+
+```bash
+GETFIT_NO_STOREKIT_CONFIG=1 npx expo prebuild --platform ios --clean
+```
+
+EAS builds do this on their own — the plugin detaches the reference whenever
+`EAS_BUILD` is set, so a `preview` or `production` build always reaches the
+real store.
 
 ---
 
@@ -201,8 +221,9 @@ sandbox or production depending on how it was signed and who is signed in:
 
 | Build | Store it reaches |
 | --- | --- |
-| Xcode run with a StoreKit config file | Neither — local simulation |
-| Development, ad-hoc or TestFlight | **Sandbox**, automatically |
+| Run from Xcode after a plain `expo prebuild` | Neither — local simulation, because the plugin attached `GetFit.storekit` |
+| Run from Xcode after `GETFIT_NO_STOREKIT_CONFIG=1 expo prebuild --clean` | **Sandbox** |
+| Ad-hoc or TestFlight from EAS | **Sandbox**, automatically |
 | Downloaded from the App Store | Production |
 | Android from a Play track, licensed tester account | **Sandbox** (no charge) |
 

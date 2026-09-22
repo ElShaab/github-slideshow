@@ -70,6 +70,20 @@ export default tseslint.config(
   },
 
   {
+    // Expo config plugins are required by the prebuild CLI, so they are
+    // CommonJS rather than modules like the rest of the tooling.
+    files: ['packages/mobile/plugins/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { module: 'writable', require: 'readonly', __dirname: 'readonly' },
+    },
+    rules: {
+      // `require` is the point: the prebuild CLI loads plugins synchronously.
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
+  {
     // React Native screens use the JSX runtime, so React is not a global here.
     files: ['packages/mobile/**/*.tsx', 'packages/mobile/**/*.ts'],
     plugins: { 'react-hooks': reactHooks },
