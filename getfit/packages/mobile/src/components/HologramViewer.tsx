@@ -1,5 +1,13 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Image,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
   ClipPath,
@@ -18,6 +26,7 @@ import type { HologramData } from '@getfit/shared';
 import { useTheme } from '../theme';
 import { buildGeometry, VIEW_HEIGHT, VIEW_WIDTH } from './hologram/geometry';
 import { Hologram3D } from './Hologram3D';
+import { frameFor } from './hologram/frameSources';
 
 export interface HologramViewerProps {
   data: HologramData;
@@ -174,6 +183,55 @@ export const HologramViewer = memo(function HologramViewer({
         )} percent relative body fat, ${Math.round(
           data.muscleNormalized * 100,
         )} percent relative muscle development.`);
+
+  // A rendered frame for this band, when one exists. It is the anatomy as it
+  // was actually modelled rather than as this app approximates it, so it wins
+  // — but only for the bands it was rendered at. See `frameFor`.
+  const frame = frameFor(data.bodyFatBand);
+  if (frame !== null) {
+    return (
+      <View
+        style={[{ width, height: size }, style]}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={label}
+      >
+        {/* Behind the figure: the same stage glow the drawn one stands on, so
+            a rendered band and a procedural one share a background. */}
+        <Svg
+          width={width}
+          height={size}
+          viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        >
+          <Defs>
+            <RadialGradient id="hg-frame-stage" cx="50%" cy="45%" r="62%">
+              <Stop offset="0%" stopColor={accent} stopOpacity={0.2} />
+              <Stop offset="60%" stopColor={accent} stopOpacity={0.055} />
+              <Stop offset="100%" stopColor={accent} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="url(#hg-frame-stage)" />
+          <Ellipse
+            cx={VIEW_WIDTH / 2}
+            cy={VIEW_HEIGHT - 16}
+            rx={80}
+            ry={12}
+            fill={accent}
+            opacity={0.16}
+          />
+        </Svg>
+
+        <Image
+          source={frame}
+          style={StyleSheet.absoluteFill}
+          resizeMode="contain"
+          accessible={false}
+        />
+      </View>
+    );
+  }
 
   if (volumetric && !glFailed) {
     return (

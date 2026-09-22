@@ -589,9 +589,31 @@ the end of the buffer draws nothing, an unnormalised normal kills the rim glow
 that is the entire effect, and a shell that does not contain the body puts fat
 inside the muscle. None of that throws.
 
-The anatomy is still vector-grade — muscle groups as lofted volume, not an
-écorché mesh. Reaching a ray-traced anatomical model needs a licensed mesh,
-which is an asset to buy rather than code to write.
+### Rendered frames
+
+Where a render exists for a body's band, the app draws that instead of building
+a figure. The renders are anatomical models — every muscle belly, a face,
+hands, feet — which no procedural figure is going to match.
+
+`scripts/prepare-hologram-frames.py` turns a render into an app asset. Three
+things happen to it. The background is keyed to alpha, which for a glow is not
+a threshold job: the figure fades into its own halo, and a cut clean enough for
+the torso eats the halo entirely, so alpha comes from luminance with a gamma
+that keeps the faint outer light. The body is then scaled to a fixed height —
+by the body, not the halo, because a brighter render frames larger and a figure
+that changes size between bands reads as the user growing rather than gaining.
+Finally the brightness is baked: a hologram is additive light, React Native's
+`<Image>` only blends normally, so the alpha curve is steepened and the colour
+lifted to land where adding would have.
+
+The frame map is deliberately sparse, and `nearestRenderedBand` will return
+nothing rather than reach too far. A body at 50% drawn with a 30% render is not
+an approximation, it is a picture of somebody else — so outside the tolerance
+the app falls back to the figure built from that user's own measurements, which
+is a worse drawing of the right body.
+
+Adding a render means adding its band to `frames.ts` and its file to
+`frameSources.ts`. Nothing else changes.
 
 Women's bands sit about 8 points higher at every equivalent level, which is
 essential fat rather than a difference in condition, so a woman at 28% draws
