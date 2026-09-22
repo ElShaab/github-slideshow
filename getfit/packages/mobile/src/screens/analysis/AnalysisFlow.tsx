@@ -52,7 +52,7 @@ export function AnalysisFlow(): React.ReactElement {
       <BodyResultScreen
         assessment={resolved}
         onContinue={markAssessmentComplete}
-        continueLabel="See membership"
+        continueLabel="Start membership"
       />
     );
   }
