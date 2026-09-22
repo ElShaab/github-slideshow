@@ -129,9 +129,9 @@
     ],
     "extra": {
       "legal": {
-        "privacyPolicyUrl": "",
+        "privacyPolicyUrl": "https://elshaab.github.io/github-slideshow/privacy.html",
         "termsOfUseUrl": "",
-        "supportUrl": ""
+        "supportUrl": "https://elshaab.github.io/github-slideshow/support.html"
       }
     },
     "icon": "./assets/icon.png",

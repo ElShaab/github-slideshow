@@ -10,7 +10,8 @@
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "legal": "node scripts/build-legal.mjs"
   },
   "dependencies": {
     "@getfit/shared": "*",

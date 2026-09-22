@@ -113,21 +113,44 @@ the purchase cannot start.
 
 ## 3. Publish the privacy policy and support page
 
-**[you]** Fill in every placeholder in `PRIVACY.md`, host it at a public HTTPS
-URL, and enter that URL in **three** places: App Store Connect, Play Console,
-and `app.json` under `extra.legal.privacyPolicyUrl`.
+Both pages are published from this repository by GitHub Pages, at:
 
-That third one is not optional. Guideline 3.1.2 requires an auto-renewable
-subscription app to carry a **working link to the privacy policy inside the
-binary**, on the purchase screen. The paywall and Settings render it from that
-field; a blank field means a release build refuses to start.
+| Page | URL |
+| --- | --- |
+| Privacy Policy | `https://elshaab.github.io/github-slideshow/privacy.html` |
+| Support | `https://elshaab.github.io/github-slideshow/support.html` |
 
-**[you]** You also need a support page at a public HTTPS URL — App Store Connect
-requires one. Put it in `app.json` under `extra.legal.supportUrl`. An email
-address on a plain page is enough.
+Those URLs are already in `app.json` under `extra.legal`. What is left is the
+content.
 
-If you host your own terms rather than using Apple's standard EULA, fill in
-`TERMS.md` the same way and set `extra.legal.termsOfUseUrl`.
+**[you] Fill in the three placeholders** in `PRIVACY.md` and `SUPPORT.md` —
+`[LEGAL ENTITY NAME]`, `[REGISTERED ADDRESS]` and `[SUPPORT EMAIL]`. Nobody can
+invent these: a privacy policy is a binding document naming the data
+controller, and a made-up company is worse than no page at all. Then:
+
+```bash
+npm run legal --workspace @getfit/mobile   # writes privacy.md and support.md
+```
+
+That renders both pages from the markdown, strips the "Before publishing" notes
+and refuses to write anything while a placeholder remains. Commit the two
+generated files, merge to the branch GitHub Pages serves, and turn Pages on in
+**Settings → Pages** if it is not already. Preflight fails the build until the
+placeholders are filled, so a policy naming nobody cannot ship.
+
+**Open both URLs in a browser before you submit.** App Review opens them, and a
+404 is a rejection that costs a review cycle.
+
+Enter the privacy URL in **three** places: App Store Connect, Play Console, and
+`app.json`. That third one is not optional — Guideline 3.1.2 requires an
+auto-renewable subscription app to carry a **working link to the privacy policy
+inside the binary**, on the purchase screen. The paywall and Settings render it
+from that field; a blank field means a release build refuses to start.
+
+GetFit uses **Apple's standard EULA**, so `extra.legal.termsOfUseUrl` is
+deliberately empty and the paywall links to Apple's terms. `TERMS.md` is in the
+repo unused; to publish your own instead, fill it in, add it to `PAGES` in
+`packages/mobile/scripts/legalPages.mjs`, and set that field.
 
 ### App privacy answers (App Store Connect)
 

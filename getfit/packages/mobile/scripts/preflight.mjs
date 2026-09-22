@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { checkRelease } from './preflightChecks.mjs';
+import { PAGES } from './legalPages.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const profileArg = process.argv.indexOf('--profile');
@@ -20,6 +21,9 @@ const { problems, warnings } = checkRelease({
   app: JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8')).expo,
   eas: JSON.parse(readFileSync(resolve(root, 'eas.json'), 'utf8')),
   dependencies: JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).dependencies,
+  legalDocuments: Object.fromEntries(
+    PAGES.map((page) => [page.source, readFileSync(resolve(root, '..', '..', page.source), 'utf8')]),
+  ),
   profile,
 });
 

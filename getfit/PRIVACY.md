@@ -93,9 +93,12 @@ We use these subprocessors, and nothing else:
 
 | Subprocessor | What it handles |
 | --- | --- |
-| **[HOSTING PROVIDER]** | Runs the API and database |
-| **[OBJECT STORAGE PROVIDER]** | Stores photos, encrypted at rest, in a private bucket |
+| **Fly.io** | Runs the API, the database and the volume photos are stored on |
 | **Apple** / **Google** | Process payments and confirm subscription status |
+
+There is **no third-party object storage**. Photos are written to an encrypted
+volume attached to the same machine that runs the API, under an unguessable
+name scoped to your account — they are never handed to another provider.
 
 There is **no AI or image-analysis subprocessor**. Body composition is computed
 on our own server from your measurements, and your photos are never sent
@@ -113,7 +116,7 @@ cross-context behavioural advertising.
 - **Training history:** until you delete your account.
 - **Account and subscription records:** until you delete your account, except
   where we must keep a transaction record for tax or accounting purposes.
-- **Server logs:** [RETENTION PERIOD, e.g. 30 days].
+- **Server logs:** 30 days, then deleted automatically.
 
 ## Deleting everything
 

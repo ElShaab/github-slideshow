@@ -6,6 +6,8 @@
  * reviewer's phone — which is the worst possible order to find them in.
  */
 
+import { PAGES, placeholders, renderPage } from './legalPages.mjs';
+
 export const isHttpsUrl = (value) =>
   typeof value === 'string' && /^https:\/\/[^\s/]+\.[^\s/]+/.test(value);
 
@@ -13,7 +15,13 @@ export const isHttpsUrl = (value) =>
 const isPlaceholderUrl = (value) =>
   /\.example($|[/:])/.test(value) || value.includes('localhost') || value.includes('10.0.2.2');
 
-export function checkRelease({ app, eas, profile = 'production', dependencies = {} }) {
+export function checkRelease({
+  app,
+  eas,
+  profile = 'production',
+  dependencies = {},
+  legalDocuments = {},
+}) {
   const problems = [];
   const warnings = [];
 
@@ -37,6 +45,23 @@ export function checkRelease({ app, eas, profile = 'production', dependencies = 
     warnings.push(
       "extra.legal.termsOfUseUrl is unset, so the app links to Apple's standard EULA. That is allowed; set your own only if you have them.",
     );
+  }
+
+  // A privacy policy is the one link App Review always opens, and a page
+  // reading "[LEGAL ENTITY NAME]" is worse than no page at all — it is a
+  // binding legal document naming nobody.
+  for (const page of PAGES) {
+    const markdown = legalDocuments[page.source];
+    if (markdown === undefined) continue;
+
+    // Checked on the published page: the note to whoever deploys the app
+    // names `[BRACKETED]` as an example and never reaches a reader.
+    const missing = placeholders(renderPage(markdown, page));
+    if (missing.length > 0) {
+      problems.push(
+        `${page.source} still has ${missing.join(', ')} to fill in, so ${page.permalink} cannot be published.`,
+      );
+    }
   }
 
   /* -------------------------- store submission ------------------------ */

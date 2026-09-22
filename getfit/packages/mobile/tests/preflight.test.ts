@@ -12,12 +12,30 @@ import { describe, test } from 'node:test';
 // The build script and this test share one module, so a rule can never pass
 // here while the script that gates the build uses a different one.
 import { checkRelease, isHttpsUrl } from '../scripts/preflightChecks.mjs';
+import { PAGES } from '../scripts/legalPages.mjs';
 
 const root = path.resolve(__dirname, '..');
 const realApp = JSON.parse(readFileSync(path.join(root, 'app.json'), 'utf8')).expo;
 const realEas = JSON.parse(readFileSync(path.join(root, 'eas.json'), 'utf8'));
 const realDependencies = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
   .dependencies as Record<string, string>;
+
+/**
+ * The real legal documents with their placeholders filled in.
+ *
+ * The fixture is a configuration with nothing wrong with it, and the documents
+ * as committed still need the repo owner's legal identity — so they are filled
+ * here and individual cases unfill one again.
+ */
+const filledDocuments = Object.fromEntries(
+  PAGES.map((page) => [
+    page.source,
+    readFileSync(path.join(root, '..', '..', page.source), 'utf8')
+      .replace(/\[LEGAL ENTITY NAME\]/g, 'Example Fitness Ltd')
+      .replace(/\[REGISTERED ADDRESS\]/g, '1 Example Street, London')
+      .replace(/\[SUPPORT EMAIL\]/g, 'support@example.com'),
+  ]),
+) as Record<string, string>;
 
 /**
  * A configuration with nothing wrong with it.
@@ -48,6 +66,7 @@ function readyConfig() {
       },
     },
     dependencies: { ...realDependencies },
+    legalDocuments: { ...filledDocuments },
     profile: 'production',
   };
 }
@@ -57,6 +76,49 @@ const run = (mutate: (config: ReturnType<typeof readyConfig>) => void = () => {}
   mutate(config);
   return checkRelease(config) as { problems: string[]; warnings: string[] };
 };
+
+describe('the published legal pages', () => {
+  test('a filled document is ready to publish', () => {
+    const { problems } = run();
+    assert.ok(!problems.some((p) => p.includes('to fill in')));
+  });
+
+  test('an unfilled placeholder blocks the build', () => {
+    const { problems } = run((c) => {
+      c.legalDocuments['PRIVACY.md'] = c.legalDocuments['PRIVACY.md'].replace(
+        'Example Fitness Ltd',
+        '[LEGAL ENTITY NAME]',
+      );
+    });
+    assert.ok(
+      problems.some((p) => p.includes('PRIVACY.md') && p.includes('[LEGAL ENTITY NAME]')),
+      'a policy naming nobody must not reach a reviewer',
+    );
+  });
+
+  test('every document is checked, not just the first', () => {
+    const { problems } = run((c) => {
+      c.legalDocuments['SUPPORT.md'] = c.legalDocuments['SUPPORT.md'].replace(
+        'support@example.com',
+        '[SUPPORT EMAIL]',
+      );
+    });
+    assert.ok(problems.some((p) => p.includes('SUPPORT.md')));
+  });
+
+  test('the note to whoever deploys the app is not mistaken for a gap', () => {
+    // It names `[BRACKETED]` as an example and is stripped before publishing.
+    const { problems } = run();
+    assert.ok(!problems.some((p) => p.includes('[BRACKETED]')));
+  });
+
+  test('documents that were not supplied are simply not checked', () => {
+    const { problems } = run((c) => {
+      c.legalDocuments = {};
+    });
+    assert.ok(!problems.some((p) => p.includes('to fill in')));
+  });
+});
 
 describe('the root view background colour', () => {
   test('a colour with nothing to apply it is called out', () => {
@@ -173,20 +235,22 @@ describe('checkRelease', () => {
   });
 
   test('the checked-in config is complete apart from what only a human can supply', () => {
-    // Everything left is a credential or a hosted URL nobody can invent: the
-    // two legal links and the App Store Connect identifiers.
+    // Everything left is a fact about the operator that nobody can invent: the
+    // legal identity the published pages name, and the App Store Connect
+    // identifiers. The URLs themselves are settled — they point at the pages
+    // this repo builds.
     const { problems } = checkRelease({
       app: structuredClone(realApp),
       eas: structuredClone(realEas),
+      legalDocuments: Object.fromEntries(
+        PAGES.map((page) => [
+          page.source,
+          readFileSync(path.join(root, '..', '..', page.source), 'utf8'),
+        ]),
+      ),
       profile: 'production',
     });
-    const expected = [
-      'privacyPolicyUrl',
-      'supportUrl',
-      'appleId',
-      'ascAppId',
-      'appleTeamId',
-    ];
+    const expected = ['PRIVACY.md', 'SUPPORT.md', 'appleId', 'ascAppId', 'appleTeamId'];
     assert.equal(problems.length, expected.length, `unexpected: ${problems.join(' | ')}`);
     for (const field of expected) {
       assert.ok(problems.some((p) => p.includes(field)), `${field} was not reported`);
