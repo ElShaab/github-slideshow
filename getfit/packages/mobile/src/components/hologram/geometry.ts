@@ -87,6 +87,17 @@ export interface HologramGeometry {
   head: { cx: number; cy: number; r: number };
   width: number;
   height: number;
+  /**
+   * The two bodies as raw widths.
+   *
+   * Exposed so the 3D renderer can loft the same shapes the flat one outlines.
+   * One assessment has to produce one body: if the mesh recomputed these from
+   * the payload it would drift from the fallback drawing the moment either
+   * side changed, and the user would see two different people depending on
+   * whether their phone gave us a GL context.
+   */
+  leanWidths: Widths;
+  outerWidths: Widths;
 }
 
 /**
@@ -290,6 +301,8 @@ export function buildGeometry(data: HologramData): HologramGeometry {
     head: { cx: CX, cy: Y.headCenter, r: 25 },
     width: VIEW_WIDTH,
     height: VIEW_HEIGHT,
+    leanWidths: lean,
+    outerWidths: outer,
   };
 }
 

@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
@@ -17,6 +17,7 @@ import Svg, {
 import type { HologramData } from '@getfit/shared';
 import { useTheme } from '../theme';
 import { buildGeometry, VIEW_HEIGHT, VIEW_WIDTH } from './hologram/geometry';
+import { Hologram3D } from './Hologram3D';
 
 export interface HologramViewerProps {
   data: HologramData;
@@ -29,6 +30,12 @@ export interface HologramViewerProps {
   scan?: boolean;
   /** Screen-reader description; a sensible default is derived from the data. */
   accessibilityLabel?: string;
+  /**
+   * Set false to draw the flat figure even where GL is available. Used by the
+   * small inline holograms, where a second GL surface costs more than the
+   * depth is worth at that size.
+   */
+  volumetric?: boolean;
 }
 
 /**
@@ -53,9 +60,19 @@ export const HologramViewer = memo(function HologramViewer({
   rotate = true,
   scan = false,
   accessibilityLabel,
+  volumetric = true,
 }: HologramViewerProps): React.ReactElement {
   const { colors, reduceMotion } = useTheme();
   const geometry = useMemo(() => buildGeometry(data), [data]);
+
+  // A device that cannot give us a GL context still gets a figure. The flat
+  // renderer lofts from the same widths, so the fallback is the same body seen
+  // flat rather than a different one.
+  const [glFailed, setGlFailed] = useState(false);
+  const onGlFailure = useCallback((error: unknown) => {
+    if (__DEV__) console.warn('Hologram fell back to the flat renderer', error);
+    setGlFailed(true);
+  }, []);
 
   const turn = useRef(new Animated.Value(0)).current;
   const sweep = useRef(new Animated.Value(0)).current;
@@ -157,6 +174,25 @@ export const HologramViewer = memo(function HologramViewer({
         )} percent relative body fat, ${Math.round(
           data.muscleNormalized * 100,
         )} percent relative muscle development.`);
+
+  if (volumetric && !glFailed) {
+    return (
+      <View
+        style={[{ width, height: size }, style]}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={label}
+      >
+        <Hologram3D
+          data={data}
+          size={size}
+          width={width}
+          rotate={rotate && !reduceMotion}
+          onFailure={onGlFailure}
+        />
+      </View>
+    );
+  }
 
   return (
     <View

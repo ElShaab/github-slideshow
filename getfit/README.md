@@ -565,10 +565,33 @@ reading describes how developed someone's abs are: the waist measures the fat
 sitting on top of them. So they read from definition instead, or they would
 glow brighter as their owner gained weight.
 
-The figure is vector art, not a render. It will not reach a ray-traced
-anatomical model — that would need licensed artwork or a real 3D mesh, and
-neither belongs in a procedural figure that has to reshape itself to every
-user's measurements.
+### It is a real 3D scene
+
+The hologram renders through `expo-gl` and three.js: a perspective camera
+orbiting two meshes, not a flat drawing spun about its centre. Both meshes are
+lofted from the same widths the vector figure outlines — one function turns an
+assessment into a shape, so the two can never become different people.
+
+The look is one idea. A hologram is bright where you see it edge-on and dim
+where it faces you, because that is where the most glowing material lies along
+your line of sight. That is the fresnel term in the shader, and it does more
+work than everything else combined; the rest is colour. Both meshes draw
+additively with depth writes off, so the far side of the body shows through the
+near side.
+
+The flat SVG renderer is still there and still maintained. It draws whenever a
+device cannot give us a GL context, and in the history list, where a scrolling
+page can hold several holograms and a GL surface each costs more than the depth
+is worth.
+
+`tests/hologramMesh.test.ts` covers what fails quietly in a mesh: an index past
+the end of the buffer draws nothing, an unnormalised normal kills the rim glow
+that is the entire effect, and a shell that does not contain the body puts fat
+inside the muscle. None of that throws.
+
+The anatomy is still vector-grade — muscle groups as lofted volume, not an
+écorché mesh. Reaching a ray-traced anatomical model needs a licensed mesh,
+which is an asset to buy rather than code to write.
 
 Women's bands sit about 8 points higher at every equivalent level, which is
 essential fat rather than a difference in condition, so a woman at 28% draws

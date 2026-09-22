@@ -164,7 +164,15 @@ function AssessmentEntry({
           <View style={{ marginTop: spacing.lg }}>
             {/* Each week renders its own hologram — never a morph between weeks. */}
             <View style={styles.hologramStage}>
-              <HologramViewer data={assessment.hologramData} size={260} rotate={false} />
+              {/* One row per past assessment, so this list can hold several
+                  holograms at once. A GL surface each is more than the depth
+                  is worth in a scrolling history — the flat figure here. */}
+              <HologramViewer
+                data={assessment.hologramData}
+                size={260}
+                rotate={false}
+                volumetric={false}
+              />
             </View>
 
             <View style={[styles.metricGrid, { marginTop: spacing.lg, gap: spacing.sm }]}>
