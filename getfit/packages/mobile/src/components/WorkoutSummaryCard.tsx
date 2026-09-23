@@ -1,7 +1,8 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { formatMinutes, type CompletedWorkout } from '@getfit/shared';
+import { formatMinutes, formatVolume, type CompletedWorkout } from '@getfit/shared';
 import { useTheme } from '../theme';
+import { useUnits } from '../state/UnitsProvider';
 import { GlassCard } from './GlassCard';
 import { Text } from './Text';
 
@@ -16,6 +17,7 @@ export const WorkoutSummaryCard = memo(function WorkoutSummaryCard({
   style?: StyleProp<ViewStyle>;
 }): React.ReactElement {
   const { spacing } = useTheme();
+  const { units } = useUnits();
   const date = new Date(workout.completedAt);
   const dateLabel = date.toLocaleDateString(undefined, {
     weekday: 'short',
@@ -35,7 +37,7 @@ export const WorkoutSummaryCard = memo(function WorkoutSummaryCard({
       <View style={[styles.statsRow, { marginTop: spacing.md, gap: spacing.xl }]}>
         <Stat label="Duration" value={formatMinutes(workout.durationSeconds)} />
         <Stat label="Sets" value={String(workout.totalSets)} />
-        <Stat label="Volume" value={`${Math.round(workout.totalVolumeKg).toLocaleString()} kg`} />
+        <Stat label="Volume" value={formatVolume(workout.totalVolumeKg, units)} />
       </View>
     </GlassCard>
   );

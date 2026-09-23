@@ -8,6 +8,9 @@ import {
   LEVEL_DESCRIPTIONS,
   LEVEL_LABELS,
   SESSION_DURATIONS,
+  displayBounds,
+  displayStep,
+  massUnit,
   planForProduct,
   planPricing,
   TRAINING_DAY_OPTIONS,
@@ -27,9 +30,11 @@ import {
   LoadingScreen,
   NumberField,
   PrimaryButton,
+  HeightField,
   Screen,
   SecondaryButton,
   Text,
+  WEIGHT_BOUNDS_KG,
   openExternal,
 } from '../../components';
 import { ApiError } from '../../api/client';
@@ -40,6 +45,8 @@ import { settingsApi, subscriptionApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
+import { cmToHeightText, heightToCm, kgToMassText, massToKg } from '../../utils/units';
 import type { RootStackParamList } from '../../navigation/types';
 
 /** Shared banner explaining that a change reshapes future training only. */
@@ -61,6 +68,8 @@ export function SettingsProfileScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'SettingsProfile'>): React.ReactElement {
   const { spacing } = useTheme();
+  const { units } = useUnits();
+  const weightBounds = displayBounds(WEIGHT_BOUNDS_KG, units, 'mass');
   const settings = useAsync(() => settingsApi.load(), []);
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
@@ -73,10 +82,10 @@ export function SettingsProfileScreen({
     const profile = settings.data?.profile;
     if (!profile) return;
     setAge(String(profile.age));
-    setHeight(String(profile.heightCm));
-    setWeight(String(profile.weightKg));
+    setHeight(cmToHeightText(profile.heightCm, units));
+    setWeight(kgToMassText(profile.weightKg, units));
     setSex(profile.sex);
-  }, [settings.data]);
+  }, [settings.data, units]);
 
   const save = useCallback(async () => {
     setBusy(true);
@@ -84,8 +93,9 @@ export function SettingsProfileScreen({
     try {
       await settingsApi.updateProfile({
         age: Number.parseInt(age, 10),
-        heightCm: Number.parseFloat(height),
-        weightKg: Number.parseFloat(weight),
+        // Typed in the user's units; stored, as always, in metric.
+        heightCm: heightToCm(height, units) ?? Number.NaN,
+        weightKg: massToKg(weight, units) ?? Number.NaN,
         sex: sex ?? undefined,
       });
       navigation.goBack();
@@ -93,7 +103,7 @@ export function SettingsProfileScreen({
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
       setBusy(false);
     }
-  }, [age, height, navigation, sex, weight]);
+  }, [age, height, navigation, sex, units, weight]);
 
   if (settings.loading && !settings.data) return <LoadingScreen />;
   if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
@@ -117,22 +127,15 @@ export function SettingsProfileScreen({
 
       <View style={{ marginTop: spacing.xxl, gap: spacing.xl }}>
         <NumberField label="Age" value={age} onChange={setAge} unit="years" min={13} max={100} />
-        <NumberField
-          label="Height"
-          value={height}
-          onChange={setHeight}
-          unit="cm"
-          min={120}
-          max={250}
-        />
+        <HeightField value={height} onChange={setHeight} units={units} />
         <NumberField
           label="Weight"
           value={weight}
           onChange={setWeight}
-          unit="kg"
-          min={30}
-          max={300}
-          step={0.5}
+          unit={massUnit(units)}
+          min={weightBounds.min}
+          max={weightBounds.max}
+          step={displayStep('mass', units)}
           decimal
           hint="Updating your weight also updates future starting loads."
         />

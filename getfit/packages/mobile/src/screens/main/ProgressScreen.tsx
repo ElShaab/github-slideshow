@@ -2,7 +2,14 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { formatWeight, type PersonalRecord } from '@getfit/shared';
+import {
+  formatMass,
+  massUnit,
+  toDisplayMass,
+  type PersonalRecord,
+  type TrendPoint,
+  type UnitSystem,
+} from '@getfit/shared';
 import {
   EmptyState,
   ErrorState,
@@ -20,6 +27,7 @@ import {
 import { progressApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
 import { MIN_TOUCH_TARGET } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -39,6 +47,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
  */
 export function ProgressScreen(): React.ReactElement {
   const { colors, spacing, radius } = useTheme();
+  const { units } = useUnits();
   const navigation = useNavigation<Navigation>();
   const [tab, setTab] = useState<Tab>('body');
   const progress = useAsync(() => progressApi.overview(), []);
@@ -107,7 +116,7 @@ export function ProgressScreen(): React.ReactElement {
               </GlassCard>
 
               <View style={[styles.metricGrid, { marginTop: spacing.lg, gap: spacing.sm }]}>
-                <MetricCard label="Weight" value={formatWeight(latestAssessment.weightKg)} style={styles.metricHalf} />
+                <MetricCard label="Weight" value={formatMass(latestAssessment.weightKg, units)} style={styles.metricHalf} />
                 <MetricCard
                   label="Body fat"
                   value={`${latestAssessment.bodyFatPercent.toFixed(1)}%`}
@@ -115,7 +124,7 @@ export function ProgressScreen(): React.ReactElement {
                 />
                 <MetricCard
                   label="Muscle"
-                  value={formatWeight(latestAssessment.estimatedMuscleMassKg)}
+                  value={formatMass(latestAssessment.estimatedMuscleMassKg, units)}
                   style={styles.metricHalf}
                 />
                 <MetricCard
@@ -136,9 +145,18 @@ export function ProgressScreen(): React.ReactElement {
             />
           )}
 
-          <Trend title="Weight" points={trends.weightKg} unit=" kg" lowerIsBetter={false} />
+          <Trend
+            title="Weight"
+            points={massPoints(trends.weightKg, units)}
+            unit={` ${massUnit(units)}`}
+            lowerIsBetter={false}
+          />
           <Trend title="Body fat" points={trends.bodyFatPercent} unit="%" lowerIsBetter />
-          <Trend title="Muscle mass" points={trends.muscleMassKg} unit=" kg" />
+          <Trend
+            title="Muscle mass"
+            points={massPoints(trends.muscleMassKg, units)}
+            unit={` ${massUnit(units)}`}
+          />
           <Trend title="Waist / body" points={trends.waistBodyRatio} unit="" precision={2} lowerIsBetter />
           {/* Every assessment carries a balance score now, so the empty state
               is about having no assessments rather than no limb measurements.
@@ -178,19 +196,19 @@ export function ProgressScreen(): React.ReactElement {
                       {entry.exerciseName}
                     </Text>
                     <Text variant="caption" color="accent" tabular>
-                      Best {entry.bestWeight} kg
+                      Best {formatMass(entry.bestWeight, units)}
                     </Text>
                   </View>
                   <ProgressChart
                     label={`${entry.exerciseName} weight over time`}
-                    points={entry.points}
-                    unit=" kg"
+                    points={massPoints(entry.points, units)}
+                    unit={` ${massUnit(units)}`}
                     height={110}
                     style={{ marginTop: spacing.md }}
                   />
                   {entry.bestEstimated1rm > 0 ? (
                     <Text variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
-                      Estimated 1RM: {entry.bestEstimated1rm} kg
+                      Estimated 1RM: {formatMass(entry.bestEstimated1rm, units)}
                     </Text>
                   ) : null}
                 </GlassCard>
@@ -238,8 +256,8 @@ export function ProgressScreen(): React.ReactElement {
             </Text>
             <ProgressChart
               label="Weekly training volume"
-              points={training.weeklyVolume}
-              unit=" kg"
+              points={massPoints(training.weeklyVolume, units)}
+              unit={` ${massUnit(units)}`}
               precision={0}
               height={140}
               style={{ marginTop: spacing.sm }}
@@ -274,6 +292,17 @@ export function ProgressScreen(): React.ReactElement {
       ) : null}
     </Screen>
   );
+}
+
+/**
+ * A trend line of weights, in the user's units.
+ *
+ * The values have to move with the label: a line labelled "lb" plotted from
+ * kilograms is not a unit bug the user can see, it is just wrong.
+ */
+function massPoints(points: TrendPoint[], units: UnitSystem): TrendPoint[] {
+  if (units === 'metric') return points;
+  return points.map((point) => ({ ...point, value: toDisplayMass(point.value, units) }));
 }
 
 function Trend({
@@ -319,7 +348,8 @@ const RECORD_LABELS: Record<PersonalRecord['recordType'], string> = {
 
 function RecordRow({ record }: { record: PersonalRecord }): React.ReactElement {
   const { colors, spacing, radius } = useTheme();
-  const unit = record.recordType === 'reps' ? ' reps' : ' kg';
+  const { units } = useUnits();
+  const unit = record.recordType === 'reps' ? ' reps' : ` ${massUnit(units)}`;
 
   return (
     <View

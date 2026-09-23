@@ -11,3 +11,4 @@ export * from './errors';
 export * from './programming';
 export * from './hologram';
 export * from './bodyAnalysis';
+export * from './units';

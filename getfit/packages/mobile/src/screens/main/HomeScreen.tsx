@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { formatPercent, formatWeight } from '@getfit/shared';
+import { formatMass, formatPercent } from '@getfit/shared';
 import {
   ErrorState,
   GlassCard,
@@ -18,6 +18,7 @@ import {
 import { homeApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
 import { MIN_TOUCH_TARGET } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -31,6 +32,7 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
  */
 export function HomeScreen(): React.ReactElement {
   const { colors, spacing } = useTheme();
+  const { units } = useUnits();
   const navigation = useNavigation<Navigation>();
   const home = useAsync(() => homeApi.load(), []);
 
@@ -88,11 +90,11 @@ export function HomeScreen(): React.ReactElement {
           <View style={styles.bodyRow}>
             <HologramViewer data={assessment.hologramData} size={190} rotate />
             <View style={[styles.bodyStats, { gap: spacing.sm }]}>
-              <MetricCard label="Weight" value={formatWeight(assessment.weightKg)} />
+              <MetricCard label="Weight" value={formatMass(assessment.weightKg, units)} />
               <MetricCard label="Body fat" value={formatPercent(assessment.bodyFatPercent)} />
               <MetricCard
                 label="Muscle"
-                value={formatWeight(assessment.estimatedMuscleMassKg)}
+                value={formatMass(assessment.estimatedMuscleMassKg, units)}
               />
               <MetricCard
                 label="Symmetry"
@@ -135,7 +137,7 @@ export function HomeScreen(): React.ReactElement {
                 </Text>
                 <Text variant="caption" color="muted" tabular>
                   {exercise.sets} × {exercise.repsMin}–{exercise.repsMax}
-                  {exercise.startingWeight ? ` · ${exercise.startingWeight} kg` : ''}
+                  {exercise.startingWeight ? ` · ${formatMass(exercise.startingWeight, units)}` : ''}
                 </Text>
               </View>
             ))}

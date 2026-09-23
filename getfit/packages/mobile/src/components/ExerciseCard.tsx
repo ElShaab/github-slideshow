@@ -1,7 +1,8 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { formatRepRange, formatWeight, type Exercise } from '@getfit/shared';
+import { formatMass, formatRepRange, type Exercise } from '@getfit/shared';
 import { useTheme } from '../theme';
+import { useUnits } from '../state/UnitsProvider';
 import { MIN_TOUCH_TARGET } from '../theme/tokens';
 import { ExerciseIllustration } from './ExerciseIllustration';
 import { GlassCard } from './GlassCard';
@@ -36,12 +37,13 @@ export const ExerciseCard = memo(function ExerciseCard({
   trailing,
 }: ExerciseCardProps): React.ReactElement {
   const { colors, spacing } = useTheme();
+  const { units } = useUnits();
 
   const prescription = [
     sets !== undefined && repsMin !== undefined && repsMax !== undefined
       ? `${sets} × ${formatRepRange(repsMin, repsMax)}`
       : null,
-    weight !== undefined && weight !== null ? formatWeight(weight) : null,
+    weight !== undefined && weight !== null ? formatMass(weight, units) : null,
   ]
     .filter(Boolean)
     .join('  ·  ');

@@ -1,12 +1,20 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { PHOTO_INSTRUCTIONS, WEEKLY_PHOTO_INSTRUCTIONS, type Sex } from '@getfit/shared';
+import {
+  PHOTO_INSTRUCTIONS,
+  WEEKLY_PHOTO_INSTRUCTIONS,
+  displayBounds,
+  displayStep,
+  massUnit,
+  type Sex,
+} from '@getfit/shared';
 import {
   GlassCard,
   MeasurementsForm,
   NumberField,
   PrimaryButton,
+  WEIGHT_BOUNDS_KG,
   Screen,
   SecondaryButton,
   Text,
@@ -14,6 +22,8 @@ import {
   type MeasurementsDraft,
 } from '../../components';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
+import { kgToMassText } from '../../utils/units';
 
 export interface AssessmentInputScreenProps {
   mode: 'initial' | 'weekly';
@@ -47,11 +57,13 @@ export function AssessmentInputScreen({
   onCancel,
 }: AssessmentInputScreenProps): React.ReactElement {
   const { colors, spacing } = useTheme();
+  const { units } = useUnits();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const instructions = mode === 'weekly' ? WEEKLY_PHOTO_INSTRUCTIONS : PHOTO_INSTRUCTIONS;
-  const measured = isMeasured(draft, sex);
+  const measured = isMeasured(draft, sex, units);
+  const weightBounds = displayBounds(WEIGHT_BOUNDS_KG, units, 'mass');
 
   const pick = useCallback(async (source: 'camera' | 'library') => {
     setError(null);
@@ -117,7 +129,7 @@ export function AssessmentInputScreen({
         </Text>
       </View>
 
-      <MeasurementsForm draft={draft} onChange={onChange} sex={sex} />
+      <MeasurementsForm draft={draft} onChange={onChange} sex={sex} units={units} />
 
       {onWeightChange ? (
         <GlassCard style={{ marginTop: spacing.lg }}>
@@ -125,12 +137,12 @@ export function AssessmentInputScreen({
             label="Current weight"
             value={weight ?? ''}
             onChange={onWeightChange}
-            unit="kg"
-            min={30}
-            max={300}
-            step={0.5}
+            unit={massUnit(units)}
+            min={weightBounds.min}
+            max={weightBounds.max}
+            step={displayStep('mass', units)}
             decimal
-            placeholder={weightPlaceholder ?? '80'}
+            placeholder={weightPlaceholder ?? kgToMassText(80, units)}
             hint="Optional — leave blank to keep your last recorded weight."
           />
         </GlassCard>

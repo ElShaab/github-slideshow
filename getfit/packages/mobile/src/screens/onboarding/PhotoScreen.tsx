@@ -14,6 +14,7 @@ import {
 import { onboardingApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useOnboardingDraft } from '../../state/OnboardingDraft';
+import { heightToCm, massToKg } from '../../utils/units';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 import type { OnboardingStackParamList } from '../../navigation/types';
@@ -99,8 +100,10 @@ export function PhotoScreen({ navigation }: Props): React.ReactElement {
       await onboardingApi.submit({
         age: Number.parseInt(draft.age, 10),
         sex,
-        heightCm: Number.parseFloat(draft.heightCm),
-        weightKg: Number.parseFloat(draft.weightKg),
+        // The draft holds what was typed, in the units it was typed in. This
+        // is the one place it becomes the centimetres and kilograms stored.
+        heightCm: heightToCm(draft.height, draft.units) ?? Number.NaN,
+        weightKg: massToKg(draft.weight, draft.units) ?? Number.NaN,
         trainingLevel,
         trainingLocation,
         trainingDays,

@@ -14,6 +14,8 @@ import {
 import { assessmentApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
+import { useUnits } from '../../state/UnitsProvider';
+import { kgToMassText, massToKg } from '../../utils/units';
 import { useTheme } from '../../theme';
 import { AnalyzingScreen } from '../analysis/AnalyzingScreen';
 import { AssessmentInputScreen } from '../analysis/AssessmentInputScreen';
@@ -36,6 +38,7 @@ interface Submission {
 export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElement {
   const { spacing } = useTheme();
   const { profile } = useSession();
+  const { units } = useUnits();
   const availability = useAsync(() => assessmentApi.availability(), []);
   const latest = useAsync(() => assessmentApi.latest(), []);
 
@@ -49,8 +52,8 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
   // number, not a blank that silently drops the measurement.
   const previous = latest.data?.assessment ?? null;
   const startingDraft = useMemo(
-    () => draftFromMeasurements(previous?.measurements),
-    [previous?.measurements],
+    () => draftFromMeasurements(previous?.measurements, units),
+    [previous?.measurements, units],
   );
   const current = draft ?? startingDraft;
 
@@ -61,12 +64,12 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
 
   const handleSubmit = useCallback(
     (photoUri: string | null) => {
-      setSubmission({ measurements: toMeasurements(current), photoUri });
+      setSubmission({ measurements: toMeasurements(current, units), photoUri });
     },
-    [current],
+    [current, units],
   );
 
-  const weightKg = Number.parseFloat(weight);
+  const weightKg = massToKg(weight, units);
 
   if (availability.loading) return <LoadingScreen message="Checking your assessment…" />;
   if (!availability.data) {
@@ -112,7 +115,7 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
         measurements={submission.measurements}
         photoUri={submission.photoUri}
         mode="weekly"
-        weightKg={Number.isFinite(weightKg) ? weightKg : undefined}
+        weightKg={weightKg ?? undefined}
         onComplete={setResult}
         onCancel={() => setSubmission(null)}
       />
@@ -127,7 +130,7 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
       onChange={handleChange}
       weight={weight}
       onWeightChange={setWeight}
-      weightPlaceholder={previous ? String(previous.weightKg) : '80'}
+      weightPlaceholder={kgToMassText(previous?.weightKg ?? 80, units)}
       onSubmit={handleSubmit}
       onCancel={navigation.goBack}
     />

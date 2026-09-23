@@ -1,5 +1,6 @@
 import React, { memo, useCallback } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { massUnit, toDisplayMass, trim, type UnitSystem } from '@getfit/shared';
 import { useTheme } from '../theme';
 import { MIN_TOUCH_TARGET } from '../theme/tokens';
 import { GlassCard } from './GlassCard';
@@ -21,9 +22,21 @@ export interface WorkoutSetCardProps {
   isTimed?: boolean;
   /** Bodyweight movements hide the weight field entirely. */
   isBodyweight?: boolean;
+  /** What `weight` is typed in. `prescribedWeight` is always kilograms. */
+  units: UnitSystem;
 }
 
-const STEP_OPTIONS = [-2.5, -1.25, 1.25, 2.5];
+/**
+ * The adjustments a rack can actually make, in the user's own units.
+ *
+ * Metric gyms have 1.25 kg plates in pairs; imperial gyms have 2.5 lb ones.
+ * Offering 1.25 lb steps to somebody with 2.5 lb plates is offering a weight
+ * they cannot load.
+ */
+const STEP_OPTIONS: Record<UnitSystem, number[]> = {
+  metric: [-2.5, -1.25, 1.25, 2.5],
+  imperial: [-5, -2.5, 2.5, 5],
+};
 
 /**
  * The active set in a guided workout.
@@ -46,8 +59,10 @@ export const WorkoutSetCard = memo(function WorkoutSetCard({
   onComplete,
   isTimed = false,
   isBodyweight = false,
+  units,
 }: WorkoutSetCardProps): React.ReactElement {
   const { colors, spacing, radius } = useTheme();
+  const unit = massUnit(units);
 
   const adjustWeight = useCallback(
     (delta: number) => {
@@ -69,7 +84,9 @@ export const WorkoutSetCard = memo(function WorkoutSetCard({
         </Text>
         <Text variant="micro" color="muted" uppercase>
           Target {prescribedRepsMin}–{prescribedRepsMax} {isTimed ? 'sec' : 'reps'}
-          {prescribedWeight !== null ? ` @ ${prescribedWeight} kg` : ''}
+          {prescribedWeight !== null
+            ? ` @ ${trim(toDisplayMass(prescribedWeight, units))} ${unit}`
+            : ''}
         </Text>
       </View>
 
@@ -77,14 +94,14 @@ export const WorkoutSetCard = memo(function WorkoutSetCard({
         {showWeight ? (
           <View style={styles.field}>
             <Text variant="micro" color="muted" uppercase>
-              Weight (kg)
+              Weight ({unit})
             </Text>
             <TextInput
               value={weight}
               onChangeText={onWeightChange}
               keyboardType="decimal-pad"
               selectTextOnFocus
-              accessibilityLabel="Weight in kilograms"
+              accessibilityLabel={units === 'metric' ? 'Weight in kilograms' : 'Weight in pounds'}
               accessibilityHint="Change this if you lifted something different to the prescription"
               placeholder="0"
               placeholderTextColor={colors.textMuted}
@@ -99,12 +116,14 @@ export const WorkoutSetCard = memo(function WorkoutSetCard({
               ]}
             />
             <View style={[styles.steppers, { marginTop: spacing.sm, gap: spacing.xs }]}>
-              {STEP_OPTIONS.map((delta) => (
+              {STEP_OPTIONS[units].map((delta) => (
                 <Pressable
                   key={delta}
                   onPress={() => adjustWeight(delta)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${delta > 0 ? 'Add' : 'Remove'} ${Math.abs(delta)} kilograms`}
+                  accessibilityLabel={`${delta > 0 ? 'Add' : 'Remove'} ${Math.abs(delta)} ${
+                    units === 'metric' ? 'kilograms' : 'pounds'
+                  }`}
                   hitSlop={8}
                   style={({ pressed }) => [
                     styles.stepper,

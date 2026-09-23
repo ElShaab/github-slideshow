@@ -2,7 +2,14 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EXERCISE_BY_ID, formatMinutes, type PersonalRecord } from '@getfit/shared';
+import {
+  EXERCISE_BY_ID,
+  formatMass,
+  formatMinutes,
+  formatVolume,
+  type PersonalRecord,
+  type UnitSystem,
+} from '@getfit/shared';
 import {
   ErrorState,
   GlassCard,
@@ -15,6 +22,7 @@ import {
 import { workoutApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutComplete'>;
@@ -22,6 +30,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutComplete'>;
 /** The completion summary: duration, volume, personal records and what changed. */
 export function WorkoutCompleteScreen({ route, navigation }: Props): React.ReactElement {
   const { colors, spacing, reduceMotion } = useTheme();
+  const { units } = useUnits();
   const summary = useAsync(() => workoutApi.detail(route.params.summaryId), [route.params.summaryId]);
   const reveal = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
 
@@ -85,7 +94,7 @@ export function WorkoutCompleteScreen({ route, navigation }: Props): React.React
           <MetricCard label="Sets" value={String(workout.totalSets)} style={styles.half} />
           <MetricCard
             label="Volume"
-            value={`${Math.round(workout.totalVolumeKg).toLocaleString()} kg`}
+            value={formatVolume(workout.totalVolumeKg, units)}
             style={styles.half}
           />
         </View>
@@ -125,15 +134,21 @@ export function WorkoutCompleteScreen({ route, navigation }: Props): React.React
   );
 }
 
-const RECORD_COPY: Record<PersonalRecord['recordType'], (value: number, previous: number | null) => string> = {
-  weight: (value, previous) =>
-    previous ? `${value} kg  (+${round(value - previous)} kg)` : `${value} kg`,
+const RECORD_COPY: Record<
+  PersonalRecord['recordType'],
+  (value: number, previous: number | null, units: UnitSystem) => string
+> = {
+  weight: (value, previous, units) =>
+    previous
+      ? `${formatMass(value, units)}  (+${formatMass(value - previous, units)})`
+      : formatMass(value, units),
   reps: (value, previous) => (previous ? `${value} reps  (+${value - previous})` : `${value} reps`),
-  estimated_1rm: (value) => `${value} kg estimated 1RM`,
-  volume: (value) => `${Math.round(value).toLocaleString()} kg total volume`,
+  estimated_1rm: (value, _previous, units) => `${formatMass(value, units)} estimated 1RM`,
+  volume: (value, _previous, units) => `${formatVolume(value, units)} total volume`,
 };
 
 function RecordLine({ record }: { record: PersonalRecord }): React.ReactElement {
+  const { units } = useUnits();
   const name = record.exerciseName ?? EXERCISE_BY_ID[record.exerciseId]?.name ?? record.exerciseId;
   return (
     <View style={styles.recordRow}>
@@ -141,14 +156,10 @@ function RecordLine({ record }: { record: PersonalRecord }): React.ReactElement 
         {name}
       </Text>
       <Text variant="bodyStrong" color="accent" tabular>
-        {RECORD_COPY[record.recordType](record.value, record.previousValue)}
+        {RECORD_COPY[record.recordType](record.value, record.previousValue, units)}
       </Text>
     </View>
   );
-}
-
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
 }
 
 const styles = StyleSheet.create({

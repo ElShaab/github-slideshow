@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { formatPercent, formatRatio, formatWeight, type BodyAssessment } from '@getfit/shared';
+import { formatMass, formatPercent, formatRatio, type BodyAssessment } from '@getfit/shared';
 import {
   EmptyState,
   ErrorState,
@@ -17,6 +17,7 @@ import {
 import { assessmentApi, workoutApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
 import { MIN_TOUCH_TARGET } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -103,6 +104,7 @@ function AssessmentEntry({
   onToggle: () => void;
 }): React.ReactElement {
   const { colors, spacing } = useTheme();
+  const { units } = useUnits();
   const date = new Date(assessment.createdAt);
 
   const change = (current: number, before: number | undefined, lowerIsBetter: boolean) => {
@@ -122,7 +124,7 @@ function AssessmentEntry({
       accessibilityState={{ expanded }}
       accessibilityLabel={`Assessment ${assessment.assessmentNumber} from ${date.toLocaleDateString()}. ${formatPercent(
         assessment.bodyFatPercent,
-      )} body fat, ${formatWeight(assessment.estimatedMuscleMassKg)} muscle.`}
+      )} body fat, ${formatMass(assessment.estimatedMuscleMassKg, units)} muscle.`}
       accessibilityHint={expanded ? 'Collapses this week' : 'Expands this week'}
       style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, minHeight: MIN_TOUCH_TARGET }]}
     >
@@ -142,9 +144,9 @@ function AssessmentEntry({
         </View>
 
         <View style={[styles.quickStats, { marginTop: spacing.md, gap: spacing.lg }]}>
-          <Quick label="Weight" value={formatWeight(assessment.weightKg)} />
+          <Quick label="Weight" value={formatMass(assessment.weightKg, units)} />
           <Quick label="BF" value={formatPercent(assessment.bodyFatPercent)} />
-          <Quick label="Muscle" value={formatWeight(assessment.estimatedMuscleMassKg)} />
+          <Quick label="Muscle" value={formatMass(assessment.estimatedMuscleMassKg, units)} />
         </View>
 
         {bodyFatChange ? (
@@ -183,7 +185,7 @@ function AssessmentEntry({
               />
               <MetricCard
                 label="Muscle mass"
-                value={formatWeight(assessment.estimatedMuscleMassKg)}
+                value={formatMass(assessment.estimatedMuscleMassKg, units)}
                 style={styles.metricHalf}
               />
               <MetricCard

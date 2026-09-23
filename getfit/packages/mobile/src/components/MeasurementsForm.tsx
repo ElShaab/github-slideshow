@@ -1,22 +1,74 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import type { Sex } from '@getfit/shared';
+import { displayStep, lengthUnit, type Sex, type UnitSystem } from '@getfit/shared';
 import { GlassCard } from './GlassCard';
 import { NumberField } from './NumberField';
 import { Text } from './Text';
 import { useTheme } from '../theme';
-import {
-  MEASUREMENT_BOUNDS as BOUNDS,
-  isMeasured,
-  type MeasurementKey,
-  type MeasurementsDraft,
-} from '../utils/measurements';
+import { boundsFor, isMeasured, type MeasurementKey, type MeasurementsDraft } from '../utils/measurements';
+import { cmToLengthText } from '../utils/units';
 
 export interface MeasurementsFormProps {
   draft: MeasurementsDraft;
   onChange: (patch: Partial<MeasurementsDraft>) => void;
   sex: Sex | null;
+  units: UnitSystem;
 }
+
+interface Field {
+  key: MeasurementKey;
+  label: string;
+  /** A typical reading in centimetres, shown in whichever units are on. */
+  typicalCm: number;
+  hint?: string;
+}
+
+/** The three the circumference formula needs. Hips only apply to women. */
+const REQUIRED: Field[] = [
+  {
+    key: 'waistCm',
+    label: 'Waist',
+    typicalCm: 85,
+    hint: 'At the narrowest point, usually just above the navel.',
+  },
+  {
+    key: 'neckCm',
+    label: 'Neck',
+    typicalCm: 38,
+    hint: "Just below the Adam's apple, tape sloping slightly downward.",
+  },
+];
+
+const HIPS: Field = {
+  key: 'hipCm',
+  label: 'Hips',
+  typicalCm: 95,
+  hint: 'Around the widest point, feet together.',
+};
+
+/** Optional, and only feed the left/right balance score. */
+const OPTIONAL: Field[] = [
+  {
+    key: 'shoulderCm',
+    label: 'Shoulders',
+    typicalCm: 120,
+    hint: 'Around the widest point, arms relaxed. Sharpens your figure.',
+  },
+  { key: 'leftArmCm', label: 'Left arm', typicalCm: 36 },
+  {
+    key: 'rightArmCm',
+    label: 'Right arm',
+    typicalCm: 36,
+    hint: 'Mid-bicep, arm relaxed at your side.',
+  },
+  { key: 'leftThighCm', label: 'Left thigh', typicalCm: 58 },
+  {
+    key: 'rightThighCm',
+    label: 'Right thigh',
+    typicalCm: 58,
+    hint: 'Widest point, standing with weight evenly on both feet.',
+  },
+];
 
 /**
  * Tape measurements.
@@ -25,11 +77,15 @@ export interface MeasurementsFormProps {
  * US Navy circumference formula. The limb pairs are genuinely optional: they
  * only add the left/right balance score, which stays unreported rather than
  * invented when they are left blank.
+ *
+ * Everything here is typed in whatever units the user chose and converted to
+ * centimetres on submission, so the bounds and the formula never see an inch.
  */
 export const MeasurementsForm = memo(function MeasurementsForm({
   draft,
   onChange,
   sex,
+  units,
 }: MeasurementsFormProps): React.ReactElement {
   const { colors, spacing } = useTheme();
   const [showOptional, setShowOptional] = useState(false);
@@ -39,7 +95,30 @@ export const MeasurementsForm = memo(function MeasurementsForm({
     [onChange],
   );
 
-  const complete = useMemo(() => isMeasured(draft, sex), [draft, sex]);
+  const complete = useMemo(() => isMeasured(draft, sex, units), [draft, sex, units]);
+  const required = useMemo(() => (sex === 'female' ? [...REQUIRED, HIPS] : REQUIRED), [sex]);
+
+  const field = useCallback(
+    ({ key, label, typicalCm, hint }: Field) => {
+      const bounds = boundsFor(key, units);
+      return (
+        <NumberField
+          key={key}
+          label={label}
+          value={draft[key]}
+          onChange={set(key)}
+          unit={lengthUnit(units)}
+          min={bounds.min}
+          max={bounds.max}
+          step={displayStep('length', units)}
+          decimal
+          placeholder={cmToLengthText(typicalCm, units)}
+          hint={hint}
+        />
+      );
+    },
+    [draft, set, units],
+  );
 
   return (
     <View style={{ gap: spacing.lg }}>
@@ -49,49 +128,11 @@ export const MeasurementsForm = memo(function MeasurementsForm({
         </Text>
         <Text variant="caption" color="secondary" style={{ marginTop: spacing.sm }}>
           Measure relaxed, directly against the skin, with the tape level. These
-          three readings are what your body-fat estimate is calculated from.
+          {sex === 'female' ? ' three' : ' two'} readings are what your body-fat
+          estimate is calculated from.
         </Text>
 
-        <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>
-          <NumberField
-            label="Waist"
-            value={draft.waistCm}
-            onChange={set('waistCm')}
-            unit="cm"
-            min={BOUNDS.waistCm.min}
-            max={BOUNDS.waistCm.max}
-            step={0.5}
-            decimal
-            placeholder="85"
-            hint="At the narrowest point, usually just above the navel."
-          />
-          <NumberField
-            label="Neck"
-            value={draft.neckCm}
-            onChange={set('neckCm')}
-            unit="cm"
-            min={BOUNDS.neckCm.min}
-            max={BOUNDS.neckCm.max}
-            step={0.5}
-            decimal
-            placeholder="38"
-            hint="Just below the Adam's apple, tape sloping slightly downward."
-          />
-          {sex === 'female' ? (
-            <NumberField
-              label="Hips"
-              value={draft.hipCm}
-              onChange={set('hipCm')}
-              unit="cm"
-              min={BOUNDS.hipCm.min}
-              max={BOUNDS.hipCm.max}
-              step={0.5}
-              decimal
-              placeholder="95"
-              hint="Around the widest point, feet together."
-            />
-          ) : null}
-        </View>
+        <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>{required.map(field)}</View>
       </GlassCard>
 
       <GlassCard emphasis="soft">
@@ -116,66 +157,7 @@ export const MeasurementsForm = memo(function MeasurementsForm({
         </Pressable>
 
         {showOptional ? (
-          <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>
-            <NumberField
-              label="Shoulders"
-              value={draft.shoulderCm}
-              onChange={set('shoulderCm')}
-              unit="cm"
-              min={BOUNDS.shoulderCm.min}
-              max={BOUNDS.shoulderCm.max}
-              step={0.5}
-              decimal
-              placeholder="120"
-              hint="Around the widest point, arms relaxed. Sharpens your figure."
-            />
-            <NumberField
-              label="Left arm"
-              value={draft.leftArmCm}
-              onChange={set('leftArmCm')}
-              unit="cm"
-              min={BOUNDS.leftArmCm.min}
-              max={BOUNDS.leftArmCm.max}
-              step={0.5}
-              decimal
-              placeholder="36"
-            />
-            <NumberField
-              label="Right arm"
-              value={draft.rightArmCm}
-              onChange={set('rightArmCm')}
-              unit="cm"
-              min={BOUNDS.rightArmCm.min}
-              max={BOUNDS.rightArmCm.max}
-              step={0.5}
-              decimal
-              placeholder="36"
-              hint="Mid-bicep, arm relaxed at your side."
-            />
-            <NumberField
-              label="Left thigh"
-              value={draft.leftThighCm}
-              onChange={set('leftThighCm')}
-              unit="cm"
-              min={BOUNDS.leftThighCm.min}
-              max={BOUNDS.leftThighCm.max}
-              step={0.5}
-              decimal
-              placeholder="58"
-            />
-            <NumberField
-              label="Right thigh"
-              value={draft.rightThighCm}
-              onChange={set('rightThighCm')}
-              unit="cm"
-              min={BOUNDS.rightThighCm.min}
-              max={BOUNDS.rightThighCm.max}
-              step={0.5}
-              decimal
-              placeholder="58"
-              hint="Widest point, standing with weight evenly on both feet."
-            />
-          </View>
+          <View style={{ marginTop: spacing.xl, gap: spacing.xl }}>{OPTIONAL.map(field)}</View>
         ) : null}
       </GlassCard>
 

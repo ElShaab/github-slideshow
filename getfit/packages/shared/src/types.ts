@@ -1,3 +1,5 @@
+import type { UnitSystem } from './units';
+
 /**
  * GetFit — shared domain types.
  * Used by the API server and the mobile client so both sides agree on shapes.
@@ -540,7 +542,11 @@ export type ThemeMode = 'dark' | 'light' | 'system';
 export interface AppSettings {
   themeMode: ThemeMode;
   reducedMotion: boolean;
-  units: 'metric';
+  /**
+   * What the user reads and types in. Everything stored stays metric — this
+   * decides presentation only, so changing it never alters a past reading.
+   */
+  units: UnitSystem;
 }
 
 /* ------------------------------------------------------------------ */

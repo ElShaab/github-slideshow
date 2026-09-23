@@ -5,11 +5,14 @@ import {
   SYMMETRY_METHOD_COPY,
   formatPercent,
   formatRatio,
-  formatWeight,
+  formatMass,
+  massUnit,
+  toDisplayMass,
   type BodyAssessment,
 } from '@getfit/shared';
 import { GlassCard, HologramViewer, PrimaryButton, Screen, StatCard, Text } from '../../components';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
 
 export interface BodyResultScreenProps {
   assessment: BodyAssessment;
@@ -35,6 +38,7 @@ export function BodyResultScreen({
   title = 'Your body',
 }: BodyResultScreenProps): React.ReactElement {
   const { spacing, reduceMotion } = useTheme();
+  const { units } = useUnits();
   const reveal = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
 
   useEffect(() => {
@@ -111,11 +115,17 @@ export function BodyResultScreen({
           />
           <StatCard
             label="Muscle"
-            value={assessment.estimatedMuscleMassKg}
-            unit="kg"
+            value={toDisplayMass(assessment.estimatedMuscleMassKg, units)}
+            unit={massUnit(units)}
             precision={1}
             style={styles.half}
-            delta={delta(assessment.estimatedMuscleMassKg, previous?.estimatedMuscleMassKg, 'up')}
+            // Converted before the subtraction: the card prints the delta with
+            // the unit above it, so a kilogram change under a "lb" label lies.
+            delta={delta(
+              toDisplayMass(assessment.estimatedMuscleMassKg, units),
+              previous == null ? null : toDisplayMass(previous.estimatedMuscleMassKg, units),
+              'up',
+            )}
           />
           <StatCard
             label="Waist / Body"
@@ -143,7 +153,7 @@ export function BodyResultScreen({
                 Weight
               </Text>
               <Text variant="subheading" style={{ marginTop: 2 }} tabular>
-                {formatWeight(assessment.weightKg)}
+                {formatMass(assessment.weightKg, units)}
               </Text>
             </View>
             <View>
@@ -151,8 +161,9 @@ export function BodyResultScreen({
                 Lean mass
               </Text>
               <Text variant="subheading" style={{ marginTop: 2 }} tabular>
-                {formatWeight(
-                  Math.round(assessment.weightKg * (1 - assessment.bodyFatPercent / 100) * 10) / 10,
+                {formatMass(
+                  assessment.weightKg * (1 - assessment.bodyFatPercent / 100),
+                  units,
                 )}
               </Text>
             </View>

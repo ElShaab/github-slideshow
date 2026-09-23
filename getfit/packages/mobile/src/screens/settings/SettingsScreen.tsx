@@ -5,7 +5,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   GOAL_LABELS,
   LEVEL_LABELS,
-  formatWeight,
+  formatHeight,
+  formatMass,
   planForProduct,
   planPricing,
 } from '@getfit/shared';
@@ -22,6 +23,7 @@ import { ApiError } from '../../api/client';
 import { authApi, settingsApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
+import { useUnits } from '../../state/UnitsProvider';
 import { useTheme } from '../../theme';
 import { appVersion } from '../../config/appInfo';
 import type { RootStackParamList } from '../../navigation/types';
@@ -34,6 +36,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
  */
 export function SettingsScreen({ navigation }: Props): React.ReactElement {
   const { spacing, mode, setMode, reduceMotion, setReduceMotionOverride } = useTheme();
+  const { units, setUnits } = useUnits();
   const { signOut } = useSession();
   const settings = useAsync(() => settingsApi.load(), []);
   const [busy, setBusy] = useState(false);
@@ -119,12 +122,12 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
         />
         <SettingsRow
           label="Height"
-          value={profile ? `${profile.heightCm} cm` : '—'}
+          value={formatHeight(profile?.heightCm, units)}
           onPress={() => navigation.navigate('SettingsProfile')}
         />
         <SettingsRow
           label="Weight"
-          value={profile ? formatWeight(profile.weightKg) : '—'}
+          value={formatMass(profile?.weightKg, units)}
           onPress={() => navigation.navigate('SettingsProfile')}
           last
         />
@@ -224,6 +227,14 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
           label="Reduce motion"
           description="Turns off hologram rotation and screen animations."
           toggle={{ value: reduceMotion, onChange: setReduceMotionOverride }}
+        />
+        <SettingsRow
+          label="Imperial units"
+          description="Feet, inches and pounds instead of centimetres and kilograms. Changes what you read, never what is stored."
+          toggle={{
+            value: units === 'imperial',
+            onChange: (value) => setUnits(value ? 'imperial' : 'metric'),
+          }}
           last
         />
       </SettingsGroup>

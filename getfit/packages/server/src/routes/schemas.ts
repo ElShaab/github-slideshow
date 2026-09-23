@@ -113,6 +113,9 @@ export const completeWorkoutSchema = z.object({
 export const settingsSchema = z.object({
   themeMode: z.enum(['dark', 'light', 'system']).optional(),
   reducedMotion: z.boolean().optional(),
+  // Presentation only. Every reading stays stored in centimetres and
+  // kilograms, so this can be changed without touching a single measurement.
+  units: z.enum(['metric', 'imperial']).optional(),
 });
 
 export const assessmentWeightSchema = z.object({

@@ -1,10 +1,9 @@
-/** Formatting helpers shared by the API responses and the mobile UI. */
-
-export function formatWeight(kg: number | null | undefined): string {
-  if (kg === null || kg === undefined) return '—';
-  const rounded = Math.round(kg * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} kg`;
-}
+/**
+ * Formatting helpers shared by the API responses and the mobile UI.
+ *
+ * Anything carrying a unit lives in `units.ts` instead, because how a weight or
+ * a length reads depends on the system the user chose.
+ */
 
 export function formatPercent(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined) return '—';

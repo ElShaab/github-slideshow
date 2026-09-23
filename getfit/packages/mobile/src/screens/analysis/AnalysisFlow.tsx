@@ -4,6 +4,7 @@ import { LoadingScreen, toMeasurements, type MeasurementsDraft } from '../../com
 import { assessmentApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useOnboardingDraft } from '../../state/OnboardingDraft';
+import { useUnits } from '../../state/UnitsProvider';
 import { useSession } from '../../state/SessionProvider';
 import { AnalyzingScreen } from './AnalyzingScreen';
 import { AssessmentInputScreen } from './AssessmentInputScreen';
@@ -20,6 +21,7 @@ interface Submission {
  */
 export function AnalysisFlow(): React.ReactElement {
   const { draft, updateMeasurements } = useOnboardingDraft();
+  const { units } = useUnits();
   const { markAssessmentComplete, profile } = useSession();
   const [assessment, setAssessment] = useState<BodyAssessment | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -33,15 +35,20 @@ export function AnalysisFlow(): React.ReactElement {
 
   const handleSubmit = useCallback(
     (draftMeasurements: MeasurementsDraft, photoUri: string | null) => {
-      setSubmission({ measurements: toMeasurements(draftMeasurements), photoUri });
+      setSubmission({ measurements: toMeasurements(draftMeasurements, units), photoUri });
     },
-    [],
+    [units],
   );
 
   // Onboarding already collected these; they are carried straight through.
   const carried = useMemo<Submission>(
-    () => ({ measurements: toMeasurements(draft.measurements), photoUri: draft.photoUri }),
-    [draft.measurements, draft.photoUri],
+    // Read in the units they were typed in, which is not necessarily the units
+    // in force now — the toggle may have moved since onboarding collected them.
+    () => ({
+      measurements: toMeasurements(draft.measurements, draft.units),
+      photoUri: draft.photoUri,
+    }),
+    [draft.measurements, draft.photoUri, draft.units],
   );
 
   if (existing.loading) return <LoadingScreen message="Loading your analysis…" />;

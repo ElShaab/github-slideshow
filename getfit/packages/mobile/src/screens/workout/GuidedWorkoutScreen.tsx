@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { formatRepRange, type ProgramDay } from '@getfit/shared';
+import { formatMass, formatRepRange, type ProgramDay } from '@getfit/shared';
 import {
   ErrorState,
   ExerciseIllustration,
@@ -20,6 +20,8 @@ import { ApiError } from '../../api/client';
 import { programApi, workoutApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
+import { useUnits } from '../../state/UnitsProvider';
+import { kgToMassText, massToKg } from '../../utils/units';
 import { MIN_TOUCH_TARGET } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
 import { useWorkoutSession } from './useWorkoutSession';
@@ -60,7 +62,9 @@ function GuidedWorkoutRunner({
   navigation: Props['navigation'];
 }): React.ReactElement {
   const { colors, spacing, radius } = useTheme();
+  const { units } = useUnits();
   const session = useWorkoutSession(day);
+  // Held in the user's units; converted to kilograms when the set is logged.
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -70,9 +74,9 @@ function GuidedWorkoutRunner({
   useEffect(() => {
     const set = session.currentSet;
     if (!set) return;
-    setWeight(set.prescribedWeight !== null ? String(set.prescribedWeight) : '');
+    setWeight(set.prescribedWeight !== null ? kgToMassText(set.prescribedWeight, units) : '');
     setReps(String(set.prescribedRepsMax));
-  }, [session.currentSet]);
+  }, [session.currentSet, units]);
 
   const confirmExit = useCallback(() => {
     Alert.alert('Leave this workout?', 'Sets you have already logged will not be saved.', [
@@ -192,7 +196,9 @@ function GuidedWorkoutRunner({
           </Text>
           <Text variant="heading" color="accent" style={{ marginTop: spacing.md }} tabular>
             {programExercise.sets} × {formatRepRange(programExercise.repsMin, programExercise.repsMax)}
-            {programExercise.startingWeight ? `  ·  ${programExercise.startingWeight} kg` : ''}
+            {programExercise.startingWeight
+              ? `  ·  ${formatMass(programExercise.startingWeight, units)}`
+              : ''}
           </Text>
         </View>
 
@@ -322,13 +328,13 @@ function GuidedWorkoutRunner({
                         {set.isWarmup ? 'Warm-up' : `Set ${set.setNumber}`}
                       </Text>
                       <Text variant="caption" tabular>
-                        {set.actualWeight !== null ? `${set.actualWeight} kg × ` : ''}
+                        {set.actualWeight !== null ? `${formatMass(set.actualWeight, units)} × ` : ''}
                         {set.actualReps ?? 0}
                         {/* A changed weight is called out so nothing is silent. */}
                         {set.actualWeight !== null &&
                         set.prescribedWeight !== null &&
                         set.actualWeight !== set.prescribedWeight
-                          ? `  (planned ${set.prescribedWeight} kg)`
+                          ? `  (planned ${formatMass(set.prescribedWeight, units)})`
                           : ''}
                       </Text>
                     </View>
@@ -410,11 +416,12 @@ function GuidedWorkoutRunner({
           onRepsChange={setReps}
           isTimed={exercise.isTimed}
           isBodyweight={exercise.isBodyweight}
+          units={units}
           onComplete={() => {
-            const parsedWeight = Number.parseFloat(weight);
+            const parsedWeight = massToKg(weight, units);
             const parsedReps = Number.parseInt(reps, 10);
             session.completeSet(
-              Number.isFinite(parsedWeight) ? parsedWeight : null,
+              parsedWeight,
               Number.isFinite(parsedReps) ? parsedReps : 0,
             );
           }}
@@ -434,7 +441,7 @@ function GuidedWorkoutRunner({
                   {set.isWarmup ? 'Warm-up' : `Set ${set.setNumber}`}
                 </Text>
                 <Text variant="caption" tabular>
-                  {set.actualWeight !== null ? `${set.actualWeight} kg × ` : ''}
+                  {set.actualWeight !== null ? `${formatMass(set.actualWeight, units)} × ` : ''}
                   {set.actualReps ?? 0}
                 </Text>
               </View>
