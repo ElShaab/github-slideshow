@@ -73,15 +73,21 @@ Product IDs must match `SUBSCRIPTION_PLANS` in
 
 **[you] App Store Connect → Subscriptions.** One group containing both:
 
-| Product ID | Price | Duration |
+| Product ID | US price | Duration |
 | --- | --- | --- |
-| `getfit_membership_monthly` | **$5.00** | 1 month |
-| `getfit_membership_yearly` | **$20.00** | 1 year |
+| `getfit_membership_monthly` | **$4.99** | 1 month |
+| `getfit_membership_yearly` | **$19.99** — confirm | 1 year |
 
-Pick the price point that is **exactly $5.00 and $20.00** in the US storefront,
-not the neighbouring $4.99 / $19.99 tiers. The app displays `priceUsd` from
-`SUBSCRIPTION_PLANS`, and Guideline 3.1.2 requires the price on screen to be the
-price actually charged — a $4.99 product behind a "$5" label is a mismatch.
+**Whatever price point you pick, `priceUsd` in `SUBSCRIPTION_PLANS` has to
+match the US price exactly.** Guideline 3.1.2 requires the price on screen to
+be the price actually charged, and a $4.99 product behind a "$5" label is a
+mismatch a reviewer finds by reading the receipt. The monthly price schedule
+in App Store Connect is $4.99, so that is what the constant says.
+
+The app asks the store for the real price and shows whatever it answers, in
+the customer's own currency. `priceUsd` is only the fallback for the moment
+before the store replies — but it is what a reviewer sees if the store is slow,
+so it still has to be right.
 
 Rank the yearly plan higher in the group so an upgrade takes effect
 immediately. Add **no** introductory offer — GetFit has no free trial, and the

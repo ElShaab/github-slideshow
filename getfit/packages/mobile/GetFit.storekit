@@ -3,8 +3,8 @@
   "nonRenewingSubscriptions": [],
   "products": [],
   "settings": {
-    "_applicationInternalID": "6470000000",
-    "_developerTeamID": "TEAMID0000",
+    "_applicationInternalID": "6815252113",
+    "_developerTeamID": "9V8U88UQCU",
     "_failTransactionsEnabled": false,
     "_lastSynchronizedDate": 0,
     "_locale": "en_US",
@@ -20,7 +20,7 @@
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "5.00",
+          "displayPrice": "4.99",
           "familyShareable": false,
           "groupNumber": 1,
           "internalID": "056C95C7-F1D2-5F86-8408-31046F607796",

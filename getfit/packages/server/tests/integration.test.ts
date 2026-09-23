@@ -10,7 +10,11 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { ASSESSMENT_INTERVAL_DAYS, MAX_EXERCISES_PER_MUSCLE } from '@getfit/shared';
+import {
+  ASSESSMENT_INTERVAL_DAYS,
+  MAX_EXERCISES_PER_MUSCLE,
+  SUBSCRIPTION_PRICE_USD,
+} from '@getfit/shared';
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
 process.env.MOCK_BILLING = 'true';
@@ -219,14 +223,16 @@ describe('GetFit end-to-end journey', () => {
     }
   });
 
-  test('the paywall advertises $5/month with no free trial', async (t) => {
+  test('the paywall advertises the catalogue price with no free trial', async (t) => {
     if (!databaseAvailable) return t.skip('No database available');
 
     const response = await api<{ priceUsd: number; freeTrial: boolean; features: string[] }>(
       'GET',
       '/api/subscription/plan',
     );
-    assert.equal(response.body.priceUsd, 5);
+    // Read from the catalogue rather than pinned here: a price lives in one
+    // place, and a test that restates it just has to be edited alongside.
+    assert.equal(response.body.priceUsd, SUBSCRIPTION_PRICE_USD);
     assert.equal(response.body.freeTrial, false);
     assert.ok(response.body.features.length >= 6);
   });

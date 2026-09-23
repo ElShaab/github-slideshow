@@ -15,7 +15,12 @@ export const MAX_CARDIO_MINUTES = 15;
 /** Warm-up sets are deliberately capped — this app does not generate long routines. */
 export const MAX_WARMUP_SETS = 2;
 
-export const SUBSCRIPTION_PRICE_USD = 5;
+/**
+ * The US monthly price, matching the App Store price point the product was
+ * created with. Apple's tiers are .99, and the schedule chosen is $4.99 — the
+ * number shown has to be the number charged, or Guideline 3.1.2 applies.
+ */
+export const SUBSCRIPTION_PRICE_USD = 4.99;
 export const SUBSCRIPTION_PRODUCT_ID = 'getfit_membership_monthly';
 export const YEARLY_PRODUCT_ID = 'getfit_membership_yearly';
 

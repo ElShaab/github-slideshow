@@ -11,6 +11,12 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import type { Server } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
+import {
+  SUBSCRIPTION_PRICE_USD,
+  SUBSCRIPTION_PRODUCT_ID,
+  YEARLY_PRODUCT_ID,
+  planForProduct,
+} from '@getfit/shared';
 import * as path from 'node:path';
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
@@ -517,19 +523,29 @@ describe('yearly membership', () => {
 
     assert.equal(response.status, 200);
     // The flat monthly fields stay for clients that predate the catalogue.
-    assert.equal(response.body.priceUsd, 5);
+    assert.equal(response.body.priceUsd, SUBSCRIPTION_PRICE_USD);
     assert.equal(response.body.freeTrial, false);
 
     const monthly = response.body.plans.find((p) => p.period === 'month');
     const yearly = response.body.plans.find((p) => p.period === 'year');
 
+    // Compared against the catalogue, not against literals: what this guards
+    // is that the endpoint serves what the app sells, whatever that costs.
+    const catalogueMonthly = planForProduct(SUBSCRIPTION_PRODUCT_ID);
+    const catalogueYearly = planForProduct(YEARLY_PRODUCT_ID);
+    assert.ok(catalogueMonthly && catalogueYearly);
+
     assert.ok(monthly, 'the monthly plan disappeared');
-    assert.equal(monthly.priceUsd, 5);
+    assert.equal(monthly.priceUsd, catalogueMonthly.priceUsd);
     assert.equal(monthly.listPriceUsd, null, 'the monthly plan should carry no offer');
 
     assert.ok(yearly, 'no yearly plan was offered');
-    assert.equal(yearly.priceUsd, 20);
-    assert.equal(yearly.listPriceUsd, 40, '$40 must be shown struck through');
+    assert.equal(yearly.priceUsd, catalogueYearly.priceUsd);
+    assert.equal(
+      yearly.listPriceUsd,
+      catalogueYearly.listPriceUsd,
+      'the struck-through price must be the one the catalogue claims',
+    );
     assert.equal(yearly.badge, 'BEST DEAL');
     assert.equal(yearly.limitedTime, true);
   });

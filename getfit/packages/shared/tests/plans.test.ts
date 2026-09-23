@@ -19,14 +19,17 @@ import {
 } from '../src/constants';
 
 describe('subscription catalogue', () => {
-  test('monthly is $5 under the product id the stores are configured with', () => {
+  test('monthly is $4.99 under the product id the stores are configured with', () => {
+    // The figure has to be the App Store price point the product was created
+    // with. A $4.99 product behind a "$5" label is the Guideline 3.1.2
+    // mismatch, and it is invisible until a reviewer reads the receipt.
     const monthly = planForProduct(SUBSCRIPTION_PRODUCT_ID);
     assert.ok(monthly, 'the monthly plan is missing from the catalogue');
     assert.equal(monthly.productId, 'getfit_membership_monthly');
-    assert.equal(monthly.priceUsd, 5);
+    assert.equal(monthly.priceUsd, 4.99);
     assert.equal(monthly.period, 'month');
     assert.equal(monthly.listPriceUsd, null, 'the monthly plan is not discounted');
-    assert.equal(SUBSCRIPTION_PRICE_USD, 5, 'the legacy constant drifted from the plan');
+    assert.equal(SUBSCRIPTION_PRICE_USD, 4.99, 'the legacy constant drifted from the plan');
   });
 
   test('yearly is $20, marked down from $40, and badged', () => {
@@ -64,14 +67,14 @@ describe('subscription catalogue', () => {
     }
   });
 
-  test('every plan is whole-dollar, matching a real store price point', () => {
+  test('every price is one a store can actually charge', () => {
     for (const plan of SUBSCRIPTION_PLANS) {
+      assert.ok(plan.priceUsd > 0, `${plan.productId} is not priced`);
       assert.equal(
-        plan.priceUsd,
-        Math.round(plan.priceUsd),
-        `${plan.productId} is $${plan.priceUsd}; the store products are whole dollars`,
+        Math.round(plan.priceUsd * 100),
+        plan.priceUsd * 100,
+        `${plan.productId} is $${plan.priceUsd}, which is finer than a cent`,
       );
-      assert.ok(plan.priceUsd > 0);
     }
   });
 
