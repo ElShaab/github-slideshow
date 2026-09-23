@@ -291,13 +291,22 @@ renewals then stop.
 cd packages/mobile
 npm run preflight -- --profile production   # must pass before you spend build minutes
 eas build --platform ios --profile production
-eas submit --platform ios --profile production   # [you] Apple credentials + 2FA
+
+# The Apple account email is deliberately not in eas.json — it is a personal
+# address and this repository is readable. Supply it here instead.
+EXPO_APPLE_ID=you@example.com \
+  eas submit --platform ios --profile production   # [you] Apple password + 2FA
 ```
+
+`eas.json` carries the two identifiers that address the upload — `ascAppId`
+(the app record's numeric Apple ID) and `appleTeamId` — because neither is a
+secret and a wrong one uploads to the wrong app.
 
 **[you]** Still required in App Store Connect, and none of it can be automated:
 
 - Apple Developer Program membership ($99/year)
-- App record, bundle ID `com.getfit.app`, and the `ascAppId` in `eas.json`
+- App record and bundle ID `com.getfit.app` — done; its Apple ID is in
+  `eas.json` as `ascAppId`
 - **Screenshots** — 6.7" and 6.5" iPhone, captured on a real device or
   simulator. Good six: the hologram result, the measurements screen, Home, a
   guided workout, Progress, and the paywall

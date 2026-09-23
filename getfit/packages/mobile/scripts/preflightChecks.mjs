@@ -73,6 +73,24 @@ export function checkRelease({
     }
   }
 
+  for (const key of ['ascAppId', 'appleTeamId']) {
+    if (!submit.ios?.[key]) {
+      problems.push(
+        `eas.json submit.${profile}.ios.${key} is missing, and the upload cannot be addressed without it.`,
+      );
+    }
+  }
+
+  // Deliberately absent from a public repository: it is a personal email
+  // address, and EAS takes it from the environment just as happily. Said out
+  // loud so it reads as a decision rather than an oversight discovered at
+  // submit time.
+  if (!submit.ios?.appleId) {
+    warnings.push(
+      'eas.json has no submit.ios.appleId, so `eas submit` will ask for your Apple account email. Set EXPO_APPLE_ID in the environment to answer it without committing the address.',
+    );
+  }
+
   /* ---------------------------- app config ---------------------------- */
 
   if (!app.version) problems.push('app.json version is required.');

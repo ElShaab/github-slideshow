@@ -81,6 +81,37 @@ const run = (mutate: (config: ReturnType<typeof readyConfig>) => void = () => {}
   return checkRelease(config) as { problems: string[]; warnings: string[] };
 };
 
+describe('addressing the upload', () => {
+  test('a missing app id is a problem, not a warning', () => {
+    const { problems } = run((c) => {
+      delete c.eas.submit.production.ios.ascAppId;
+    });
+    assert.ok(problems.some((p) => p.includes('ascAppId')));
+  });
+
+  test('so is a missing team id', () => {
+    const { problems } = run((c) => {
+      delete c.eas.submit.production.ios.appleTeamId;
+    });
+    assert.ok(problems.some((p) => p.includes('appleTeamId')));
+  });
+
+  test('a missing account email only warns, because it comes from the environment', () => {
+    // Deliberately kept out of a public repository; EXPO_APPLE_ID supplies it.
+    const { problems, warnings } = run((c) => {
+      delete c.eas.submit.production.ios.appleId;
+    });
+    assert.ok(warnings.some((w) => w.includes('EXPO_APPLE_ID')));
+    assert.ok(!problems.some((p) => p.includes('appleId')));
+  });
+
+  test('the checked-in config addresses the upload', () => {
+    const ios = realEas.submit?.production?.ios ?? {};
+    assert.ok(ios.ascAppId && !String(ios.ascAppId).startsWith('REPLACE_WITH'));
+    assert.ok(ios.appleTeamId && !String(ios.appleTeamId).startsWith('REPLACE_WITH'));
+  });
+});
+
 describe('the published legal pages', () => {
   test('a document with nothing left to fill is ready to publish', () => {
     const { problems } = run();
@@ -241,16 +272,15 @@ describe('checkRelease', () => {
   });
 
   test('the checked-in config is complete apart from what only a human can supply', () => {
-    // What is left is a contact channel and two Apple identifiers. None can be
-    // invented: the support address is a decision about what to make public,
-    // and the App Store Connect id does not exist until the app record does.
+    // What is left is a contact channel, which is a decision about what to
+    // make public rather than a value anyone can look up.
     const { problems } = checkRelease({
       app: structuredClone(realApp),
       eas: structuredClone(realEas),
       legalDocuments: Object.fromEntries(PAGES.map((page) => [page.source, readDocument(page.source)])),
       profile: 'production',
     });
-    const expected = ['PRIVACY.md', 'SUPPORT.md', 'appleId', 'ascAppId'];
+    const expected = ['PRIVACY.md', 'SUPPORT.md'];
     assert.equal(problems.length, expected.length, `unexpected: ${problems.join(' | ')}`);
     for (const field of expected) {
       assert.ok(problems.some((p) => p.includes(field)), `${field} was not reported`);
