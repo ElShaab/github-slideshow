@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "getfit",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "backgroundColor": "#0A3B85",
     "splash": {
       "backgroundColor": "#0A3B85",

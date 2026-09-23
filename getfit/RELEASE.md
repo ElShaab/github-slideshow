@@ -232,6 +232,30 @@ product ids and prices matching `SUBSCRIPTION_PLANS` and keep the scheme XML
 valid, because a drifted id fails silently — the paywall simply shows nothing
 to buy.
 
+### Why the app pins the old React Native architecture
+
+`app.json` sets `newArchEnabled: false`, deliberately. It is not a leftover.
+
+`react-native-iap` 12 is a legacy bridge module and never gained New
+Architecture support — the request for it sat unanswered and the project was
+archived in August 2026. One call in particular does not survive the move:
+selecting StoreKit 2 asks the native module whether it is available over a
+*blocking synchronous* bridge call, and where that kind of call is not exposed
+the method is simply absent, so it throws `undefined is not a function` rather
+than answering "no". Worse, the library points itself at the StoreKit 2 module
+before making that call, so the throw leaves it aimed at a module it never
+confirmed and every later billing call throws the same error.
+
+The adapter guards against that and falls back to StoreKit 1 (see
+`enableStoreKit2` in `src/state/storeAdapter.ts`), so the app keeps working
+either way — but the fallback decides membership from a receipt that does not
+always state an expiry, which means a lapsed subscriber can keep access. The
+old architecture is what lets StoreKit 2 engage properly, so it is what ships.
+
+Turning the flag back on means first replacing `react-native-iap` with a
+billing library that supports the new architecture, then confirming on a device
+that the StoreKit 1 fallback warning does **not** appear in the console.
+
 ### When you want the real sandbox instead
 
 This is not a substitute for a sandbox purchase on a device. StoreKit

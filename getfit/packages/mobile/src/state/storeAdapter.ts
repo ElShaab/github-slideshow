@@ -198,9 +198,13 @@ export class NativeStoreProvider implements StoreProvider {
    * `setup` is synchronous and reaches straight into the native module: it asks
    * the StoreKit 2 module whether it is available, over a blocking synchronous
    * bridge call. Where such a call is not exposed — under a JS debugger, and
-   * under the bridgeless runtime this app enables with `newArchEnabled` — the
-   * method is simply absent, so the call does not answer "no", it throws
-   * `undefined is not a function`.
+   * under React Native's bridgeless runtime — the method is simply absent, so
+   * the call does not answer "no", it throws `undefined is not a function`.
+   * That is the failure this guard exists for. `app.json` now pins the old
+   * architecture (`newArchEnabled: false`) because react-native-iap 12 never
+   * supported the new one and is no longer maintained, but the guard stays:
+   * turning that flag back on must not silently break every billing screen
+   * again, and a debugger attached to a dev build hits the same call.
    *
    * Catching it is not enough. `storekit2Mode` points the library at the
    * StoreKit 2 module on its first line and only then makes that call, so a
