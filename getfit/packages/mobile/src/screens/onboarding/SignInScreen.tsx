@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { GlassButton, PrimaryButton, Screen, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
+import { AuthError } from '../../supabase/auth';
 import { authApi } from '../../api/endpoints';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
@@ -26,7 +27,13 @@ export function SignInScreen({ navigation }: Props): React.ReactElement {
       await authApi.login(email.trim(), password);
       await refresh();
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      // AuthError carries a message written for a user — "that email already
+      // has an account" is the whole point of showing it.
+      setError(
+        caught instanceof ApiError || caught instanceof AuthError
+          ? caught.message
+          : 'Something went wrong.',
+      );
     } finally {
       setBusy(false);
     }

@@ -1,16 +1,22 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { PrimaryButton, Screen, Text, TextField } from '../../components';
+import { PrimaryButton, Screen, SecondaryButton, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
+import { AuthError } from '../../supabase/auth';
 import { authApi } from '../../api/endpoints';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 
 /**
- * Account creation, which happens after payment.
+ * The offer of an account, made after payment.
  *
- * The guest user is upgraded in place, so the analysis taken before signup
- * stays attached to the same person.
+ * An account does exactly one thing: it keeps a copy of the training data off
+ * the phone, so a lost or replaced device does not cost the user their history.
+ * Nothing in the app is gated on it, so it is declinable — and the decline is
+ * remembered, because an offer that reappears on every launch is a demand.
+ *
+ * Everything already on the device is pushed up as part of signing up, so the
+ * analysis taken before the account existed stays attached to the same person.
  */
 export function CreateAccountScreen(): React.ReactElement {
   const { spacing } = useTheme();
@@ -18,6 +24,7 @@ export function CreateAccountScreen(): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const valid = useMemo(
@@ -32,11 +39,29 @@ export function CreateAccountScreen(): React.ReactElement {
       await authApi.createAccount(email.trim(), password);
       await refresh();
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      // AuthError carries a message written for a user — "that email already
+      // has an account" is the whole point of showing it.
+      setError(
+        caught instanceof ApiError || caught instanceof AuthError
+          ? caught.message
+          : 'Something went wrong.',
+      );
     } finally {
       setBusy(false);
     }
   }, [email, password, refresh]);
+
+  const decline = useCallback(async () => {
+    setDeclining(true);
+    setError(null);
+    try {
+      await authApi.declineAccount();
+      await refresh();
+    } catch {
+      setError('Something went wrong.');
+      setDeclining(false);
+    }
+  }, [refresh]);
 
   return (
     <Screen
@@ -51,7 +76,13 @@ export function CreateAccountScreen(): React.ReactElement {
             label="Create account"
             onPress={() => void submit()}
             loading={busy}
-            disabled={!valid}
+            disabled={!valid || declining}
+          />
+          <SecondaryButton
+            label="Not now"
+            onPress={() => void decline()}
+            disabled={busy || declining}
+            accessibilityHint="Keeps everything on this phone. You can create an account later in Settings."
           />
         </View>
       }
@@ -63,8 +94,12 @@ export function CreateAccountScreen(): React.ReactElement {
         Save your progress
       </Text>
       <Text variant="body" color="secondary" style={{ marginTop: spacing.md }}>
-        Create an account so your program, assessments and training history follow
-        you to any device.
+        Your program, assessments and training history are on this phone. An account
+        keeps a copy so they survive a lost phone and follow you to the next one.
+      </Text>
+      <Text variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
+        Optional — everything works without one, and your progress photos stay on this
+        phone either way.
       </Text>
 
       <View style={{ marginTop: spacing.xxxl, gap: spacing.lg }}>

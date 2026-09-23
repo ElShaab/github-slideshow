@@ -35,7 +35,10 @@ import { completeWorkout, progressOverview, type CompleteWorkoutInput } from './
  * instead. The signatures are unchanged, so nothing above this layer knows the
  * network is gone.
  */
-const repo = new LocalRepository(new DocumentStore(AsyncStorage));
+/** The one document store. Exported so the cloud sync works on the same copy. */
+export const localStore = new DocumentStore(AsyncStorage);
+
+const repo = new LocalRepository(localStore);
 const selection = new ExerciseSelectionService();
 
 /** Membership, from the store. Screens that show it ask through here. */
@@ -70,6 +73,12 @@ export const localApi = {
   async deleteAccount() {
     await repo.deleteEverything();
     return { deleted: true, photosRemoved: 0 };
+  },
+
+  /** Records that the user turned down an account, so they are not asked again. */
+  async declineAccount() {
+    await repo.updateProfileDoc((doc) => ({ ...doc, accountDeclined: true }));
+    return { declined: true };
   },
 
   /* ----------------------------- onboarding --------------------------- */
@@ -142,6 +151,7 @@ export const localApi = {
       goals: doc.goals,
       equipment: doc.equipment,
       hasPreferences: doc.preferences.length > 0,
+      accountDeclined: doc.accountDeclined ?? false,
     };
   },
 

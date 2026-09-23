@@ -9,11 +9,12 @@ import React, {
 } from 'react';
 import { AppState } from 'react-native';
 import type { Entitlement, UserProfile } from '@getfit/shared';
-import { ApiError, clearCache, clearToken, loadToken, onUnauthorized } from '../api/client';
+import { ApiError, clearCache, clearToken, onUnauthorized } from '../api/client';
 import { assessmentApi, authApi, onboardingApi } from '../api/endpoints';
 import { createStoreProvider } from './billing';
 import { resolveEntitlement } from './localEntitlement';
 import { recoverFromFailure, type FailureKind } from './sessionRecovery';
+import { startCloudSync, stopCloudSync, syncNow } from '../supabase/cloud';
 import type { SessionStage } from './sessionStage';
 
 export type { SessionStage };
@@ -78,20 +79,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
   const refreshing = useRef(false);
 
   const resolveStage = useCallback(async (): Promise<SessionState> => {
-    const token = await loadToken();
-    if (!token) {
-      return {
-        stage: 'onboarding',
-        userId: null,
-        isGuest: true,
-        profile: null,
-        entitlement: null,
-        hasAssessment: false,
-        hasPreferences: false,
-        error: null,
-      };
-    }
-
+    // This used to begin by reading an access token and, without one, returning
+    // straight to onboarding. Nothing has issued a token since the HTTP API was
+    // replaced by local storage, so the check always failed and every cold
+    // launch dropped a fully onboarded, paying user back on the welcome screen.
+    // The stored profile is what says where the user is now.
     const me = await authApi.me();
     const status = await onboardingApi.status();
 
@@ -134,7 +126,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       // first-time user sees the paywall.
       return { ...base, stage: entitlement.status === 'none' ? 'paywall' : 'expired' };
     }
-    if (me.isGuest) return { ...base, stage: 'account' };
+    // An account is offered, not required: it buys a copy of the training data
+    // that survives the phone, and nothing in the app is gated on it. Somebody
+    // who has said no once is not asked again.
+    if (me.isGuest && !status.accountDeclined) return { ...base, stage: 'account' };
     if (!status.hasPreferences) return { ...base, stage: 'preferences' };
     return { ...base, stage: 'ready' };
   }, []);
@@ -173,10 +168,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
     void refresh();
   }, [refresh]);
 
-  // Re-check entitlement whenever the app comes back to the foreground.
+  // Starts mirroring local writes to the account, when there is one. A build
+  // with no Supabase project configured makes this a no-op and the app stays
+  // exactly as local as it was.
+  useEffect(() => {
+    startCloudSync();
+    return () => stopCloudSync();
+  }, []);
+
+  // Re-check entitlement whenever the app comes back to the foreground, and
+  // take the chance to reconcile with the account. The sync never blocks the
+  // refresh: a phone with no signal must still open the app.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (status) => {
-      if (status === 'active') void refresh();
+      if (status !== 'active') return;
+      void refresh();
+      void syncNow();
     });
     return () => subscription.remove();
   }, [refresh]);
@@ -204,6 +211,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
   }, []);
 
   const signOut = useCallback(async () => {
+    // Takes the Supabase session with it, and the local documents too: the
+    // body figures and training history on this device belong to the account
+    // that just left it.
+    await authApi.signOut();
     await endLocalSession();
     setState({
       stage: 'onboarding',

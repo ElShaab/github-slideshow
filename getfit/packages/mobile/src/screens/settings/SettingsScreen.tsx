@@ -51,7 +51,7 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
   const confirmDelete = useCallback(() => {
     Alert.alert(
       'Delete account?',
-      'This permanently removes your profile, assessments, photos and training history. It cannot be undone.',
+      'This permanently removes your profile, assessments, photos and training history — from this phone and from your GetFit account. It cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -69,9 +69,14 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
                     .deleteAccount()
                     .then(() => signOut())
                     .catch((error: unknown) => {
+                      // Deliberately explicit: the account's data is still
+                      // there. Saying only "something went wrong" would leave
+                      // someone believing they had deleted it.
                       Alert.alert(
-                        'Something went wrong.',
-                        error instanceof ApiError ? error.message : 'Please try again.',
+                        'Your account was not deleted.',
+                        error instanceof ApiError
+                          ? error.message
+                          : 'Nothing was removed. Check your connection and try again.',
                       );
                     })
                     .finally(() => setBusy(false));

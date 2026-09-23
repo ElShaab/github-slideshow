@@ -574,8 +574,8 @@ export function SettingsSubscriptionScreen({
       </GlassCard>
 
       <Text variant="caption" color="muted" style={{ marginTop: spacing.lg }}>
-        Your membership state is verified on our servers, so it stays correct on every
-        device you sign in to.
+        Your membership is read from the App Store or Google Play itself, so it stays
+        correct on every device signed in to the same store account.
       </Text>
 
       {data.active && data.status !== 'cancelled' ? (
@@ -643,10 +643,10 @@ export function SettingsPrivacyScreen({
       <GlassCard accented style={{ marginTop: spacing.xl }}>
         <Text variant="subheading">Nothing is sent to an AI service</Text>
         <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
-          Your body composition is calculated on our own server from the measurements
-          you enter, using published formulas. No third party receives your
-          measurements, your photos or your training data, and none of it is used to
-          train any model.
+          Your body composition is calculated on this phone from the measurements you
+          enter, using published formulas. No third party receives your measurements,
+          your photos or your training data, and none of it is used to train any
+          model.
         </Text>
       </GlassCard>
 
@@ -654,10 +654,10 @@ export function SettingsPrivacyScreen({
         <Text variant="subheading">Progress photos are optional and private</Text>
         <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
           A photo is never required, and it is never analysed — it is kept only so you
-          have a before-and-after to look back on. Photos are stored in private,
-          authenticated storage that only your account can read. There are no public
-          links, no sharing and no community feed, and Progress and History show your
-          figure and your numbers rather than the photograph.
+          have a before-and-after to look back on. Photos never leave this phone: they
+          are not uploaded, not synced to your account, and not backed up by us. There
+          are no public links, no sharing and no community feed, and Progress and
+          History show your figure and your numbers rather than the photograph.
         </Text>
       </GlassCard>
 
@@ -669,7 +669,7 @@ export function SettingsPrivacyScreen({
             'Your program, scheduled and completed workouts',
             'Every set you log, and your personal records',
             'Your tape measurements and your body assessments',
-            'Your subscription state',
+            'Your subscription state, read from the store',
           ].map((item) => (
             <Text key={item} variant="body" color="secondary">
               · {item}
@@ -679,11 +679,22 @@ export function SettingsPrivacyScreen({
       </GlassCard>
 
       <GlassCard style={{ marginTop: spacing.lg }}>
+        <Text variant="subheading">Where it is kept</Text>
+        <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
+          All of it is stored on this phone, which is why GetFit works with no signal.
+          If you created an account, the same data is also kept in our database so it
+          survives a lost phone — locked to your account, so no other account can read
+          it. Your photos are the exception: they stay on this phone and are never
+          uploaded.
+        </Text>
+      </GlassCard>
+
+      <GlassCard style={{ marginTop: spacing.lg }}>
         <Text variant="subheading">Deleting your account</Text>
         <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
-          Deleting your account removes all of the above, including your stored
-          photos. It is permanent and cannot be undone. You can do it from the
-          Privacy section of Settings.
+          Deleting your account removes all of the above — from this phone and from
+          your GetFit account — including your photos. It is permanent and cannot be
+          undone. You can do it from the Privacy section of Settings.
         </Text>
         <Text variant="body" color="secondary" style={{ marginTop: spacing.md }}>
           Deleting your GetFit account does not cancel your subscription — the App

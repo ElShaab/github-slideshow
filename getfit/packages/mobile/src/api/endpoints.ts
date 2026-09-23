@@ -31,6 +31,8 @@ import {
   errors,
 } from '@getfit/shared';
 import { localApi, localRepository } from '../local/api';
+import { accountsAvailable, currentAccount, signIn, signUp } from '../supabase/auth';
+import { deleteAccountEverywhere, signOutAndClearLocal, syncNow } from '../supabase/cloud';
 import { createStoreProvider } from '../state/billing';
 import { clearLocalBilling, resolveEntitlement } from '../state/localEntitlement';
 
@@ -46,32 +48,76 @@ import { clearLocalBilling, resolveEntitlement } from '../state/localEntitlement
 
 export const authApi = {
   /**
-   * There are no accounts to sign in to.
+   * Starts using the app without an account.
    *
-   * The install is the identity: data lives on this device and the membership
-   * belongs to the App Store or Play account, so there is nothing to
-   * authenticate against. These remain so the screens that call them keep
-   * working, and they simply make sure local identity exists.
+   * The install is still the identity, and everything works from here with no
+   * network at all. An account is offered later and adds exactly one thing:
+   * the data survives the phone.
    */
   async startGuestSession(): Promise<AuthTokens> {
+    const { userId } = await localApi.me();
+    return { accessToken: userId, userId, isGuest: accountsAvailable() } as AuthTokens;
+  },
+
+  /**
+   * Creates the account and hands this device's data to it.
+   *
+   * The sync runs before returning, so the first thing the new account holds is
+   * the analysis and programme the user already has — signing up must never
+   * look like starting over.
+   */
+  async createAccount(email: string, password: string): Promise<AuthTokens> {
+    if (!accountsAvailable()) return authApi.startGuestSession();
+
+    await signUp(email, password);
+    await syncNow();
     const { userId } = await localApi.me();
     return { accessToken: userId, userId, isGuest: false } as AuthTokens;
   },
 
-  createAccount(_email: string, _password: string): Promise<AuthTokens> {
-    return authApi.startGuestSession();
+  /**
+   * Signs in and brings the account's data down.
+   *
+   * Anything already on this device is merged in rather than replaced —
+   * somebody who trained before signing in keeps those sessions.
+   */
+  async login(email: string, password: string): Promise<AuthTokens> {
+    if (!accountsAvailable()) return authApi.startGuestSession();
+
+    await signIn(email, password);
+    await syncNow();
+    const { userId } = await localApi.me();
+    return { accessToken: userId, userId, isGuest: false } as AuthTokens;
   },
 
-  login(_email: string, _password: string): Promise<AuthTokens> {
-    return authApi.startGuestSession();
+  async me(): Promise<{ userId: string; email: string | null; isGuest: boolean }> {
+    const local = await localApi.me();
+    if (!accountsAvailable()) return local;
+
+    const account = await currentAccount();
+    return { userId: local.userId, email: account?.email ?? null, isGuest: account === null };
   },
 
-  me(): Promise<{ userId: string; email: string | null; isGuest: boolean }> {
-    return localApi.me();
+  /** Records that the user turned down an account, so they are not asked again. */
+  async declineAccount(): Promise<void> {
+    await localApi.declineAccount();
   },
 
-  deleteAccount(): Promise<{ deleted: boolean; photosRemoved: number }> {
-    return localApi.deleteAccount();
+  /** Signs out and takes the account's data off this device with it. */
+  async signOut(): Promise<void> {
+    await signOutAndClearLocal();
+  },
+
+  /**
+   * Deletes the account and everything in it, from inside the app, in one step.
+   *
+   * The server rows go first: if that fails the local copy is deliberately left
+   * alone and the error is raised, because reporting a deletion that only
+   * happened on the phone would be untrue.
+   */
+  async deleteAccount(): Promise<{ deleted: boolean; photosRemoved: number }> {
+    await deleteAccountEverywhere();
+    return { deleted: true, photosRemoved: 0 };
   },
 };
 
@@ -114,6 +160,8 @@ export const onboardingApi = {
     goals: UserGoal[];
     equipment: EquipmentId[];
     hasPreferences: boolean;
+    /** True once the user has turned down the offer of an account. */
+    accountDeclined: boolean;
   }> {
     return localApi.onboardingStatus();
   },

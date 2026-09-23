@@ -14,7 +14,29 @@ import type { KeyValueStore } from './keyValue';
 export class DocumentStore {
   private queues = new Map<string, Promise<unknown>>();
 
+  /**
+   * Told about every document that changes, once the write has landed.
+   *
+   * The cloud sync registers here rather than the other way round: local
+   * storage stays the thing that works, and syncing is something that listens.
+   * A listener that throws is ignored — nothing it does is allowed to fail a
+   * write the user just made.
+   */
+  private listener: ((key: string) => void) | null = null;
+
   constructor(private readonly storage: KeyValueStore) {}
+
+  onChange(listener: ((key: string) => void) | null): void {
+    this.listener = listener;
+  }
+
+  private notify(key: string): void {
+    try {
+      this.listener?.(key);
+    } catch {
+      // A broken listener must not break the write it was told about.
+    }
+  }
 
   async read<T>(key: string, fallback: () => T): Promise<T> {
     try {
@@ -42,6 +64,7 @@ export class DocumentStore {
       const current = await this.read<T>(key, fallback);
       const next = await change(current);
       await this.write(key, next);
+      this.notify(key);
       return next;
     });
 
@@ -59,4 +82,5 @@ export class DocumentStore {
     this.queues.clear();
     await this.storage.multiRemove(Object.values(DOCUMENT_KEYS));
   }
+
 }

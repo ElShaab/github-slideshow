@@ -7,7 +7,7 @@ permalink: /privacy
 
 <!-- Generated from the markdown in getfit/ by `npm run legal`. Do not edit. -->
 
-**Last updated: 12 September 2026**
+**Last updated: 23 September 2026**
 
 GetFit is operated by **Mohamed Hussein** ("we", "us"), who can be reached at
 **getfit.app.support@gmail.com** about anything in this policy. It
@@ -15,11 +15,23 @@ explains what we collect, why, and what control you have over it.
 
 ---
 
+## The short version
+
+GetFit works entirely on your phone. Your body analysis is calculated on the
+device, your progress photos never leave it, and you can use the whole app
+without ever creating an account.
+
+If you do create an account, your training data is also stored on our database
+so it survives a lost phone and follows you to a new one. That database is run
+by Supabase, and every row in it is locked to your account.
+
+---
+
 ## What we collect
 
 ### Your measurements
 
-Your body-fat estimate is calculated on our server from the measurements you
+Your body-fat estimate is calculated **on your phone** from the measurements you
 enter — waist, neck, height, weight and, for women, hips — using published
 anthropometric formulas. **No third party is involved in this calculation, and
 your measurements are never sent to any AI or analysis service.**
@@ -30,13 +42,13 @@ You can attach a photo to an assessment. It is entirely optional, the app works
 fully without it, and **it is never analysed** — it exists only so you have a
 genuine before-and-after to look back on.
 
-- Photos are **private**. They are never public, never shared with other users,
-  and never used for advertising or to train any model.
-- Every photo is stored under an unguessable identifier scoped to your account.
-  There is no public URL and no shareable link.
-- Reading a photo requires being signed in as the account that owns it. The
-  lookup itself is scoped by account, so there is no path that serves someone
-  else's photo.
+- **Photos never leave your phone.** They are not uploaded, not backed up by us,
+  and not synced to your account. They are stored in GetFit's private storage
+  area on the device, which other apps cannot read.
+- Because they stay on the device, a photo does **not** follow you to a new
+  phone, and deleting the app deletes it.
+- Photos are never public, never shared with other users, and never used for
+  advertising or to train any model.
 - **Photos are never displayed in the app's Progress or History screens.** Past
   assessments are shown as numbers and as a generated 3D figure, never as the
   original photograph.
@@ -50,28 +62,54 @@ measurements, height, weight, age and sex.
 This is **health-related personal data**. Where GDPR applies it is a special
 category of data under Article 9, processed on the basis of your explicit
 consent, which you give by entering your measurements and running an analysis.
-You can withdraw that consent at any time by deleting your account.
+You can withdraw that consent at any time by deleting your account, which also
+erases the data from the device.
 
 ### Training data
 
 Your program, the workouts you complete, the weights and repetitions you log,
 personal records, and your goals.
 
-### Account and subscription data
+### Account data
 
-Your email address and a hashed password (we never store your password itself).
-For subscriptions we store the store's transaction identifier, which plan you
-bought, and when the period ends.
+Only if you choose to create an account: your email address and a password.
+**We never see your password.** It is handled and hashed by Supabase Auth; what
+GetFit receives is a session token, which is kept in your phone's keychain.
+
+You are offered an account after you subscribe, and you can decline it. Without
+one, everything above stays on the device and nothing is transmitted.
+
+### Subscription data
+
+Which plan you bought and when the period ends, read from the App Store or Play
+Store on the device.
 
 **We never see or store your payment details.** All payments are handled by
-Apple or Google. We only ever receive a receipt confirming that a purchase
-happened, which our server verifies directly with the store.
+Apple or Google, and GetFit checks your membership with the store directly from
+your phone.
 
 ### Technical data
 
-Standard server logs: IP address, request paths, timestamps and error details.
 GetFit contains **no third-party analytics, advertising or tracking SDKs**, and
-does not track you across other apps or websites.
+does not track you across other apps or websites. When you have an account,
+Supabase records standard service logs — IP address, timestamps, and which
+requests were made — as part of running the database.
+
+---
+
+## Where your data is
+
+| | Without an account | With an account |
+| --- | --- | --- |
+| Measurements and assessments | On your phone | On your phone **and** in your account |
+| Program and training history | On your phone | On your phone **and** in your account |
+| Progress photos | On your phone | On your phone **only** — never uploaded |
+| Email address | Not collected | In your account |
+| Payment details | Never collected | Never collected |
+
+The app keeps its own copy on the device at all times, which is why it works
+with no signal. When you have an account, that copy is synchronised with the
+database in the background.
 
 ---
 
@@ -82,7 +120,7 @@ does not track you across other apps or websites.
 | Estimating your body composition | Measurements, height, weight, age, sex | Explicit consent (Art. 9(2)(a)) |
 | Keeping your optional progress photo | Photo | Explicit consent (Art. 9(2)(a)) |
 | Building and progressing your program | Body metrics, training history, goals | Contract |
-| Running your membership | Email, subscription record | Contract |
+| Keeping your data across devices | Email, training data, assessments | Contract |
 | Keeping the service secure and working | Technical data | Legitimate interests |
 
 ---
@@ -93,15 +131,18 @@ We use these subprocessors, and nothing else:
 
 | Subprocessor | What it handles |
 | --- | --- |
-| **Fly.io** | Runs the API, the database and the volume photos are stored on |
+| **Supabase** | Hosts the database your account's data is stored in, and handles sign-in |
 | **Apple** / **Google** | Process payments and confirm subscription status |
 
-There is **no third-party object storage**. Photos are written to an encrypted
-volume attached to the same machine that runs the API, under an unguessable
-name scoped to your account — they are never handed to another provider.
+Your account's data is held in the region the GetFit Supabase project is hosted
+in. Supabase publishes its own infrastructure providers, subprocessors and
+security practices at supabase.com/privacy.
+
+There is **no third-party object storage** and no photo hosting of any kind,
+because photos are never uploaded.
 
 There is **no AI or image-analysis subprocessor**. Body composition is computed
-on our own server from your measurements, and your photos are never sent
+on your own phone from your measurements, and your photos are never sent
 anywhere for analysis.
 
 We do **not** sell your personal information, and we do not share it for
@@ -111,20 +152,27 @@ cross-context behavioural advertising.
 
 ## How long we keep it
 
-- **Photos and assessments:** until you delete your account, or delete the
-  individual assessment.
-- **Training history:** until you delete your account.
-- **Account and subscription records:** until you delete your account, except
-  where we must keep a transaction record for tax or accounting purposes.
-- **Server logs:** 30 days, then deleted automatically.
+- **Photos:** on your phone until you delete the assessment or the app. We never
+  hold a copy.
+- **Assessments and training history:** until you delete your account.
+- **Account record:** until you delete your account.
+- **Subscription records:** held by Apple or Google, not by us.
+- **Supabase service logs:** kept for Supabase's own retention period as part of
+  running the database.
 
 ## Deleting everything
 
 **Settings → Privacy & data → Delete account.**
 
-This is immediate and permanent. It erases your profile, every photo file, every
-assessment, your whole training history, your goals and your subscription
-record. Nothing is retained in a recoverable form, and there is no grace period.
+This is immediate and permanent. It erases your profile, every assessment, your
+whole training history and your goals — both from this phone and from our
+database — and signs you out. Your photos are deleted with the device data.
+Nothing is retained in a recoverable form, and there is no grace period.
+
+If the deletion cannot reach our database — for example because you are
+offline — the app tells you so and **does not** delete the local copy, so that
+you are never told your data is gone while it is still stored. Try again when
+you have a connection.
 
 Deleting your GetFit account does **not** cancel your subscription — Apple and
 Google own that relationship. Cancel it in your App Store or Play Store account
@@ -148,10 +196,13 @@ delete it.
 
 ## Security
 
-Traffic is encrypted in transit. Passwords are hashed with bcrypt. Photos are
-stored in a private bucket, encrypted at rest, and served only to their owner
-through an authenticated, ownership-checked request. Database credentials and
-API keys are held as deployment secrets, never in source control.
+Traffic between the app and the database is encrypted in transit with TLS. Every
+table is protected by row-level security, which means the database itself
+refuses to return one account's rows to another — access is not something the
+app is trusted to enforce on its own. Passwords are handled and hashed by
+Supabase Auth and are never seen by GetFit. Your session token is stored in the
+device keychain, not in ordinary app storage. Photos are never transmitted at
+all.
 
 No system is perfectly secure, but we will notify affected users and the
 relevant authority without undue delay if a breach puts your data at risk.
