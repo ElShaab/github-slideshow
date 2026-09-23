@@ -45,7 +45,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     productId: YEARLY_PRODUCT_ID,
     period: 'year',
-    priceUsd: 20,
+    priceUsd: 19.99,
     listPriceUsd: 40,
     badge: 'BEST DEAL',
     limitedTime: true,

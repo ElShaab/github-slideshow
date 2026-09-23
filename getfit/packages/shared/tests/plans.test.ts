@@ -32,11 +32,11 @@ describe('subscription catalogue', () => {
     assert.equal(SUBSCRIPTION_PRICE_USD, 4.99, 'the legacy constant drifted from the plan');
   });
 
-  test('yearly is $20, marked down from $40, and badged', () => {
+  test('yearly is $19.99, marked down from $40, and badged', () => {
     const yearly = planForProduct(YEARLY_PRODUCT_ID);
     assert.ok(yearly, 'the yearly plan is missing from the catalogue');
     assert.equal(yearly.productId, 'getfit_membership_yearly');
-    assert.equal(yearly.priceUsd, 20);
+    assert.equal(yearly.priceUsd, 19.99);
     assert.equal(yearly.period, 'year');
     assert.equal(yearly.listPriceUsd, 40, 'the struck-through price changed');
     assert.equal(yearly.badge, 'BEST DEAL');
@@ -70,9 +70,11 @@ describe('subscription catalogue', () => {
   test('every price is one a store can actually charge', () => {
     for (const plan of SUBSCRIPTION_PLANS) {
       assert.ok(plan.priceUsd > 0, `${plan.productId} is not priced`);
-      assert.equal(
-        Math.round(plan.priceUsd * 100),
-        plan.priceUsd * 100,
+      // Compared with a tolerance, because 19.99 * 100 is 1998.9999999999998
+      // in binary floating point and an exact check fails on a valid price.
+      const cents = plan.priceUsd * 100;
+      assert.ok(
+        Math.abs(cents - Math.round(cents)) < 1e-6,
         `${plan.productId} is $${plan.priceUsd}, which is finer than a cent`,
       );
     }

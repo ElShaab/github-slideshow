@@ -30,8 +30,8 @@ const price = (
 
 const ukMonthly = price(SUBSCRIPTION_PRODUCT_ID, '£4.49', 'GBP', 4.49);
 const ukYearly = price(YEARLY_PRODUCT_ID, '£17.99', 'GBP', 17.99);
-const usMonthly = price(SUBSCRIPTION_PRODUCT_ID, '$5.00', 'USD', 5);
-const usYearly = price(YEARLY_PRODUCT_ID, '$20.00', 'USD', 20);
+const usMonthly = price(SUBSCRIPTION_PRODUCT_ID, '$4.99', 'USD', 4.99);
+const usYearly = price(YEARLY_PRODUCT_ID, '$19.99', 'USD', 19.99);
 const jpYearly = price(YEARLY_PRODUCT_ID, '¥3,000', 'JPY', 3000);
 
 describe('the store price is what gets displayed', () => {
@@ -56,7 +56,9 @@ describe('the store price is what gets displayed', () => {
   test('falls back to the bundled USD price until the store answers', () => {
     const pricing = planPricing(yearlyPlan);
     assert.equal(pricing.fromStore, false);
-    assert.ok(pricing.price.includes('20'), `expected the $20 fallback, got ${pricing.price}`);
+    // Asserted against the catalogue rather than a literal, so the fallback
+    // stays tied to the price the app actually sells at.
+    assert.equal(pricing.price, formatCurrency(yearlyPlan.priceUsd, 'USD'));
   });
 });
 

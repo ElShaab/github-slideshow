@@ -582,7 +582,11 @@ describe('yearly membership', () => {
       `SELECT price_usd, product_id FROM subscriptions WHERE user_id = $1`,
       [guest.body.userId],
     );
-    assert.equal(Number(row.rows[0].price_usd), 20, 'the yearly plan was priced as monthly');
+    assert.equal(
+      Number(row.rows[0].price_usd),
+      planForProduct(YEARLY_PRODUCT_ID)?.priceUsd,
+      'the yearly plan was priced as monthly',
+    );
     assert.equal(row.rows[0].product_id, 'getfit_membership_yearly');
   });
 
