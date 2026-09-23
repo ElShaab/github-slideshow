@@ -1,13 +1,13 @@
-# GetFit Privacy Policy
+---
+layout: legal
+title: Privacy Policy
+description: What GetFit collects, why, and what control you have over it.
+permalink: /privacy
+---
+
+<!-- Generated from the markdown in getfit/ by `npm run legal`. Do not edit. -->
 
 **Last updated: 12 September 2026**
-
-> **Before publishing:** replace every `[BRACKETED]` placeholder with your real
-> details, host this at a public HTTPS URL, and enter that URL in App Store
-> Connect and Play Console. This document describes what the software actually
-> does; it is not legal advice, and it should be reviewed by a lawyer before you
-> rely on it — particularly for GDPR, UK GDPR and CCPA obligations, which depend
-> on where you and your users are.
 
 GetFit is operated by **Mohamed Hussein** ("we", "us"), who can be reached at
 **mohamed.huss0123@gmail.com**. This policy explains what we collect, why, and

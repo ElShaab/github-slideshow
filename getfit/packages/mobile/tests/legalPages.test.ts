@@ -38,8 +38,16 @@ describe('finding what is still unfilled', () => {
     assert.deepEqual(placeholders('operated by Example Fitness Ltd of 1 Example Street'), []);
   });
 
-  test('ordinary bracketed prose is not mistaken for one', () => {
-    assert.deepEqual(placeholders('see clause [4] and the note [above]'), []);
+  test('a note to whoever deploys the app counts too', () => {
+    // Not all caps, so an all-caps rule sails past it onto the live page.
+    assert.deepEqual(placeholders('[If you have a DPO, name them here.]'), [
+      '[If you have a DPO, name them here.]',
+    ]);
+  });
+
+  test('a markdown link is not a placeholder', () => {
+    assert.deepEqual(placeholders('see the [Privacy Policy](privacy.html)'), []);
+    assert.deepEqual(placeholders('[report a problem](https://apple.com)'), []);
   });
 });
 

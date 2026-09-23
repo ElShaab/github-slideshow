@@ -10,8 +10,16 @@
 /** The note to the repo's owner, which no visitor should ever read. */
 const EDITOR_NOTE = /^> \*\*Before publishing:\*\*[\s\S]*?(?=\n\n)/m;
 
-/** An unfilled `[PLACEHOLDER]`, which must never reach a published page. */
-const PLACEHOLDER = /\[[A-Z][A-Z ,/]*\]/g;
+/**
+ * Anything still in square brackets that is not a link.
+ *
+ * Deliberately wider than `[LEGAL ENTITY NAME]`: a note to whoever deploys the
+ * app reads as ordinary prose — "[If you have an EU/UK representative, name
+ * them here]" — and an all-caps rule sails straight past it onto the live
+ * page. The negative lookahead spares markdown links, which are the only
+ * brackets these documents legitimately contain.
+ */
+const PLACEHOLDER = /\[[^\]]+\](?!\()/g;
 
 /** Every unfilled placeholder in `markdown`, deduplicated and in order. */
 export function placeholders(markdown) {

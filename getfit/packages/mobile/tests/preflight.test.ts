@@ -21,21 +21,20 @@ const realDependencies = JSON.parse(readFileSync(path.join(root, 'package.json')
   .dependencies as Record<string, string>;
 
 /**
- * The real legal documents with their placeholders filled in.
+ * The legal documents as committed, which are filled in and ready to publish.
  *
- * The fixture is a configuration with nothing wrong with it, and the documents
- * as committed still need the repo owner's legal identity — so they are filled
- * here and individual cases unfill one again.
+ * Read rather than faked: a case that unfills one of them is only meaningful
+ * if the starting point is the real thing.
  */
-const filledDocuments = Object.fromEntries(
-  PAGES.map((page) => [
-    page.source,
-    readFileSync(path.join(root, '..', '..', page.source), 'utf8')
-      .replace(/\[LEGAL ENTITY NAME\]/g, 'Example Fitness Ltd')
-      .replace(/\[REGISTERED ADDRESS\]/g, '1 Example Street, London')
-      .replace(/\[SUPPORT EMAIL\]/g, 'support@example.com'),
-  ]),
+const realDocuments = Object.fromEntries(
+  PAGES.map((page) => [page.source, readFileSync(path.join(root, '..', '..', page.source), 'utf8')]),
 ) as Record<string, string>;
+
+/** The same documents with one detail taken back out. */
+const unfilled = (source: string, placeholder: string): Record<string, string> => ({
+  ...realDocuments,
+  [source]: `${realDocuments[source]}\n\nOperated by ${placeholder}.\n`,
+});
 
 /**
  * A configuration with nothing wrong with it.
@@ -66,7 +65,7 @@ function readyConfig() {
       },
     },
     dependencies: { ...realDependencies },
-    legalDocuments: { ...filledDocuments },
+    legalDocuments: { ...realDocuments },
     profile: 'production',
   };
 }
@@ -78,17 +77,17 @@ const run = (mutate: (config: ReturnType<typeof readyConfig>) => void = () => {}
 };
 
 describe('the published legal pages', () => {
-  test('a filled document is ready to publish', () => {
+  test('the documents as committed are ready to publish', () => {
     const { problems } = run();
-    assert.ok(!problems.some((p) => p.includes('to fill in')));
+    assert.ok(
+      !problems.some((p) => p.includes('to fill in')),
+      `something is still unfilled: ${problems.join(' | ')}`,
+    );
   });
 
   test('an unfilled placeholder blocks the build', () => {
     const { problems } = run((c) => {
-      c.legalDocuments['PRIVACY.md'] = c.legalDocuments['PRIVACY.md'].replace(
-        'Example Fitness Ltd',
-        '[LEGAL ENTITY NAME]',
-      );
+      c.legalDocuments = unfilled('PRIVACY.md', '[LEGAL ENTITY NAME]');
     });
     assert.ok(
       problems.some((p) => p.includes('PRIVACY.md') && p.includes('[LEGAL ENTITY NAME]')),
@@ -98,12 +97,17 @@ describe('the published legal pages', () => {
 
   test('every document is checked, not just the first', () => {
     const { problems } = run((c) => {
-      c.legalDocuments['SUPPORT.md'] = c.legalDocuments['SUPPORT.md'].replace(
-        'support@example.com',
-        '[SUPPORT EMAIL]',
-      );
+      c.legalDocuments = unfilled('SUPPORT.md', '[SUPPORT EMAIL]');
     });
     assert.ok(problems.some((p) => p.includes('SUPPORT.md')));
+  });
+
+  test('a note to whoever deploys the app blocks it too', () => {
+    // Not all caps, and it would otherwise be published verbatim.
+    const { problems } = run((c) => {
+      c.legalDocuments = unfilled('PRIVACY.md', '[name your DPO here]');
+    });
+    assert.ok(problems.some((p) => p.includes('[name your DPO here]')));
   });
 
   test('the note to whoever deploys the app is not mistaken for a gap', () => {
@@ -235,10 +239,8 @@ describe('checkRelease', () => {
   });
 
   test('the checked-in config is complete apart from what only a human can supply', () => {
-    // Everything left is a fact about the operator that nobody can invent: the
-    // legal identity the published pages name, and the App Store Connect
-    // identifiers. The URLs themselves are settled — they point at the pages
-    // this repo builds.
+    // One thing left, and it cannot be invented or guessed: the numeric id App
+    // Store Connect assigns, which does not exist until the app record does.
     const { problems } = checkRelease({
       app: structuredClone(realApp),
       eas: structuredClone(realEas),
@@ -250,7 +252,7 @@ describe('checkRelease', () => {
       ),
       profile: 'production',
     });
-    const expected = ['PRIVACY.md', 'SUPPORT.md', 'appleId', 'ascAppId', 'appleTeamId'];
+    const expected = ['ascAppId'];
     assert.equal(problems.length, expected.length, `unexpected: ${problems.join(' | ')}`);
     for (const field of expected) {
       assert.ok(problems.some((p) => p.includes(field)), `${field} was not reported`);
