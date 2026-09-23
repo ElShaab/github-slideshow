@@ -31,7 +31,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutComplete'>;
 export function WorkoutCompleteScreen({ route, navigation }: Props): React.ReactElement {
   const { colors, spacing, reduceMotion } = useTheme();
   const { units } = useUnits();
-  const summary = useAsync(() => workoutApi.detail(route.params.summaryId), [route.params.summaryId]);
+  const summary = useAsync(() => workoutApi.detail(route.params.summaryId), [route.params.summaryId], 'workoutApi.detail');
   const reveal = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
 
   useEffect(() => {

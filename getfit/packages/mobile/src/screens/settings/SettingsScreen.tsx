@@ -38,7 +38,7 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
   const { spacing, mode, setMode, reduceMotion, setReduceMotionOverride } = useTheme();
   const { units, setUnits } = useUnits();
   const { signOut } = useSession();
-  const settings = useAsync(() => settingsApi.load(), []);
+  const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [busy, setBusy] = useState(false);
 
   useFocusEffect(

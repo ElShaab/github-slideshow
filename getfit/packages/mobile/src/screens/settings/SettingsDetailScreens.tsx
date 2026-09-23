@@ -70,7 +70,7 @@ export function SettingsProfileScreen({
   const { spacing } = useTheme();
   const { units } = useUnits();
   const weightBounds = displayBounds(WEIGHT_BOUNDS_KG, units, 'mass');
-  const settings = useAsync(() => settingsApi.load(), []);
+  const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
@@ -164,7 +164,7 @@ export function SettingsTrainingScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'SettingsTraining'>): React.ReactElement {
   const { spacing } = useTheme();
-  const settings = useAsync(() => settingsApi.load(), []);
+  const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [level, setLevel] = useState<TrainingLevel | null>(null);
   const [location, setLocation] = useState<TrainingLocation | null>(null);
   const [days, setDays] = useState<TrainingDays | null>(null);
@@ -290,7 +290,7 @@ export function SettingsGoalsScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'SettingsGoals'>): React.ReactElement {
   const { spacing } = useTheme();
-  const settings = useAsync(() => settingsApi.load(), []);
+  const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [selected, setSelected] = useState<GoalType[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -374,7 +374,7 @@ export function SettingsEquipmentScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'SettingsEquipment'>): React.ReactElement {
   const { spacing } = useTheme();
-  const settings = useAsync(() => settingsApi.load(), []);
+  const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [selected, setSelected] = useState<EquipmentId[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -475,7 +475,7 @@ export function SettingsSubscriptionScreen({
 }: NativeStackScreenProps<RootStackParamList, 'SettingsSubscription'>): React.ReactElement {
   const { spacing } = useTheme();
   const { refresh } = useSession();
-  const entitlement = useAsync(() => subscriptionApi.entitlement(), []);
+  const entitlement = useAsync(() => subscriptionApi.entitlement(), [], 'subscriptionApi.entitlement');
   const [busy, setBusy] = useState(false);
 
   // Show what the store charges this customer, not a hardcoded dollar figure.

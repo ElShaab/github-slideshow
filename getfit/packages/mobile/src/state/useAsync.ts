@@ -24,7 +24,18 @@ export interface AsyncState<T> {
  * Loads data on mount and exposes a reload. Errors arrive already translated
  * into a message that is safe to show a user.
  */
-export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): AsyncState<T> {
+export function useAsync<T>(
+  loader: () => Promise<T>,
+  deps: unknown[] = [],
+  /**
+   * What is being loaded, for the log.
+   *
+   * A release bundle is minified, so a stack trace names bundle offsets and
+   * nothing else. This is the only thing that survives to say which of the
+   * app's twenty loaders failed, so it is worth the twenty call sites.
+   */
+  label = 'data',
+): AsyncState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,10 +70,13 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): Asy
         setError(caught.message);
         setOffline(caught.isOffline);
       } else {
-        setDetail(describeError(caught));
+        setDetail(`${label}: ${describeError(caught) ?? 'failed'}`);
         // The message stays generic — a raw failure is not something to show
         // a user — but the cause is logged so a release build leaves a trace.
-        console.error('GetFit load failed:', caught);
+        console.error(
+          `GetFit load failed (${label}):`,
+          caught instanceof Error ? (caught.stack ?? caught.message) : caught,
+        );
         setError('Something went wrong.');
         setOffline(false);
       }
@@ -72,7 +86,7 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): Asy
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [label]);
 
   useEffect(() => {
     void run(false);

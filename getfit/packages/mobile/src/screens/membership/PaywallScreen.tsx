@@ -60,7 +60,7 @@ async function finishQuietly(store: StoreProvider, purchase: StorePurchase): Pro
 export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): React.ReactElement {
   const { spacing } = useTheme();
   const { refresh } = useSession();
-  const plan = useAsync(() => subscriptionApi.plan(), []);
+  const plan = useAsync(() => subscriptionApi.plan(), [], 'subscriptionApi.plan');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A purchase awaiting approval is not a failure, so it is not shown as one.

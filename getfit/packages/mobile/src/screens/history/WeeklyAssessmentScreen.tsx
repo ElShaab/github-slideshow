@@ -39,8 +39,8 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
   const { spacing } = useTheme();
   const { profile } = useSession();
   const { units } = useUnits();
-  const availability = useAsync(() => assessmentApi.availability(), []);
-  const latest = useAsync(() => assessmentApi.latest(), []);
+  const availability = useAsync(() => assessmentApi.availability(), [], 'assessmentApi.availability');
+  const latest = useAsync(() => assessmentApi.latest(), [], 'assessmentApi.latest');
 
   const [draft, setDraft] = useState<MeasurementsDraft | null>(null);
   const [weight, setWeight] = useState('');

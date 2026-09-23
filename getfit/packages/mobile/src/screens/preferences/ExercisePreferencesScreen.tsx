@@ -44,7 +44,7 @@ export function ExercisePreferencesScreen({
   onCancel,
 }: ExercisePreferencesScreenProps): React.ReactElement {
   const { colors, spacing } = useTheme();
-  const choices = useAsync(() => exerciseApi.preferenceChoices(), []);
+  const choices = useAsync(() => exerciseApi.preferenceChoices(), [], 'exerciseApi.preferenceChoices');
   const [selection, setSelection] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -50,7 +50,7 @@ export function ProgressScreen(): React.ReactElement {
   const { units } = useUnits();
   const navigation = useNavigation<Navigation>();
   const [tab, setTab] = useState<Tab>('body');
-  const progress = useAsync(() => progressApi.overview(), []);
+  const progress = useAsync(() => progressApi.overview(), [], 'progressApi.overview');
 
   useFocusEffect(
     useCallback(() => {

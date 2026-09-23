@@ -34,7 +34,7 @@ export function HomeScreen(): React.ReactElement {
   const { colors, spacing } = useTheme();
   const { units } = useUnits();
   const navigation = useNavigation<Navigation>();
-  const home = useAsync(() => homeApi.load(), []);
+  const home = useAsync(() => homeApi.load(), [], 'homeApi.load');
 
   // Refresh whenever the tab regains focus so a finished workout shows at once.
   useFocusEffect(

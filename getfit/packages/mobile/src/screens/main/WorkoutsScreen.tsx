@@ -27,8 +27,8 @@ export function WorkoutsScreen(): React.ReactElement {
   const { colors, spacing } = useTheme();
   const navigation = useNavigation<Navigation>();
 
-  const schedule = useAsync(() => programApi.schedule(), []);
-  const today = useAsync(() => workoutApi.today(), []);
+  const schedule = useAsync(() => programApi.schedule(), [], 'programApi.schedule');
+  const today = useAsync(() => workoutApi.today(), [], 'workoutApi.today');
 
   useFocusEffect(
     useCallback(() => {

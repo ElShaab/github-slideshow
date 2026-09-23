@@ -12,7 +12,14 @@ import * as path from 'node:path';
  */
 
 const SOURCE = /\.tsx?$/;
-const IMPORT = /(?:^|\n)\s*import\s+(type\s+)?[^'"]*?from\s+['"]([^'"]+)['"]/g;
+/**
+ * Both ways a module can depend on another at runtime.
+ *
+ * `export … from` is a re-export and every bit as real an edge as an import —
+ * a barrel file is nothing but those. Missing them is how a checker reports a
+ * clean graph while the cycle it was written to find sits in an index.ts.
+ */
+const IMPORT = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?[^'"]*?from\s+['"]([^'"]+)['"]/g;
 
 export function sourceFiles(root) {
   const out = [];

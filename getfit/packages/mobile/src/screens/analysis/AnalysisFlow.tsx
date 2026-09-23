@@ -27,7 +27,7 @@ export function AnalysisFlow(): React.ReactElement {
   const [submission, setSubmission] = useState<Submission | null>(null);
 
   // If the app restarted after the analysis, pick the stored result back up.
-  const existing = useAsync(() => assessmentApi.latest(), []);
+  const existing = useAsync(() => assessmentApi.latest(), [], 'assessmentApi.latest');
 
   const handleComplete = useCallback((result: BodyAssessment) => {
     setAssessment(result);

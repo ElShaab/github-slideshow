@@ -31,7 +31,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GuidedWorkout'>;
 /** Loads the day, then hands off to the guided runner. */
 export function GuidedWorkoutScreen({ route, navigation }: Props): React.ReactElement {
   const { workoutDayId, scheduledWorkoutId } = route.params;
-  const day = useAsync(() => programApi.day(workoutDayId), [workoutDayId]);
+  const day = useAsync(() => programApi.day(workoutDayId), [workoutDayId], 'programApi.day');
 
   if (day.loading) return <LoadingScreen message="Loading your workout…" />;
   if (!day.data?.day) return <ErrorState message={day.error ?? undefined} onRetry={day.reload} />;

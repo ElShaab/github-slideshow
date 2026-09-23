@@ -31,8 +31,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'History'>;
  */
 export function HistoryScreen({ navigation }: Props): React.ReactElement {
   const { spacing } = useTheme();
-  const assessments = useAsync(() => assessmentApi.history(), []);
-  const workouts = useAsync(() => workoutApi.history(), []);
+  const assessments = useAsync(() => assessmentApi.history(), [], 'assessmentApi.history');
+  const workouts = useAsync(() => workoutApi.history(), [], 'workoutApi.history');
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (assessments.loading && !assessments.data) return <LoadingScreen message="Loading history…" />;
