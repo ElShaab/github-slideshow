@@ -271,19 +271,29 @@ describe('checkRelease', () => {
     assert.ok(problems.some((p) => p.includes('NSCameraUsageDescription')));
   });
 
-  test('the checked-in config is complete apart from what only a human can supply', () => {
-    // What is left is a contact channel, which is a decision about what to
-    // make public rather than a value anyone can look up.
+  test('the checked-in config is submittable', () => {
+    // Everything App Review checks that can be checked from here is settled:
+    // the legal pages name their operator and a contact, the links are public
+    // https URLs, and eas.json addresses the right app record. What is left is
+    // work on a device and in App Store Connect, which no file can attest to.
     const { problems } = checkRelease({
       app: structuredClone(realApp),
       eas: structuredClone(realEas),
       legalDocuments: Object.fromEntries(PAGES.map((page) => [page.source, readDocument(page.source)])),
       profile: 'production',
     });
-    const expected = ['PRIVACY.md', 'SUPPORT.md'];
-    assert.equal(problems.length, expected.length, `unexpected: ${problems.join(' | ')}`);
-    for (const field of expected) {
-      assert.ok(problems.some((p) => p.includes(field)), `${field} was not reported`);
+    assert.deepEqual(problems, [], `the build is not submittable: ${problems.join(' | ')}`);
+  });
+
+  test('a published page names somewhere to complain to', () => {
+    // A policy has to give its data controller's contact details, and a
+    // support page that answers nothing is a rejection on its own.
+    for (const page of PAGES) {
+      assert.match(
+        readDocument(page.source),
+        /[\w.+-]+@[\w-]+\.[\w.]+/,
+        `${page.source} gives the reader no way to make contact`,
+      );
     }
   });
 });

@@ -1,11 +1,13 @@
-# GetFit Support
+---
+layout: legal
+title: Support
+description: How to get help with GetFit, manage a membership, or delete your data.
+permalink: /support
+---
+
+<!-- Generated from the markdown in getfit/ by `npm run legal`. Do not edit. -->
 
 **Last updated: 22 September 2026**
-
-> **Before publishing:** replace every `[BRACKETED]` placeholder with your real
-> details, host this at a public HTTPS URL, and enter that URL in App Store
-> Connect as the app's Support URL. App Review opens it, so it has to answer a
-> real question rather than redirect to a marketing page.
 
 ## Contact us
 
