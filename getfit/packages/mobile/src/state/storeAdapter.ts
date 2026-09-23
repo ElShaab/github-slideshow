@@ -118,6 +118,8 @@ export class NativeStoreProvider implements StoreProvider {
 
   private module: IapModule | null = null;
   private connection: Promise<IapModule> | null = null;
+  /** False when StoreKit 2 could not be engaged and we are on StoreKit 1. */
+  private storeKit2 = false;
   private listeners: Array<{ remove(): void }> = [];
   private waiters = new Map<string, PurchaseWaiter>();
   /** Transactions the store delivered with nobody waiting — redelivered ones. */
@@ -164,16 +166,7 @@ export class NativeStoreProvider implements StoreProvider {
     if (!iap) throw new StoreUnavailable();
 
     this.connection = (async () => {
-      // StoreKit 2, explicitly. The library defaults to StoreKit 1, where
-      // `getAvailablePurchases` returns the whole receipt — expired
-      // subscriptions included — and the active-only filter is ignored. Since
-      // entitlement here is "the store says you own it", that default would
-      // leave a lapsed subscriber with the paid product forever. Expo SDK 52
-      // requires iOS 15.1, so StoreKit 2 is available on every device that can
-      // run this app.
-      if (this.os === 'ios' && typeof iap.setup === 'function') {
-        iap.setup({ storekitMode: 'STOREKIT2_MODE' });
-      }
+      this.storeKit2 = this.enableStoreKit2(iap);
 
       await iap.initConnection();
       // Clears purchases Play left pending from an interrupted flow; without
@@ -193,9 +186,66 @@ export class NativeStoreProvider implements StoreProvider {
     }
   }
 
+  /**
+   * Selects StoreKit 2, and reports whether it actually engaged.
+   *
+   * The library defaults to StoreKit 1, where `getAvailablePurchases` returns
+   * the whole receipt — expired subscriptions included — and the active-only
+   * filter is ignored. Entitlement here is "the store says you own it", so that
+   * default would leave a lapsed subscriber holding the paid product forever.
+   * Hence asking for StoreKit 2 explicitly.
+   *
+   * `setup` is synchronous and reaches straight into the native module: it asks
+   * the StoreKit 2 module whether it is available, over a blocking synchronous
+   * bridge call. Where such a call is not exposed — under a JS debugger, and
+   * under the bridgeless runtime this app enables with `newArchEnabled` — the
+   * method is simply absent, so the call does not answer "no", it throws
+   * `undefined is not a function`.
+   *
+   * Catching it is not enough. `storekit2Mode` points the library at the
+   * StoreKit 2 module on its first line and only then makes that call, so a
+   * throw leaves the library aimed at a module it never confirmed — and it
+   * re-checks availability inside `getSubscriptions`, `getAvailablePurchases`,
+   * `requestSubscription` and `finishTransaction`, each of which then throws
+   * the same error forever. Asking for StoreKit 1 afterwards re-aims it,
+   * because that function reassigns the module before it makes any call.
+   */
+  private enableStoreKit2(iap: IapModule): boolean {
+    if (this.os !== 'ios' || typeof iap.setup !== 'function') return false;
+
+    try {
+      iap.setup({ storekitMode: 'STOREKIT2_MODE' });
+      return true;
+    } catch (error) {
+      try {
+        iap.setup({ storekitMode: 'STOREKIT1_MODE' });
+      } catch {
+        // Nothing more to do: the reassignment it performs first is the part
+        // that matters, and it happens before anything that can fail.
+      }
+
+      // Logged on every build. This is a silent downgrade of how membership is
+      // decided, so it must not be invisible to whoever has to explain why a
+      // cancelled subscriber still has the app.
+      console.warn(
+        'GetFit: StoreKit 2 could not be engaged; falling back to StoreKit 1. ' +
+          'Expired subscriptions are filtered locally where the store states an expiry.',
+        error,
+      );
+      return false;
+    }
+  }
+
   private registerListeners(iap: IapModule): void {
     if (this.listeners.length > 0) return;
-    if (typeof iap.purchaseUpdatedListener !== 'function') return;
+    if (
+      typeof iap.purchaseUpdatedListener !== 'function' ||
+      typeof iap.purchaseErrorListener !== 'function'
+    ) {
+      // Checked together: registering one without the other would leave
+      // failures with nobody to report them, and a purchase waiting forever.
+      return;
+    }
 
     this.listeners.push(
       iap.purchaseUpdatedListener((purchase) => this.deliver(purchase)),
@@ -312,9 +362,11 @@ export class NativeStoreProvider implements StoreProvider {
     const iap = await this.connect();
     // Asked for explicitly rather than relying on the default, because this
     // single flag is the difference between a lapsed subscriber losing access
-    // and keeping it.
+    // and keeping it. StoreKit 1 ignores it, which is why the expiry the store
+    // states is checked again below rather than trusted to have been applied.
     const purchases = await iap.getAvailablePurchases({ onlyIncludeActiveItems: true });
     return [...purchases, ...this.unclaimed]
+      .filter((purchase) => !purchaseHasLapsed(purchase))
       .map((purchase) => readActivePurchase(purchase, this.os, this.platform))
       .filter((entry): entry is ActivePurchase => entry !== null);
   }
@@ -385,8 +437,12 @@ export class NativeStoreProvider implements StoreProvider {
       ...this.unclaimed,
     ];
 
-    // The most recent entitlement is the one worth reading back.
+    // The most recent entitlement is the one worth reading back. A purchase the
+    // store says has expired is not one: restoring it would report success and
+    // then unlock nothing, because entitlement is resolved from the same
+    // expiry a moment later.
     const purchase = [...purchases]
+      .filter((item) => !purchaseHasLapsed(item))
       .sort((a, b) => (b.transactionDate ?? 0) - (a.transactionDate ?? 0))
       .find((item) => Boolean(receiptOf(item, this.os)));
 
@@ -415,7 +471,10 @@ export class NativeStoreProvider implements StoreProvider {
         ...this.unclaimed,
       ];
       const owned = purchases.find(
-        (item) => item.productId === productId && Boolean(receiptOf(item, this.os)),
+        (item) =>
+          item.productId === productId &&
+          !purchaseHasLapsed(item) &&
+          Boolean(receiptOf(item, this.os)),
       );
       return owned ? this.toStorePurchase(owned, productId) : null;
     } catch {
@@ -439,6 +498,25 @@ export class NativeStoreProvider implements StoreProvider {
 interface PurchaseWaiter {
   resolve: (purchase: StorePurchase) => void;
   reject: (error: unknown) => void;
+}
+
+/**
+ * Whether the store itself says this subscription has already ended.
+ *
+ * Only ever answers from an expiry the store stated. A purchase with no expiry
+ * is not judged to have lapsed — under StoreKit 1 most carry none, and guessing
+ * one from the purchase date would revoke a paying customer's membership. The
+ * residual gap is deliberate and documented: on StoreKit 1 an expired
+ * subscription that states no expiry still reads as owned, which costs revenue
+ * rather than costing a paying customer their app.
+ */
+export function purchaseHasLapsed(purchase: IapPurchase, now = Date.now()): boolean {
+  const stated =
+    purchase.expirationDateIos ??
+    (purchase.expiryTimeMillis ? Number(purchase.expiryTimeMillis) : undefined);
+
+  if (stated === undefined || !Number.isFinite(stated)) return false;
+  return stated <= now;
 }
 
 /** iOS hands back the app receipt; Android hands back a purchase token. */
