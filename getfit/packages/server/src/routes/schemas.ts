@@ -138,7 +138,7 @@ const cm = (min: number, max: number) =>
 
 export const bodyMeasurementsSchema = z.object({
   waistCm: cm(40, 200),
-  neckCm: cm(20, 70),
+  neckCm: cm(35, 70),
   hipCm: cm(50, 200),
   shoulderCm: cm(60, 200),
   leftArmCm: cm(15, 70),

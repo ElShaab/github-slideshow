@@ -33,7 +33,7 @@ export type MeasurementKey =
  */
 export const MEASUREMENT_BOUNDS: Record<MeasurementKey, { min: number; max: number }> = {
   waistCm: { min: 40, max: 200 },
-  neckCm: { min: 20, max: 70 },
+  neckCm: { min: 35, max: 70 },
   hipCm: { min: 50, max: 200 },
   shoulderCm: { min: 60, max: 200 },
   leftArmCm: { min: 15, max: 70 },

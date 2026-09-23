@@ -97,9 +97,17 @@ describe('isMeasured', () => {
   });
 
   test('women need hips as well, because the formula does', () => {
-    const partial = { ...EMPTY_MEASUREMENTS, waistCm: '75', neckCm: '32' };
+    const partial = { ...EMPTY_MEASUREMENTS, waistCm: '75', neckCm: '36' };
     assert.equal(isMeasured(partial, 'female', 'metric'), false);
     assert.equal(isMeasured({ ...partial, hipCm: '95' }, 'female', 'metric'), true);
+  });
+
+  test('a neck below the adult floor does not count as measured', () => {
+    // 20 cm is a child's neck, and the formula is a log ratio of waist to neck
+    // — a neck that small does not give a wrong answer, it gives a nonsense one.
+    const draft = { ...EMPTY_MEASUREMENTS, waistCm: '85', neckCm: '20' };
+    assert.equal(isMeasured(draft, 'male', 'metric'), false);
+    assert.deepEqual(toMeasurements(draft, 'metric'), { waistCm: 85 });
   });
 
   test('an implausible reading does not count as measured', () => {
@@ -198,5 +206,24 @@ describe('the range a field accepts', () => {
       assert.deepEqual(toMeasurements(lowest, 'imperial'), {}, `${key} min`);
       assert.deepEqual(toMeasurements(highest, 'imperial'), {}, `${key} max`);
     }
+  });
+});
+
+describe('the neck floor', () => {
+  test('35 cm is the smallest neck accepted', () => {
+    const at = { ...EMPTY_MEASUREMENTS, neckCm: '35' };
+    const below = { ...EMPTY_MEASUREMENTS, neckCm: '34.9' };
+    assert.equal(toMeasurements(at, 'metric').neckCm, 35);
+    assert.equal(toMeasurements(below, 'metric').neckCm, undefined);
+  });
+
+  test('the field will not let you type below it either', () => {
+    assert.equal(boundsFor('neckCm', 'metric').min, 35);
+  });
+
+  test('the same floor applies in inches', () => {
+    // 13.5 in is 34.3 cm, under the floor; 14 in is 35.6 cm, over it.
+    assert.equal(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '13.5' }, 'imperial').neckCm, undefined);
+    assert.ok(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '14' }, 'imperial').neckCm);
   });
 });
