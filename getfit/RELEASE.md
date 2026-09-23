@@ -187,9 +187,36 @@ npx expo prebuild --platform ios      # regenerates ios/ from app.json
 open ios/GetFit.xcworkspace
 ```
 
-**Nothing to configure in Xcode.** `plugins/withStoreKitConfiguration.js` runs
-during prebuild and points the Run scheme at `GetFit.storekit` for you. Press
-Run and the paywall opens a real StoreKit sheet that completes.
+**Nothing to configure in Xcode.** Three things that would otherwise be hand
+edits are applied by prebuild:
+
+| What | Where it comes from |
+| --- | --- |
+| Run scheme points at `GetFit.storekit` | `plugins/withStoreKitConfiguration.js` |
+| App target deploys to iOS 15.1 | `expo-build-properties` in `app.json` |
+| **Every pod target** deploys to 15.1 | `plugins/withPodDeploymentTarget.js` |
+| Signing team is set | `ios.appleTeamId` in `app.json` |
+
+Press Run and the paywall opens a real StoreKit sheet that completes.
+
+### Why the pod deployment target needs its own plugin
+
+Xcode 16 warns and Xcode 27 refuses when a target deploys below its supported
+range. Several pods still declare iOS 13.4 in their podspec — RNCAsyncStorage
+among them — and a podspec's own floor is not overridden by `platform :ios` in
+the Podfile.
+
+`expo-build-properties` sets the Podfile's platform line and the **app**
+target. It does not touch pod targets, and in particular not **resource bundle
+targets**, which CocoaPods generates per pod and which inherit the podspec's
+floor. `RNCAsyncStorage_resources` is exactly that case.
+
+So the plugin injects a `post_install` hook that walks every target in every
+generated project and raises anything below the app's target. It only raises,
+so a pod needing something newer keeps it. It goes **inside** the Podfile's
+existing `post_install` block rather than adding a second one, because a
+Podfile keeps a single post-install callback and declaring it twice silently
+discards the first — React Native's own post-install work included.
 
 That is a plugin rather than a line in this file because **prebuild regenerates
 `ios/` wholesale** — a scheme edited by hand through *Product → Scheme → Edit

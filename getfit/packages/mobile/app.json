@@ -19,6 +19,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.getfit.app",
+      "appleTeamId": "9V8U88UQCU",
       "infoPlist": {
         "NSCameraUsageDescription": "GetFit uses your camera to take an optional progress photo, stored privately for your own before-and-after comparison.",
         "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo to keep as a private progress photo.",
@@ -125,7 +126,16 @@
           "paymentProvider": "Play Store"
         }
       ],
-      "./plugins/withStoreKitConfiguration"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "./plugins/withStoreKitConfiguration",
+      "./plugins/withPodDeploymentTarget"
     ],
     "extra": {
       "legal": {
