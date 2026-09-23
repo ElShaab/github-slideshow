@@ -48,6 +48,9 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): Asy
         setError(caught.message);
         setOffline(caught.isOffline);
       } else {
+        // The message stays generic — a raw failure is not something to show
+        // a user — but the cause is logged so a release build leaves a trace.
+        console.error('GetFit load failed:', caught);
         setError('Something went wrong.');
         setOffline(false);
       }

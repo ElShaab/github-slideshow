@@ -154,10 +154,19 @@ export const LoadingScreen = memo(function LoadingScreen({
  */
 export const ErrorState = memo(function ErrorState({
   message = 'Something went wrong.',
+  detail,
   onRetry,
   fullScreen = true,
 }: {
   message?: string;
+  /**
+   * What actually failed, for someone reporting it.
+   *
+   * Shown small and quietly beneath the message. It is not an explanation and
+   * is not meant to be one — it is the difference between a report that says
+   * "it broke" and one that can be acted on.
+   */
+  detail?: string | null;
   onRetry?: () => void;
   fullScreen?: boolean;
 }): React.ReactElement {
@@ -175,6 +184,17 @@ export const ErrorState = memo(function ErrorState({
           fullWidth={false}
           style={{ marginTop: spacing.xl, minWidth: 200 }}
         />
+      ) : null}
+      {detail ? (
+        <Text
+          variant="caption"
+          color="muted"
+          align="center"
+          selectable
+          style={{ marginTop: spacing.xl }}
+        >
+          {detail}
+        </Text>
       ) : null}
     </View>
   );
