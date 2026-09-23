@@ -13,6 +13,7 @@ import { ApiError, clearCache, clearToken, loadToken, onUnauthorized } from '../
 import { assessmentApi, authApi, onboardingApi } from '../api/endpoints';
 import { createStoreProvider } from './billing';
 import { resolveEntitlement } from './localEntitlement';
+import { recoverFromFailure, type FailureKind } from './sessionRecovery';
 
 /**
  * Ends the session on this device. The offline cache holds body-composition
@@ -153,24 +154,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       const next = await resolveStage();
       setState(next);
     } catch (error) {
-      if (error instanceof ApiError && error.isUnauthorized) {
-        await endLocalSession();
-        setState((current) => ({ ...current, stage: 'onboarding', userId: null, error: null }));
-      } else if (error instanceof ApiError && error.isOffline) {
-        // Offline at launch: stay where we are rather than throwing the user
-        // back to onboarding and losing their place.
-        setState((current) => ({
-          ...current,
-          stage: current.stage === 'loading' ? 'onboarding' : current.stage,
-          error: null,
-        }));
-      } else {
-        setState((current) => ({
-          ...current,
-          stage: current.stage === 'loading' ? 'onboarding' : current.stage,
-          error: 'Something went wrong.',
-        }));
-      }
+      // Logged on every build: this is a failure the user is about to be told
+      // about in the vaguest possible terms, so the cause has to go somewhere.
+      console.error('GetFit session failed to resolve:', error);
+
+      const unauthorized = error instanceof ApiError && error.isUnauthorized;
+      if (unauthorized) await endLocalSession();
+
+      const kind: FailureKind = unauthorized
+        ? 'unauthorized'
+        : error instanceof ApiError && error.isOffline
+          ? 'offline'
+          : 'unknown';
+
+      setState((current) => ({
+        ...current,
+        ...recoverFromFailure(current.stage, kind),
+        userId: unauthorized ? null : current.userId,
+      }));
     } finally {
       refreshing.current = false;
     }

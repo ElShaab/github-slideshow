@@ -2,7 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LoadingScreen } from '../components';
+import { ErrorState, LoadingScreen } from '../components';
 import { AnalysisFlow } from '../screens/analysis/AnalysisFlow';
 import { HistoryScreen } from '../screens/history/HistoryScreen';
 import { WeeklyAssessmentScreen } from '../screens/history/WeeklyAssessmentScreen';
@@ -37,6 +37,7 @@ import { ExerciseDetailScreen } from '../screens/workout/ExerciseDetailScreen';
 import { GuidedWorkoutScreen } from '../screens/workout/GuidedWorkoutScreen';
 import { WorkoutCompleteScreen } from '../screens/workout/WorkoutCompleteScreen';
 import { useSession } from '../state/SessionProvider';
+import { isBlocked } from '../state/sessionRecovery';
 import { useTheme } from '../theme';
 import { BottomNavigation } from './BottomNavigation';
 import type { MainTabParamList, OnboardingStackParamList, RootStackParamList } from './types';
@@ -112,6 +113,17 @@ export function RootNavigator(): React.ReactElement {
     () => <GeneratingProgramScreen onComplete={session.markProgramReady} />,
     [session.markProgramReady],
   );
+
+  // A session that could not be resolved used to set an error nothing read,
+  // leaving a spinner that never resolved. It gets a screen and a retry.
+  if (isBlocked(session.stage, session.error)) {
+    return (
+      <ErrorState
+        message={session.error ?? 'GetFit could not start.'}
+        onRetry={() => void session.refresh()}
+      />
+    );
+  }
 
   return (
     <NavigationContainer theme={navigationTheme}>
