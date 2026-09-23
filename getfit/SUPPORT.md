@@ -9,7 +9,7 @@
 
 ## Contact us
 
-**mohamed.huss0123@gmail.com**
+**[SUPPORT EMAIL]**
 
 We answer within two business days. Tell us your device, your iOS version and
 what you were doing when it went wrong, and we will get there faster.
@@ -101,4 +101,6 @@ breath.
 
 ---
 
-**Mohamed Hussein**, operator of GetFit — mohamed.huss0123@gmail.com
+**Mohamed Hussein**, 20 Mahmoud El Deeb, Glim, Alexandria, Egypt
+
+[SUPPORT EMAIL]

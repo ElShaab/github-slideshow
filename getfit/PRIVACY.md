@@ -9,9 +9,9 @@
 > rely on it — particularly for GDPR, UK GDPR and CCPA obligations, which depend
 > on where you and your users are.
 
-GetFit is operated by **Mohamed Hussein** ("we", "us"), who can be reached at
-**mohamed.huss0123@gmail.com**. This policy explains what we collect, why, and
-what control you have over it.
+GetFit is operated by **Mohamed Hussein**, **20 Mahmoud El Deeb, Glim, Alexandria, Egypt**
+("we", "us"). This policy explains what we collect, why, and what control you
+have over it.
 
 ---
 
@@ -163,6 +163,6 @@ in the app before the change takes effect.
 
 ## Contact
 
-**mohamed.huss0123@gmail.com**
+**[SUPPORT EMAIL]**
 
-Mohamed Hussein, operator of GetFit.
+Mohamed Hussein, 20 Mahmoud El Deeb, Glim, Alexandria, Egypt.
