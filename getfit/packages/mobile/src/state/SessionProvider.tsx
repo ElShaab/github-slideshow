@@ -14,6 +14,9 @@ import { assessmentApi, authApi, onboardingApi } from '../api/endpoints';
 import { createStoreProvider } from './billing';
 import { resolveEntitlement } from './localEntitlement';
 import { recoverFromFailure, type FailureKind } from './sessionRecovery';
+import type { SessionStage } from './sessionStage';
+
+export type { SessionStage };
 
 /**
  * Ends the session on this device. The offline cache holds body-composition
@@ -26,17 +29,6 @@ async function endLocalSession(): Promise<void> {
   await clearCache();
 }
 
-/** Where in the product journey the user currently is. */
-export type SessionStage =
-  | 'loading'
-  | 'onboarding'
-  | 'analysis'
-  | 'paywall'
-  | 'account'
-  | 'preferences'
-  | 'program'
-  | 'ready'
-  | 'expired';
 
 export interface SessionState {
   stage: SessionStage;

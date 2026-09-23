@@ -109,7 +109,11 @@ export function ExercisePreferencesScreen({
   }, [fromSettings, onDone, selection]);
 
   if (choices.loading) return <LoadingScreen message="Loading exercises…" />;
-  if (!choices.data) return <ErrorState message={choices.error ?? undefined} onRetry={choices.reload} />;
+  if (!choices.data) return <ErrorState
+        message={choices.error ?? undefined}
+        detail={choices.detail}
+        onRetry={choices.reload}
+      />;
 
   return (
     <Screen

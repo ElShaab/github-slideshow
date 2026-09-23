@@ -85,7 +85,11 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
   }, [signOut]);
 
   if (settings.loading && !settings.data) return <LoadingScreen message="Loading settings…" />;
-  if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
+  if (!settings.data) return <ErrorState
+        message={settings.error ?? undefined}
+        detail={settings.detail}
+        onRetry={settings.reload}
+      />;
 
   const { profile, goals, equipment, preferences, entitlement } = settings.data;
   const plan = planForProduct(entitlement.productId);

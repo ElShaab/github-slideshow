@@ -12,7 +12,8 @@
     "test": "tsx --test tests/**/*.test.ts",
     "preflight": "node scripts/preflight.mjs",
     "legal": "node scripts/build-legal.mjs",
-    "listing": "node scripts/check-listing.mjs"
+    "listing": "node scripts/check-listing.mjs",
+    "cycles": "node scripts/check-cycles.mjs"
   },
   "dependencies": {
     "@getfit/shared": "*",

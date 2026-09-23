@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { isBlocked, recoverFromFailure } from '../src/state/sessionRecovery';
-import type { SessionStage } from '../src/state/SessionProvider';
+import type { SessionStage } from '../src/state/sessionStage';
 
 const STAGES: SessionStage[] = [
   'loading',

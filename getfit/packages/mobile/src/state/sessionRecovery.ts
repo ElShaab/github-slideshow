@@ -1,4 +1,4 @@
-import type { SessionStage } from './SessionProvider';
+import type { SessionStage } from './sessionStage';
 
 /** The parts of the session a failure is allowed to change. */
 export interface RecoveryPatch {

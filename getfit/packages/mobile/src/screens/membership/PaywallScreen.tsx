@@ -216,7 +216,11 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
   }, [logPurchase, refresh, store]);
 
   if (plan.loading) return <LoadingScreen message="Loading membership…" />;
-  if (!plan.data) return <ErrorState message={plan.error ?? undefined} onRetry={plan.reload} />;
+  if (!plan.data) return <ErrorState
+        message={plan.error ?? undefined}
+        detail={plan.detail}
+        onRetry={plan.reload}
+      />;
 
   const isRenewal = variant === 'renewal';
 

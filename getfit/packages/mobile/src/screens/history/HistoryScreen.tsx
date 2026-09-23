@@ -37,7 +37,11 @@ export function HistoryScreen({ navigation }: Props): React.ReactElement {
 
   if (assessments.loading && !assessments.data) return <LoadingScreen message="Loading history…" />;
   if (!assessments.data) {
-    return <ErrorState message={assessments.error ?? undefined} onRetry={assessments.reload} />;
+    return <ErrorState
+        message={assessments.error ?? undefined}
+        detail={assessments.detail}
+        onRetry={assessments.reload}
+      />;
   }
 
   const list = assessments.data.assessments;

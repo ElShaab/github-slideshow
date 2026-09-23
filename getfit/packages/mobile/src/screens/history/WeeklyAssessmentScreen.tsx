@@ -73,7 +73,11 @@ export function WeeklyAssessmentScreen({ navigation }: Props): React.ReactElemen
 
   if (availability.loading) return <LoadingScreen message="Checking your assessment…" />;
   if (!availability.data) {
-    return <ErrorState message={availability.error ?? undefined} onRetry={availability.reload} />;
+    return <ErrorState
+        message={availability.error ?? undefined}
+        detail={availability.detail}
+        onRetry={availability.reload}
+      />;
   }
 
   if (result) {

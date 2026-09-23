@@ -106,7 +106,11 @@ export function SettingsProfileScreen({
   }, [age, height, navigation, sex, units, weight]);
 
   if (settings.loading && !settings.data) return <LoadingScreen />;
-  if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
+  if (!settings.data) return <ErrorState
+        message={settings.error ?? undefined}
+        detail={settings.detail}
+        onRetry={settings.reload}
+      />;
 
   return (
     <Screen
@@ -195,7 +199,11 @@ export function SettingsTrainingScreen({
   }, [days, duration, level, location, navigation]);
 
   if (settings.loading && !settings.data) return <LoadingScreen />;
-  if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
+  if (!settings.data) return <ErrorState
+        message={settings.error ?? undefined}
+        detail={settings.detail}
+        onRetry={settings.reload}
+      />;
 
   return (
     <Screen
@@ -311,7 +319,11 @@ export function SettingsGoalsScreen({
   }, [navigation, selected]);
 
   if (settings.loading && !settings.data) return <LoadingScreen />;
-  if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
+  if (!settings.data) return <ErrorState
+        message={settings.error ?? undefined}
+        detail={settings.detail}
+        onRetry={settings.reload}
+      />;
 
   return (
     <Screen
@@ -391,7 +403,11 @@ export function SettingsEquipmentScreen({
   }, [navigation, selected]);
 
   if (settings.loading && !settings.data) return <LoadingScreen />;
-  if (!settings.data) return <ErrorState message={settings.error ?? undefined} onRetry={settings.reload} />;
+  if (!settings.data) return <ErrorState
+        message={settings.error ?? undefined}
+        detail={settings.detail}
+        onRetry={settings.reload}
+      />;
 
   const isGym = settings.data.profile?.trainingLocation === 'gym';
 
@@ -515,7 +531,11 @@ export function SettingsSubscriptionScreen({
 
   if (entitlement.loading && !entitlement.data) return <LoadingScreen />;
   if (!entitlement.data) {
-    return <ErrorState message={entitlement.error ?? undefined} onRetry={entitlement.reload} />;
+    return <ErrorState
+        message={entitlement.error ?? undefined}
+        detail={entitlement.detail}
+        onRetry={entitlement.reload}
+      />;
   }
 
   const data = entitlement.data;
