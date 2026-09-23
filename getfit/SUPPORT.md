@@ -101,6 +101,6 @@ breath.
 
 ---
 
-**Mohamed Hussein**, 20 Mahmoud El Deeb, Glim, Alexandria, Egypt
+**Mohamed Hussein**, [REGISTERED ADDRESS]
 
 [SUPPORT EMAIL]

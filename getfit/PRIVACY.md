@@ -9,7 +9,7 @@
 > rely on it — particularly for GDPR, UK GDPR and CCPA obligations, which depend
 > on where you and your users are.
 
-GetFit is operated by **Mohamed Hussein**, **20 Mahmoud El Deeb, Glim, Alexandria, Egypt**
+GetFit is operated by **Mohamed Hussein**, **[REGISTERED ADDRESS]**
 ("we", "us"). This policy explains what we collect, why, and what control you
 have over it.
 
@@ -165,4 +165,4 @@ in the app before the change takes effect.
 
 **[SUPPORT EMAIL]**
 
-Mohamed Hussein, 20 Mahmoud El Deeb, Glim, Alexandria, Egypt.
+Mohamed Hussein, [REGISTERED ADDRESS].
