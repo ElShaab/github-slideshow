@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
+  ACCOUNT_REMINDER_HOURS,
   CODE_LENGTH,
   MIN_PASSWORD_LENGTH,
   cleanCode,
@@ -17,6 +18,7 @@ import {
   nextStep,
   passwordProblem,
   resumeStep,
+  shouldAskForAccount,
 } from '../src/state/accountSetup';
 
 describe('accepting an email address', () => {
@@ -137,5 +139,74 @@ describe('coming back to a half-finished account', () => {
 
   test('a finished account is not asked again', () => {
     assert.equal(resumeStep({ signedIn: true, passwordSet: true }), 'done');
+  });
+});
+
+describe('when to ask for an account', () => {
+  const NOW = new Date('2026-09-24T12:00:00.000Z');
+  const hoursAgo = (n: number) => new Date(NOW.getTime() - n * 3_600_000).toISOString();
+
+  test('a customer who has just paid is asked', () => {
+    assert.equal(
+      shouldAskForAccount({ signedIn: false, passwordSet: false, deferredAt: null }, NOW),
+      true,
+    );
+  });
+
+  test('postponing buys real peace, not a single screen', () => {
+    // The whole point is a customer with no signal who cannot complete this.
+    // Asking again on the next launch would put them straight back.
+    assert.equal(
+      shouldAskForAccount({ signedIn: false, passwordSet: false, deferredAt: hoursAgo(1) }, NOW),
+      false,
+    );
+  });
+
+  test('but it wears off, so an account nobody made is not forgotten', () => {
+    assert.equal(
+      shouldAskForAccount(
+        { signedIn: false, passwordSet: false, deferredAt: hoursAgo(ACCOUNT_REMINDER_HOURS + 1) },
+        NOW,
+      ),
+      true,
+    );
+  });
+
+  test('a finished account is never asked again', () => {
+    assert.equal(
+      shouldAskForAccount({ signedIn: true, passwordSet: true, deferredAt: null }, NOW),
+      false,
+    );
+    assert.equal(
+      shouldAskForAccount({ signedIn: true, passwordSet: true, deferredAt: hoursAgo(100) }, NOW),
+      false,
+    );
+  });
+
+  test('a half-finished one is asked every time, even right after postponing', () => {
+    // Verifying the code signs them in, so this account looks done while being
+    // unable to sign in on any other phone. Leaving it is worse than never
+    // having started, so the cooldown does not apply.
+    assert.equal(
+      shouldAskForAccount({ signedIn: true, passwordSet: false, deferredAt: hoursAgo(0) }, NOW),
+      true,
+    );
+  });
+
+  test('an unreadable timestamp asks rather than going silent forever', () => {
+    assert.equal(
+      shouldAskForAccount({ signedIn: false, passwordSet: false, deferredAt: 'not a date' }, NOW),
+      true,
+    );
+  });
+
+  test('a clock that jumped backwards does not silence it permanently', () => {
+    // A deferral stamped in the future never elapses, so without this the app
+    // would stop asking for good — and the customer would only find out when
+    // they lost the phone.
+    assert.equal(
+      shouldAskForAccount({ signedIn: false, passwordSet: false, deferredAt: hoursAgo(-50) }, NOW),
+      true,
+    );
   });
 });

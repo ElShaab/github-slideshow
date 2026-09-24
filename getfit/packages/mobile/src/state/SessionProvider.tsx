@@ -14,6 +14,7 @@ import { assessmentApi, authApi, onboardingApi } from '../api/endpoints';
 import { createStoreProvider } from './billing';
 import { resolveEntitlement } from './localEntitlement';
 import { recoverFromFailure, type FailureKind } from './sessionRecovery';
+import { shouldAskForAccount } from './accountSetup';
 import { startCloudSync, stopCloudSync, syncNow } from '../supabase/cloud';
 import type { SessionStage } from './sessionStage';
 
@@ -126,11 +127,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       // first-time user sees the paywall.
       return { ...base, stage: entitlement.status === 'none' ? 'paywall' : 'expired' };
     }
-    // Required, and deliberately after payment: the membership is bought, and
-    // the account is what ties it to a person rather than to one handset. An
-    // account that has a session but no password yet is not finished, so it
-    // lands here too and resumes at the password step.
-    if (me.isGuest) return { ...base, stage: 'account' };
+    // Asked for after payment, and postponable. The membership itself never
+    // depends on it: entitlement comes from the store and is cached here, so a
+    // customer with no signal keeps the app they just paid for and is asked
+    // again when they have bars. A session with no password yet is the one case
+    // that is asked about every time — it looks signed in while being unable to
+    // sign in anywhere else.
+    if (
+      shouldAskForAccount({
+        signedIn: !me.isGuest,
+        passwordSet: me.passwordSet,
+        deferredAt: status.accountDeferredAt,
+      })
+    ) {
+      return { ...base, stage: 'account' };
+    }
     if (!status.hasPreferences) return { ...base, stage: 'preferences' };
     return { ...base, stage: 'ready' };
   }, []);

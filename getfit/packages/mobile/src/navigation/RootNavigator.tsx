@@ -168,6 +168,7 @@ export function RootNavigator(): React.ReactElement {
             <RootStack.Screen name="History" component={HistoryScreen} />
             <RootStack.Screen name="WeeklyAssessment" component={WeeklyAssessmentScreen} />
             <RootStack.Screen name="Settings" component={SettingsScreen} />
+            <RootStack.Screen name="CreateAccount" component={CreateAccountScreen} />
             <RootStack.Screen name="SettingsProfile" component={SettingsProfileScreen} />
             <RootStack.Screen name="SettingsTraining" component={SettingsTrainingScreen} />
             <RootStack.Screen name="SettingsGoals" component={SettingsGoalsScreen} />

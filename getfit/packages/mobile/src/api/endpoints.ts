@@ -78,6 +78,11 @@ export const authApi = {
     await verifyEmailCode(email, code);
   },
 
+  /** Records that the user postponed creating an account. */
+  async deferAccount(): Promise<void> {
+    await localApi.deferAccount();
+  },
+
   /** Emails a code for a forgotten password. Never creates an account. */
   async sendPasswordResetCode(email: string): Promise<void> {
     await sendPasswordResetCode(email);
@@ -118,12 +123,25 @@ export const authApi = {
     return { accessToken: userId, userId, isGuest: false } as AuthTokens;
   },
 
-  async me(): Promise<{ userId: string; email: string | null; isGuest: boolean }> {
+  async me(): Promise<{
+    userId: string;
+    email: string | null;
+    isGuest: boolean;
+    /** False while an account exists but setup never reached the password. */
+    passwordSet: boolean;
+  }> {
     const local = await localApi.me();
-    if (!accountsAvailable()) return local;
+    // A build with no Supabase project has no accounts to finish, so it must
+    // never read as one left half-done.
+    if (!accountsAvailable()) return { ...local, passwordSet: true };
 
     const account = await currentAccount();
-    return { userId: local.userId, email: account?.email ?? null, isGuest: account === null };
+    return {
+      userId: local.userId,
+      email: account?.email ?? null,
+      isGuest: account === null,
+      passwordSet: account?.passwordSet ?? false,
+    };
   },
 
   /** Signs out and takes the account's data off this device with it. */
@@ -183,6 +201,8 @@ export const onboardingApi = {
     goals: UserGoal[];
     equipment: EquipmentId[];
     hasPreferences: boolean;
+    /** When the user last postponed creating an account, if ever. */
+    accountDeferredAt: string | null;
   }> {
     return localApi.onboardingStatus();
   },

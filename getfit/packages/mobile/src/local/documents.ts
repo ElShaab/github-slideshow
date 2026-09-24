@@ -38,6 +38,14 @@ export interface ProfileDocument {
   preferences: ExercisePreference[];
   /** True when the user chose them rather than accepting the generated set. */
   preferencesChosen: boolean;
+  /**
+   * When the user last postponed creating their account.
+   *
+   * A timestamp rather than a flag: postponing is "not now", not "never". The
+   * membership does not depend on it — entitlement comes from the store — so
+   * the app asks again later rather than blocking someone with no signal.
+   */
+  accountDeferredAt?: string;
   settings: AppSettings;
 }
 

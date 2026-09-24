@@ -70,6 +70,15 @@ export const localApi = {
     return { userId: doc.userId, email: null, isGuest: false };
   },
 
+  /** Records that the user postponed creating an account. */
+  async deferAccount() {
+    await repo.updateProfileDoc((doc) => ({
+      ...doc,
+      accountDeferredAt: new Date().toISOString(),
+    }));
+    return { deferred: true };
+  },
+
   async deleteAccount() {
     await repo.deleteEverything();
     return { deleted: true, photosRemoved: 0 };
@@ -146,6 +155,7 @@ export const localApi = {
       goals: doc.goals,
       equipment: doc.equipment,
       hasPreferences: doc.preferences.length > 0,
+      accountDeferredAt: doc.accountDeferredAt ?? null,
     };
   },
 

@@ -37,7 +37,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 export function SettingsScreen({ navigation }: Props): React.ReactElement {
   const { spacing, reduceMotion, setReduceMotionOverride } = useTheme();
   const { units, setUnits } = useUnits();
-  const { signOut } = useSession();
+  const { signOut, isGuest } = useSession();
   const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [busy, setBusy] = useState(false);
 
@@ -215,6 +215,19 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
           last
         />
       </SettingsGroup>
+
+      {isGuest ? (
+        <SettingsGroup title="Account">
+          {/* The way in for anyone who postponed it after paying. Without this,
+              "later" would depend on the app happening to ask again. */}
+          <SettingsRow
+            label="Create your account"
+            description="Keeps your program and history if you lose this phone."
+            onPress={() => navigation.navigate('CreateAccount')}
+            last
+          />
+        </SettingsGroup>
+      ) : null}
 
       <SettingsGroup title="App">
         <SettingsRow

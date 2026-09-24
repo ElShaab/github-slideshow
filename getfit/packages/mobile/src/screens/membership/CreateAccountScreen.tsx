@@ -20,10 +20,12 @@ import { useTheme } from '../../theme';
 /**
  * Setting up the account, after payment.
  *
- * Three steps: the address, the code that proves it, then a password. There is
- * no way past this screen — the membership is bought, and an account is what
- * ties it to a person rather than to one phone, so skipping it would leave a
- * paying customer whose training dies with the handset.
+ * Three steps: the address, the code that proves it, then a password. It can be
+ * postponed, and deliberately so: every step needs the network, and a customer
+ * who has just paid and has no signal must not be held on a screen they cannot
+ * complete. The membership does not depend on this — entitlement comes from the
+ * store and is cached on the device — so the app opens either way and asks
+ * again tomorrow.
  *
  * Each step only advances on a confirmed result, never on a tap, so the code
  * screen is never shown for an email that failed to send. Someone who closes
@@ -97,6 +99,17 @@ export function CreateAccountScreen(): React.ReactElement {
       setBusy(false);
     }
   }, [code, show, state.email]);
+
+  const later = useCallback(async () => {
+    setBusy(true);
+    try {
+      await authApi.deferAccount();
+      await refresh();
+    } catch (caught) {
+      show(caught);
+      setBusy(false);
+    }
+  }, [refresh, show]);
 
   const choosePassword = useCallback(async () => {
     const problem = passwordProblem(password);
@@ -217,6 +230,17 @@ export function CreateAccountScreen(): React.ReactElement {
               fullWidth
             />
           ) : null}
+
+          {/* Always offered. The one step where postponing costs something is
+              the password — that account is signed in but cannot sign in
+              anywhere else — and the app asks about that one on every launch
+              rather than waiting a day. */}
+          <GlassButton
+            label="I'll do this later"
+            onPress={() => void later()}
+            disabled={busy}
+            fullWidth
+          />
         </View>
       }
     >

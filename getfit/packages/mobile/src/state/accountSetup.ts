@@ -111,3 +111,54 @@ export function resumeStep(account: {
   if (!account?.signedIn) return 'email';
   return account.passwordSet ? 'done' : 'password';
 }
+
+/**
+ * How long a "later" lasts before the app asks again.
+ *
+ * Long enough that deferring actually buys a day's peace, short enough that an
+ * account nobody finishes does not quietly become an account nobody has. The
+ * membership is already safe without it — entitlement comes from the store and
+ * is cached on the device — so this is a reminder, never a gate.
+ */
+export const ACCOUNT_REMINDER_HOURS = 20;
+
+export interface AccountPrompt {
+  /** Whether a Supabase session exists on this device. */
+  signedIn: boolean;
+  /** Whether that session belongs to a finished account. */
+  passwordSet: boolean;
+  /** When the user last said "later", if they ever did. */
+  deferredAt: string | null;
+}
+
+/**
+ * Whether to put the account screen in front of the user now.
+ *
+ * Deferring is allowed because the alternative is worse: a customer who has
+ * just paid, has no signal, and cannot get past a screen that needs the network
+ * to complete. The store already told us they paid and the answer is cached, so
+ * the app works regardless — the account buys them a copy that survives the
+ * phone, and that can wait until they have bars.
+ *
+ * A half-finished account is the exception. Verifying the emailed code signs
+ * them in, so someone who stopped before choosing a password looks signed in
+ * while being unable to sign in anywhere else. That is asked about every time,
+ * because leaving it is worse than not starting.
+ */
+export function shouldAskForAccount(prompt: AccountPrompt, now = new Date()): boolean {
+  if (prompt.signedIn) return !prompt.passwordSet;
+  if (!prompt.deferredAt) return true;
+
+  const deferred = Date.parse(prompt.deferredAt);
+  // An unreadable stamp is treated as never deferred: asking once too often is
+  // a smaller failure than never asking again.
+  if (!Number.isFinite(deferred)) return true;
+
+  const elapsed = now.getTime() - deferred;
+  // A stamp in the future — a clock that was wrong when it was written, or has
+  // since been moved back — would otherwise never elapse, and the app would
+  // stop asking for good. Treat it as due.
+  if (elapsed < 0) return true;
+
+  return elapsed >= ACCOUNT_REMINDER_HOURS * 3_600_000;
+}
