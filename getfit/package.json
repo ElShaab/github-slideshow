@@ -22,9 +22,9 @@
     "verify": "npm run lint && npm run typecheck && npm test",
     "test": "npm run build:shared && npm run test --workspace @getfit/shared && npm run test --workspace @getfit/server && npm run test --workspace @getfit/mobile",
     "typecheck": "npm run typecheck --workspace @getfit/shared && npm run typecheck --workspace @getfit/server && npm run typecheck --workspace @getfit/mobile",
-    "mobile": "npm run start --workspace @getfit/mobile",
-    "mobile:ios": "npm run ios --workspace @getfit/mobile",
-    "mobile:android": "npm run android --workspace @getfit/mobile"
+    "mobile": "npm run build:shared && npm run start --workspace @getfit/mobile",
+    "mobile:ios": "npm run build:shared && npm run ios --workspace @getfit/mobile",
+    "mobile:android": "npm run build:shared && npm run android --workspace @getfit/mobile"
   },
   "engines": {
     "node": ">=20"
