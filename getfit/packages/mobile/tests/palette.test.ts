@@ -8,28 +8,28 @@
  * caption on top of it can be read on a phone in daylight.
  *
  * So these tests composite the real stack of layers and assert WCAG ratios on
- * the result, at the worst case — the brightest stop of the field in Deep, the
- * palest in Daylight. Body text must clear 4.5:1 and large text 3:1, per WCAG
- * 2.1 AA.
+ * the result, at the worst case — the brightest stop of the field, where light
+ * text has least to work with. Body text must clear 4.5:1 and large text 3:1,
+ * per WCAG 2.1 AA.
+ *
+ * There is one palette. A light one existed and was never designed past the
+ * token values, so turning the phone to light gave a washed-out screen; it has
+ * been removed rather than half-kept.
  */
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { contrastRatio, compositeStack } from '../src/theme/contrast';
-import { darkColors, lightColors, type ThemeColors } from '../src/theme/palette';
+import { darkColors, type ThemeColors } from '../src/theme/palette';
 
 const BODY_TEXT = 4.5;
 const LARGE_TEXT = 3;
 
 /**
- * The hardest background in a theme to read against: the stop of the field
- * closest in luminance to the text sitting on it.
+ * The hardest background to read against: the brightest stop of the field,
+ * since every label in the app is light.
  */
 function worstStop(colors: ThemeColors): string {
-  return colors.statusBar === 'light'
-    ? // Light text: the brightest stop is the hardest.
-      colors.backgroundGradient[0]
-    : // Dark text: the palest stop is the hardest.
-      colors.backgroundGradient[2];
+  return colors.backgroundGradient[0];
 }
 
 /** Every surface a user reads text on, at its worst point on the field. */
@@ -48,10 +48,7 @@ function surfaces(colors: ThemeColors): Array<[string, string]> {
   ];
 }
 
-for (const [themeName, colors] of [
-  ['Deep', darkColors],
-  ['Daylight', lightColors],
-] as const) {
+for (const [themeName, colors] of [['Deep', darkColors]] as const) {
   describe(`${themeName} theme`, () => {
     test('body text is readable on every surface', () => {
       for (const [where, background] of surfaces(colors)) {
@@ -138,7 +135,7 @@ for (const [themeName, colors] of [
 }
 
 describe('the field', () => {
-  test('runs light to dark in Deep and stays inside the blue family', () => {
+  test('runs light to dark and stays inside the blue family', () => {
     // A gradient that brightens downward fights the bloom and flattens the
     // page, and a stop that wanders off-hue stops reading as one surface.
     const [top, mid, bottom] = darkColors.backgroundGradient;

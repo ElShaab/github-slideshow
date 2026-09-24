@@ -33,7 +33,7 @@ export const GlassCard = memo(function GlassCard({
   padded = true,
   intensity,
 }: GlassCardProps): React.ReactElement {
-  const { colors, radius, spacing, isDark } = useTheme();
+  const { colors, radius, spacing } = useTheme();
 
   const fill = emphasis === 'strong' ? colors.glassStrong : colors.glass;
 
@@ -44,8 +44,8 @@ export const GlassCard = memo(function GlassCard({
         {
           borderRadius: radius.xl,
           borderColor: accented ? colors.glassEdge : colors.glassBorder,
-          shadowColor: accented ? colors.accent : isDark ? '#01122B' : '#0A3B85',
-          shadowOpacity: accented ? (isDark ? 0.55 : 0.28) : isDark ? 0.4 : 0.12,
+          shadowColor: accented ? colors.accent : '#01122B',
+          shadowOpacity: accented ? 0.55 : 0.4,
           shadowRadius: accented ? 26 : 18,
           elevation: accented ? 10 : 4,
         },

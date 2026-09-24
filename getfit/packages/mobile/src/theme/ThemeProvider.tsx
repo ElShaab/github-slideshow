@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, useColorScheme } from 'react-native';
+import { AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ThemeMode } from '@getfit/shared';
-import { darkColors, lightColors, type ThemeColors } from './palette';
+import { darkColors, type ThemeColors } from './palette';
 import { durations, fontFamily, radius, spacing, typeScale } from './tokens';
 
 export interface Theme {
@@ -12,26 +11,33 @@ export interface Theme {
   typeScale: typeof typeScale;
   fontFamily: typeof fontFamily;
   durations: typeof durations;
-  isDark: boolean;
   /** True when the OS asks for reduced motion, or the user turned it on. */
   reduceMotion: boolean;
 }
 
 interface ThemeContextValue extends Theme {
-  mode: ThemeMode;
-  setMode: (mode: ThemeMode) => void;
   setReduceMotionOverride: (value: boolean) => void;
 }
 
-const THEME_STORAGE_KEY = 'getfit.themeMode';
 const MOTION_STORAGE_KEY = 'getfit.reduceMotion';
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+/**
+ * GetFit is a dark app.
+ *
+ * It used to offer a light palette and a "match system theme" switch. Turning
+ * the phone to light gave a washed-out screen that nobody had designed: the
+ * cards lost their contrast, and the hologram — which is drawn as light on a
+ * dark stage — read as a blue smear on white. Shipping a second appearance
+ * means designing and testing every screen twice, and the second one was never
+ * finished. So there is one appearance, and it is the one the product was
+ * drawn in.
+ *
+ * Reduce motion stays adjustable. That is an accessibility setting, not a
+ * matter of taste.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }): React.ReactElement {
-  const systemScheme = useColorScheme();
-  // Dark is the product default, so an unset preference resolves to dark.
-  const [mode, setModeState] = useState<ThemeMode>('dark');
   const [systemReduceMotion, setSystemReduceMotion] = useState(false);
   const [reduceMotionOverride, setReduceMotionOverrideState] = useState(false);
 
@@ -40,14 +46,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
 
     void (async () => {
       try {
-        const [storedTheme, storedMotion] = await Promise.all([
-          AsyncStorage.getItem(THEME_STORAGE_KEY),
-          AsyncStorage.getItem(MOTION_STORAGE_KEY),
-        ]);
+        const storedMotion = await AsyncStorage.getItem(MOTION_STORAGE_KEY);
         if (cancelled) return;
-        if (storedTheme === 'dark' || storedTheme === 'light' || storedTheme === 'system') {
-          setModeState(storedTheme);
-        }
         if (storedMotion === 'true') setReduceMotionOverrideState(true);
       } catch {
         // A missing preference is not an error — the defaults already apply.
@@ -68,33 +68,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
     };
   }, []);
 
-  const setMode = useCallback((next: ThemeMode) => {
-    setModeState(next);
-    void AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(() => undefined);
-  }, []);
-
   const setReduceMotionOverride = useCallback((value: boolean) => {
     setReduceMotionOverrideState(value);
     void AsyncStorage.setItem(MOTION_STORAGE_KEY, String(value)).catch(() => undefined);
   }, []);
 
-  const isDark = mode === 'system' ? systemScheme !== 'light' : mode === 'dark';
-
   const value = useMemo<ThemeContextValue>(
     () => ({
-      colors: isDark ? darkColors : lightColors,
+      colors: darkColors,
       spacing,
       radius,
       typeScale,
       fontFamily,
       durations,
-      isDark,
       reduceMotion: systemReduceMotion || reduceMotionOverride,
-      mode,
-      setMode,
       setReduceMotionOverride,
     }),
-    [isDark, mode, reduceMotionOverride, setMode, setReduceMotionOverride, systemReduceMotion],
+    [reduceMotionOverride, setReduceMotionOverride, systemReduceMotion],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

@@ -35,7 +35,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
  * Changes that affect programming rebuild future training; history is kept.
  */
 export function SettingsScreen({ navigation }: Props): React.ReactElement {
-  const { spacing, mode, setMode, reduceMotion, setReduceMotionOverride } = useTheme();
+  const { spacing, reduceMotion, setReduceMotionOverride } = useTheme();
   const { units, setUnits } = useUnits();
   const { signOut } = useSession();
   const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
@@ -217,21 +217,6 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
       </SettingsGroup>
 
       <SettingsGroup title="App">
-        <SettingsRow
-          label="Dark mode"
-          description="Dark is the GetFit default."
-          toggle={{
-            value: mode === 'dark' || (mode === 'system' && true),
-            onChange: (value) => setMode(value ? 'dark' : 'light'),
-          }}
-        />
-        <SettingsRow
-          label="Match system theme"
-          toggle={{
-            value: mode === 'system',
-            onChange: (value) => setMode(value ? 'system' : 'dark'),
-          }}
-        />
         <SettingsRow
           label="Reduce motion"
           description="Turns off hologram rotation and screen animations."

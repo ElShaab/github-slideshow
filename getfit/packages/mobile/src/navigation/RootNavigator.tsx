@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ErrorState, LoadingScreen } from '../components';
 import { AnalysisFlow } from '../screens/analysis/AnalysisFlow';
@@ -85,11 +85,11 @@ function MainTabs(): React.ReactElement {
  * app with the renewal screen, which is what keeps paid features gated.
  */
 export function RootNavigator(): React.ReactElement {
-  const { isDark, colors } = useTheme();
+  const { colors } = useTheme();
   const session = useSession();
 
   const navigationTheme = useMemo(() => {
-    const base = isDark ? DarkTheme : DefaultTheme;
+    const base = DarkTheme;
     return {
       ...base,
       colors: {
@@ -101,7 +101,7 @@ export function RootNavigator(): React.ReactElement {
         border: colors.divider,
       },
     };
-  }, [colors, isDark]);
+  }, [colors]);
 
   const PaywallRoute = useCallback(() => <PaywallScreen variant="paywall" />, []);
   const RenewalRoute = useCallback(() => <RenewalScreen />, []);
