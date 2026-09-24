@@ -33,7 +33,11 @@ export type MeasurementKey =
  */
 export const MEASUREMENT_BOUNDS: Record<MeasurementKey, { min: number; max: number }> = {
   waistCm: { min: 40, max: 200 },
-  neckCm: { min: 35, max: 70 },
+  // 35 excluded most adult women: female necks average 30-34 cm, and the neck
+  // is required to finish the assessment, so the floor locked them out of the
+  // thing they had just paid for. 26 sits below any adult neck while still
+  // catching a typed-in 3 or 9.
+  neckCm: { min: 26, max: 70 },
   hipCm: { min: 50, max: 200 },
   shoulderCm: { min: 60, max: 200 },
   leftArmCm: { min: 15, max: 70 },

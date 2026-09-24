@@ -17,7 +17,7 @@ import { bodyMeasurementsSchema } from '../src/routes/schemas';
 /** The same table the mobile app holds, in the same units. */
 const EXPECTED: Record<string, { min: number; max: number }> = {
   waistCm: { min: 40, max: 200 },
-  neckCm: { min: 35, max: 70 },
+  neckCm: { min: 26, max: 70 },
   hipCm: { min: 50, max: 200 },
   shoulderCm: { min: 60, max: 200 },
   leftArmCm: { min: 15, max: 70 },
@@ -46,13 +46,22 @@ describe('every measurement is bounded where the app says it is', () => {
 });
 
 describe('the neck floor', () => {
-  test('a neck below 35 cm is refused', () => {
+  test('accepts the necks adult women actually have', () => {
+    // This floor was 35 cm, which is above the average adult female neck of
+    // 30-34 cm. Since the neck is required to finish the assessment, that
+    // locked a large share of women out of the thing they had just paid for.
+    for (const cm of [28, 30, 32, 34]) {
+      assert.ok(accepts('neckCm', cm), `${cm} cm should be accepted`);
+    }
+  });
+
+  test('and still refuses a reading that cannot be a neck', () => {
     // The circumference formula is a log ratio of waist to neck. A neck small
     // enough to be a mistyped reading does not give a slightly wrong body-fat
     // figure — it gives a nonsense one, presented with the same confidence.
-    assert.ok(!accepts('neckCm', 20));
-    assert.ok(!accepts('neckCm', 34.9));
-    assert.ok(accepts('neckCm', 35));
+    assert.ok(!accepts('neckCm', 3));
+    assert.ok(!accepts('neckCm', 25.9));
+    assert.ok(accepts('neckCm', 26));
   });
 
   test('every measurement stays optional, so a blank form is still valid', () => {
