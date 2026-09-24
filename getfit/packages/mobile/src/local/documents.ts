@@ -38,15 +38,6 @@ export interface ProfileDocument {
   preferences: ExercisePreference[];
   /** True when the user chose them rather than accepting the generated set. */
   preferencesChosen: boolean;
-  /**
-   * True once the user has turned down the offer of an account.
-   *
-   * Optional, so documents written before accounts existed read as "not asked"
-   * rather than as a decision they never made. An account is an offer — it buys
-   * the user a copy that survives the phone, and nothing else — so declining it
-   * has to stick, or the app would ask again on every launch.
-   */
-  accountDeclined?: boolean;
   settings: AppSettings;
 }
 

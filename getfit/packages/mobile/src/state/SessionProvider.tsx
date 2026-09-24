@@ -126,10 +126,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       // first-time user sees the paywall.
       return { ...base, stage: entitlement.status === 'none' ? 'paywall' : 'expired' };
     }
-    // An account is offered, not required: it buys a copy of the training data
-    // that survives the phone, and nothing in the app is gated on it. Somebody
-    // who has said no once is not asked again.
-    if (me.isGuest && !status.accountDeclined) return { ...base, stage: 'account' };
+    // Required, and deliberately after payment: the membership is bought, and
+    // the account is what ties it to a person rather than to one handset. An
+    // account that has a session but no password yet is not finished, so it
+    // lands here too and resumes at the password step.
+    if (me.isGuest) return { ...base, stage: 'account' };
     if (!status.hasPreferences) return { ...base, stage: 'preferences' };
     return { ...base, stage: 'ready' };
   }, []);

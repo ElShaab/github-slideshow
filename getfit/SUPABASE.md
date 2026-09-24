@@ -28,16 +28,43 @@ where schemaname = 'public'
 order by tablename;
 ```
 
-## 2. Turn on email sign-in
+## 2. Turn on email sign-in, and make it send a code
 
 **Authentication → Sign In / Providers → Email.** The app uses email and
 password; no other provider is wired up.
 
-If **Confirm email** is on, `signUp` returns a user with no session, and the
-first sync is refused by row-level security until the user clicks the link in
-their inbox. That is correct behaviour, not a bug — but it means a user who
-subscribes and then creates an account will not see their data sync until they
-confirm. Decide which you want before launch.
+Two settings decide whether account setup works at all.
+
+### The email must carry a code, not a link
+
+Account setup asks for a six-digit code. Supabase sends a **magic link** unless
+the template says otherwise, and a link cannot be typed into the code field —
+the screen would be unusable.
+
+**Authentication → Emails → Magic Link**: the template body must include
+`{{ .Token }}`. Something like:
+
+```html
+<p>Your GetFit code is <strong>{{ .Token }}</strong>.</p>
+<p>It expires in an hour. If you didn't ask for it, ignore this email.</p>
+```
+
+A template left on the default `{{ .ConfirmationURL }}` sends a link, and every
+customer who has just paid will be stuck on a screen they cannot complete.
+
+### The default email service will not carry your users
+
+Supabase's built-in SMTP is rated for a handful of messages an hour and is
+documented as being for development only. Setup happens **immediately after
+payment**, so a rate-limited email is a customer who has been charged and
+cannot finish — the worst moment to fail.
+
+Before launch, set a real provider under **Project Settings → Authentication →
+SMTP Settings** (Resend, Postmark, SES — any of them). Then raise the limit
+under **Authentication → Rate Limits**.
+
+This is the single most likely thing to break this flow in production, and it
+is configuration rather than code.
 
 ## 3. Point the app at the project
 
@@ -106,6 +133,24 @@ run; a sign-up that returns no session tells you email confirmation is on.
 - **Photos are never uploaded.** The local record keeps a file path inside the
   app's private directory; that path is not synced, because it means nothing on
   another device.
+
+## Account setup, step by step
+
+After a successful purchase the app requires an account. It cannot be skipped:
+the membership is bought, and the account is what ties it to a person rather
+than to one handset.
+
+1. **Email** — `signInWithOtp({ shouldCreateUser: true })` sends the code and
+   creates the account if the address is new.
+2. **Code** — `verifyOtp({ type: 'email' })` proves the address and returns a
+   session. Row-level security refuses every write before this point, which is
+   why nothing syncs until the code is entered.
+3. **Password** — `updateUser({ password, data: { passwordSet: true } })`.
+
+That flag matters. Verifying the code signs the user in, so being signed in is
+not the same as being finished; without a password they could never sign in on
+a second phone. Someone who closes the app between steps 2 and 3 comes back to
+step 3 rather than starting over.
 
 ## What is deliberately not here
 

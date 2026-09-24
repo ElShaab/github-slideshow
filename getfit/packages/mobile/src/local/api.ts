@@ -75,11 +75,6 @@ export const localApi = {
     return { deleted: true, photosRemoved: 0 };
   },
 
-  /** Records that the user turned down an account, so they are not asked again. */
-  async declineAccount() {
-    await repo.updateProfileDoc((doc) => ({ ...doc, accountDeclined: true }));
-    return { declined: true };
-  },
 
   /* ----------------------------- onboarding --------------------------- */
 
@@ -151,7 +146,6 @@ export const localApi = {
       goals: doc.goals,
       equipment: doc.equipment,
       hasPreferences: doc.preferences.length > 0,
-      accountDeclined: doc.accountDeclined ?? false,
     };
   },
 

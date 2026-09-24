@@ -101,19 +101,8 @@ export function mergeProfile(
   const localComplete = local.profile?.onboardingCompleted ?? false;
   const remoteComplete = remote.profile?.onboardingCompleted ?? false;
 
-  const resolved =
-    localComplete !== remoteComplete
-      ? localComplete
-        ? local
-        : remote
-      : winner === 'remote'
-        ? remote
-        : local;
-
-  // Whether this phone's owner turned down an account is a decision about this
-  // phone, not a property of the account, so it is not synced and it is not
-  // lost to a merge the server won. Dropping it would ask them again.
-  return { ...resolved, accountDeclined: local.accountDeclined };
+  if (localComplete !== remoteComplete) return localComplete ? local : remote;
+  return winner === 'remote' ? remote : local;
 }
 
 /**

@@ -31,7 +31,14 @@ import {
   errors,
 } from '@getfit/shared';
 import { localApi, localRepository } from '../local/api';
-import { accountsAvailable, currentAccount, signIn, signUp } from '../supabase/auth';
+import {
+  accountsAvailable,
+  currentAccount,
+  sendEmailCode,
+  setPassword,
+  signIn,
+  verifyEmailCode,
+} from '../supabase/auth';
 import { deleteAccountEverywhere, signOutAndClearLocal, syncNow } from '../supabase/cloud';
 import { createStoreProvider } from '../state/billing';
 import { clearLocalBilling, resolveEntitlement } from '../state/localEntitlement';
@@ -59,17 +66,26 @@ export const authApi = {
     return { accessToken: userId, userId, isGuest: accountsAvailable() } as AuthTokens;
   },
 
-  /**
-   * Creates the account and hands this device's data to it.
-   *
-   * The sync runs before returning, so the first thing the new account holds is
-   * the analysis and programme the user already has — signing up must never
-   * look like starting over.
-   */
-  async createAccount(email: string, password: string): Promise<AuthTokens> {
-    if (!accountsAvailable()) return authApi.startGuestSession();
+  /** Emails a one-time code, creating the account if the address is new. */
+  async sendEmailCode(email: string): Promise<void> {
+    await sendEmailCode(email);
+  },
 
-    await signUp(email, password);
+  /** Exchanges the emailed code for a session. This is what proves the address. */
+  async verifyEmailCode(email: string, code: string): Promise<void> {
+    await verifyEmailCode(email, code);
+  },
+
+  /**
+   * Finishes setup: sets the password, then hands this device's data to the
+   * new account.
+   *
+   * The sync runs before returning, so the first thing the account holds is the
+   * analysis and programme the user already has — signing up must never look
+   * like starting over.
+   */
+  async completeAccount(password: string): Promise<AuthTokens> {
+    await setPassword(password);
     await syncNow();
     const { userId } = await localApi.me();
     return { accessToken: userId, userId, isGuest: false } as AuthTokens;
@@ -96,11 +112,6 @@ export const authApi = {
 
     const account = await currentAccount();
     return { userId: local.userId, email: account?.email ?? null, isGuest: account === null };
-  },
-
-  /** Records that the user turned down an account, so they are not asked again. */
-  async declineAccount(): Promise<void> {
-    await localApi.declineAccount();
   },
 
   /** Signs out and takes the account's data off this device with it. */
@@ -160,8 +171,6 @@ export const onboardingApi = {
     goals: UserGoal[];
     equipment: EquipmentId[];
     hasPreferences: boolean;
-    /** True once the user has turned down the offer of an account. */
-    accountDeclined: boolean;
   }> {
     return localApi.onboardingStatus();
   },

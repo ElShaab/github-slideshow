@@ -1,67 +1,188 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { PrimaryButton, Screen, SecondaryButton, Text, TextField } from '../../components';
+import { GlassButton, PrimaryButton, Screen, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
-import { AuthError } from '../../supabase/auth';
+import { AuthError, currentAccount } from '../../supabase/auth';
 import { authApi } from '../../api/endpoints';
+import {
+  CODE_LENGTH,
+  cleanCode,
+  isValidCode,
+  isValidEmail,
+  nextStep,
+  passwordProblem,
+  resumeStep,
+  type AccountSetupState,
+} from '../../state/accountSetup';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 
 /**
- * The offer of an account, made after payment.
+ * Setting up the account, after payment.
  *
- * An account does exactly one thing: it keeps a copy of the training data off
- * the phone, so a lost or replaced device does not cost the user their history.
- * Nothing in the app is gated on it, so it is declinable — and the decline is
- * remembered, because an offer that reappears on every launch is a demand.
+ * Three steps: the address, the code that proves it, then a password. There is
+ * no way past this screen — the membership is bought, and an account is what
+ * ties it to a person rather than to one phone, so skipping it would leave a
+ * paying customer whose training dies with the handset.
  *
- * Everything already on the device is pushed up as part of signing up, so the
- * analysis taken before the account existed stays attached to the same person.
+ * Each step only advances on a confirmed result, never on a tap, so the code
+ * screen is never shown for an email that failed to send. Someone who closes
+ * the app between the code and the password comes back to the password: the
+ * code signed them in, but without a password they could not sign in anywhere
+ * else, which is the whole point.
  */
 export function CreateAccountScreen(): React.ReactElement {
   const { spacing } = useTheme();
   const { refresh } = useSession();
+
+  const [state, setState] = useState<AccountSetupState>({ step: 'email', email: '' });
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [declining, setDeclining] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = useMemo(
-    () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && password.length >= 8,
-    [email, password],
-  );
+  // Resume where they left off rather than starting the email again, which
+  // would send a second code and confuse the one already in their inbox.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const account = await currentAccount();
+      if (cancelled || !account) return;
+      const step = resumeStep({ signedIn: true, passwordSet: account.passwordSet });
+      if (step === 'password') {
+        setState({ step: 'password', email: account.email ?? '' });
+        setEmail(account.email ?? '');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const submit = useCallback(async () => {
+  const show = useCallback((caught: unknown) => {
+    setError(
+      caught instanceof AuthError || caught instanceof ApiError
+        ? caught.message
+        : 'Something went wrong.',
+    );
+  }, []);
+
+  const sendCode = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      await authApi.createAccount(email.trim(), password);
-      await refresh();
+      await authApi.sendEmailCode(email);
+      setState((current) => nextStep(current, { type: 'code-sent', email }));
+      setNotice(`We sent a ${CODE_LENGTH}-digit code to ${email.trim()}.`);
     } catch (caught) {
-      // AuthError carries a message written for a user — "that email already
-      // has an account" is the whole point of showing it.
-      setError(
-        caught instanceof ApiError || caught instanceof AuthError
-          ? caught.message
-          : 'Something went wrong.',
-      );
+      show(caught);
     } finally {
       setBusy(false);
     }
-  }, [email, password, refresh]);
+  }, [email, show]);
 
-  const decline = useCallback(async () => {
-    setDeclining(true);
+  const verifyCode = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await authApi.verifyEmailCode(state.email, code);
+      setState((current) => nextStep(current, { type: 'code-verified' }));
+    } catch (caught) {
+      show(caught);
+    } finally {
+      setBusy(false);
+    }
+  }, [code, show, state.email]);
+
+  const choosePassword = useCallback(async () => {
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+
+    setBusy(true);
     setError(null);
     try {
-      await authApi.declineAccount();
+      // Sets the password, records that setup finished, and pushes everything
+      // already on this phone up to the new account.
+      await authApi.completeAccount(password);
       await refresh();
-    } catch {
-      setError('Something went wrong.');
-      setDeclining(false);
+    } catch (caught) {
+      show(caught);
+    } finally {
+      setBusy(false);
     }
-  }, [refresh]);
+  }, [password, refresh, show]);
+
+  const { title, subtitle, body, action, canSubmit } = useMemo(() => {
+    if (state.step === 'code') {
+      return {
+        title: 'Check your email',
+        subtitle: `Enter the ${CODE_LENGTH}-digit code we sent to ${state.email}.`,
+        canSubmit: isValidCode(code),
+        action: { label: 'Verify', onPress: verifyCode },
+        body: (
+          <TextField
+            label="Code"
+            value={code}
+            onChangeText={(value) => setCode(cleanCode(value))}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+            placeholder="123456"
+            maxLength={CODE_LENGTH}
+          />
+        ),
+      };
+    }
+
+    if (state.step === 'password') {
+      return {
+        title: 'Create a password',
+        subtitle: 'This is how you sign in on a new phone.',
+        canSubmit: passwordProblem(password) === null,
+        action: { label: 'Finish', onPress: choosePassword },
+        body: (
+          <TextField
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            placeholder="At least 8 characters"
+            hint="At least 8 characters."
+          />
+        ),
+      };
+    }
+
+    return {
+      title: 'Save your progress',
+      subtitle:
+        'Your program, assessments and training history are on this phone. An account keeps a copy so they survive a lost phone.',
+      canSubmit: isValidEmail(email),
+      action: { label: 'Send code', onPress: sendCode },
+      body: (
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          placeholder="you@example.com"
+        />
+      ),
+    };
+  }, [choosePassword, code, email, password, sendCode, state.email, state.step, verifyCode]);
 
   return (
     <Screen
@@ -71,19 +192,31 @@ export function CreateAccountScreen(): React.ReactElement {
             <Text variant="caption" color="danger" align="center" accessibilityLiveRegion="polite">
               {error}
             </Text>
+          ) : notice ? (
+            <Text variant="caption" color="muted" align="center" accessibilityLiveRegion="polite">
+              {notice}
+            </Text>
           ) : null}
+
           <PrimaryButton
-            label="Create account"
-            onPress={() => void submit()}
+            label={action.label}
+            onPress={() => void action.onPress()}
             loading={busy}
-            disabled={!valid || declining}
+            disabled={!canSubmit || busy}
           />
-          <SecondaryButton
-            label="Not now"
-            onPress={() => void decline()}
-            disabled={busy || declining}
-            accessibilityHint="Keeps everything on this phone. You can create an account later in Settings."
-          />
+
+          {state.step === 'code' ? (
+            <GlassButton
+              label="Use a different email"
+              onPress={() => {
+                setCode('');
+                setNotice(null);
+                setError(null);
+                setState((current) => nextStep(current, { type: 'change-email' }));
+              }}
+              fullWidth
+            />
+          ) : null}
         </View>
       }
     >
@@ -91,39 +224,13 @@ export function CreateAccountScreen(): React.ReactElement {
         Membership active
       </Text>
       <Text variant="title" style={{ marginTop: spacing.sm }} accessibilityRole="header">
-        Save your progress
+        {title}
       </Text>
       <Text variant="body" color="secondary" style={{ marginTop: spacing.md }}>
-        Your program, assessments and training history are on this phone. An account
-        keeps a copy so they survive a lost phone and follow you to the next one.
-      </Text>
-      <Text variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
-        Optional — everything works without one, and your progress photos stay on this
-        phone either way.
+        {subtitle}
       </Text>
 
-      <View style={{ marginTop: spacing.xxxl, gap: spacing.lg }}>
-        <TextField
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-        />
-
-        <TextField
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="new-password"
-          accessibilityHint="At least 8 characters"
-          placeholder="At least 8 characters"
-          hint="At least 8 characters."
-        />
-      </View>
+      <View style={{ marginTop: spacing.xxxl, gap: spacing.lg }}>{body}</View>
     </Screen>
   );
 }

@@ -222,21 +222,6 @@ describe('merging the profile', () => {
     assert.equal(mergeProfile(fresh, stored, 'local').profile?.weightKg, 85);
   });
 
-  test('turning down an account is a decision about this phone, and it sticks', () => {
-    const declined = { ...complete('user_1', 80), accountDeclined: true };
-    const remote = complete('user_1', 85);
-
-    // Even when the account's copy wins outright, the user is not asked again.
-    assert.equal(mergeProfile(declined, remote, 'remote').accountDeclined, true);
-    assert.equal(mergeProfile(declined, remote, 'remote').profile?.weightKg, 85);
-  });
-
-  test('an account that was never declined here does not become declined', () => {
-    const local = complete('user_1', 80);
-    const remote = { ...complete('user_1', 85), accountDeclined: true };
-    assert.equal(mergeProfile(local, remote, 'remote').accountDeclined, undefined);
-  });
-
   test('an onboarded device is not overwritten by an empty account either', () => {
     const stored = complete('user_1', 85);
     const empty = emptyProfile('user_new', '2026-06-01T00:00:00Z');
