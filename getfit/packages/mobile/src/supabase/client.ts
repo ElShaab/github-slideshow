@@ -85,9 +85,3 @@ export function getSupabase(): SupabaseClient | null {
 
   return client;
 }
-
-/** Test seam: drops the memoised client so configuration can be re-read. */
-export function resetSupabaseClient(): void {
-  client = null;
-  clientFailed = false;
-}

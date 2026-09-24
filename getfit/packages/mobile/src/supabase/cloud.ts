@@ -86,10 +86,6 @@ export async function syncNow(): Promise<SyncResult> {
   return current.sync(account.id);
 }
 
-export async function syncMeta(): Promise<SyncMeta> {
-  return localStore.read<SyncMeta>(SYNC_KEY, emptySyncMeta);
-}
-
 /**
  * Signs out and drops everything the account left on this device.
  *

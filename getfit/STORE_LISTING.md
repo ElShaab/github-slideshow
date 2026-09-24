@@ -95,10 +95,12 @@ Your body-fat estimate comes from a tape measure, not a photo. See your full ana
 - **No claim about AI.** The app has none: body composition is computed
   in-process from published formulas, and the privacy policy says so. The
   repository name is a leftover, not a feature.
-- **No claim about where data is stored.** The privacy policy and the shipped
-  binary currently disagree on that, and a description is a bad place to
-  settle it.
-- **No "was $40".** The struck-through price in the app claims a price GetFit
-  has never charged. Saying it in the listing too would compound it.
+- **No claim about where data is stored.** The policy is the place for that,
+  and it is precise about what is on the phone and what is in the account. A
+  description is a bad place to restate it loosely.
+- **No "was $40" anywhere.** That struck-through price claimed a figure GetFit
+  had never charged; it has been removed from the app, and repeating it in the
+  listing would have compounded it. The yearly saving against monthly is a real
+  comparison and can be stated freely.
 - **No ranking or superlative claims** ("best", "#1"), which Apple rejects
   without evidence.

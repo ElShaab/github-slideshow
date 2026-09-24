@@ -16,13 +16,14 @@ explains what we collect, why, and what control you have over it.
 
 ## The short version
 
-GetFit works entirely on your phone. Your body analysis is calculated on the
-device, your progress photos never leave it, and you can use the whole app
-without ever creating an account.
+Your body analysis is calculated on your phone and your progress photos never
+leave it. You can see your analysis and try the app without an account.
 
-If you do create an account, your training data is also stored on our database
-so it survives a lost phone and follows you to a new one. That database is run
-by Supabase, and every row in it is locked to your account.
+When you take out a membership we ask you to create one: an email address, a
+code we send to check it is yours, and a password. That is what ties the
+membership to you rather than to one handset, and it is what puts your training
+data somewhere it survives a lost phone. The database is run by Supabase, and
+every row in it is locked to your account.
 
 ---
 
@@ -71,12 +72,15 @@ personal records, and your goals.
 
 ### Account data
 
-Only if you choose to create an account: your email address and a password.
+Your email address and a password, collected when you take out a membership.
 **We never see your password.** It is handled and hashed by Supabase Auth; what
 GetFit receives is a session token, which is kept in your phone's keychain.
 
-You are offered an account after you subscribe, and you can decline it. Without
-one, everything above stays on the device and nothing is transmitted.
+We email you a short code to check the address is yours. We do this so that the
+membership you paid for can be returned to you on a new phone — an address we
+cannot reach is an account you could be locked out of.
+
+Before you subscribe, no account exists and nothing is transmitted.
 
 ### Subscription data
 
@@ -98,12 +102,13 @@ requests were made — as part of running the database.
 
 ## Where your data is
 
-| | Without an account | With an account |
+| | Before you subscribe | With a membership |
 | --- | --- | --- |
 | Measurements and assessments | On your phone | On your phone **and** in your account |
 | Program and training history | On your phone | On your phone **and** in your account |
 | Progress photos | On your phone | On your phone **only** — never uploaded |
 | Email address | Not collected | In your account |
+| Password | Not collected | Hashed by Supabase; never seen by us |
 | Payment details | Never collected | Never collected |
 
 The app keeps its own copy on the device at all times, which is why it works

@@ -682,10 +682,9 @@ export function SettingsPrivacyScreen({
         <Text variant="subheading">Where it is kept</Text>
         <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
           All of it is stored on this phone, which is why GetFit works with no signal.
-          If you created an account, the same data is also kept in our database so it
-          survives a lost phone — locked to your account, so no other account can read
-          it. Your photos are the exception: they stay on this phone and are never
-          uploaded.
+          The same data is also kept in our database under your account, so it survives
+          a lost phone — locked to you, so no other account can read it. Your photos are
+          the exception: they stay on this phone and are never uploaded.
         </Text>
       </GlassCard>
 

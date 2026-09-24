@@ -32,13 +32,16 @@ describe('subscription catalogue', () => {
     assert.equal(SUBSCRIPTION_PRICE_USD, 4.99, 'the legacy constant drifted from the plan');
   });
 
-  test('yearly is $19.99, marked down from $40, and badged', () => {
+  test('yearly is $19.99 and badged, with no invented reference price', () => {
     const yearly = planForProduct(YEARLY_PRODUCT_ID);
     assert.ok(yearly, 'the yearly plan is missing from the catalogue');
     assert.equal(yearly.productId, 'getfit_membership_yearly');
     assert.equal(yearly.priceUsd, 19.99);
     assert.equal(yearly.period, 'year');
-    assert.equal(yearly.listPriceUsd, 40, 'the struck-through price changed');
+    // GetFit has never charged more than it charges now, so there is nothing
+    // honest to strike through. The saving is stated against the monthly plan,
+    // which is a real alternative the customer can actually buy.
+    assert.equal(yearly.listPriceUsd, null, 'a reference price we never charged came back');
     assert.equal(yearly.badge, 'BEST DEAL');
     assert.equal(yearly.limitedTime, true);
   });

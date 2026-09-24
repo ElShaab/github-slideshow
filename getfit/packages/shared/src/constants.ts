@@ -30,7 +30,14 @@ export const YEARLY_PRODUCT_ID = 'getfit_membership_yearly';
  * refuses any purchase naming a product that is not in this list — the client
  * chooses which plan to buy, so the catalogue is what bounds that choice.
  *
- * `listPriceUsd` is the undiscounted price. It is struck through beside the
+ * `listPriceUsd` is a price this product was genuinely sold at before. Both
+ * plans are null: GetFit has never charged more than it charges now, so there
+ * is nothing honest to strike through, and a reference price the seller never
+ * used is deceptive under App Review 3.1.1 and under consumer law in the EU,
+ * the UK and the US. The saving shown on the yearly plan is measured against
+ * the monthly plan, which is a real alternative the customer can actually buy.
+ *
+ * When it is not null it is struck through beside the
  * price actually charged, and is null when a plan carries no offer.
  */
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -46,7 +53,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     productId: YEARLY_PRODUCT_ID,
     period: 'year',
     priceUsd: 19.99,
-    listPriceUsd: 40,
+    listPriceUsd: null,
     badge: 'BEST DEAL',
     limitedTime: true,
   },

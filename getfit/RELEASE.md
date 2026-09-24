@@ -91,21 +91,24 @@ so it still has to be right.
 
 Rank the yearly plan higher in the group so an upgrade takes effect
 immediately. Add **no** introductory offer — GetFit has no free trial, and the
-"was $40" is our own discount, not a store offer.
+saving shown against monthly is computed by the app, not a store offer.
 
 **Sell worldwide if you want to.** The paywall asks the store what it will
 charge and renders that string, so a customer in the UK sees Apple's `£4.49`
 and one in Japan sees `¥800`. GetFit never converts currency — Apple and Google
 set each storefront's price from the point you choose above, and displaying
-anything else would be the 3.1.2 mismatch again. The bundled `$5` / `$20` show
-only in the moment before the store answers.
+anything else would be the 3.1.2 mismatch again. The bundled `$4.99` / `$19.99`
+show only in the moment before the store answers.
 
 Two things follow from that:
 
-- **The "was $40" strike-through only appears in USD storefronts.** It is our
-  own claim about US pricing; converting it at a rate we invented would quote a
-  price we have never charged. Everywhere else the yearly card shows the real
-  saving against twelve months at that storefront's own monthly rate.
+- **No struck-through reference price is shown at all.** GetFit has never
+  charged more than it charges now, so there is no earlier price to strike
+  through, and quoting one the product was never sold at is deceptive under
+  App Review 3.1.1 and under consumer law in the EU, the UK and the US. The
+  yearly card instead states its saving against twelve months at that
+  storefront's own monthly rate — a comparison between two prices the customer
+  can actually pay today, which holds in every currency.
 - Apple's generated local prices are *approximate* equivalents, not conversions,
   and they change when Apple adjusts its price matrix. That is expected and
   needs nothing from you.
@@ -165,8 +168,8 @@ Answer these to match what the app does:
 | Question | Answer |
 | --- | --- |
 | Health & Fitness data collected | **Yes** — linked to identity, app functionality |
-| Photos collected | **Yes** — linked to identity, app functionality (optional progress photos) |
-| Contact info (email) | **Yes** — linked to identity, app functionality |
+| Photos collected | **No** — a progress photo is optional, stays in the app's private directory on the device, and is never uploaded. Apple counts data as collected only when it leaves the device |
+| Contact info (email) | **Yes** — linked to identity, app functionality. Required to take out a membership, and verified by emailed code |
 | Purchases | **Yes** — linked to identity |
 | Used for tracking | **No** |
 | Used for third-party advertising | **No** |
@@ -313,13 +316,14 @@ renewals then stop.
 
 **[you]** With a sandbox tester account signed in, verify each of:
 
-- [ ] Both plans appear with the right prices; yearly shows **$40 struck
-      through**, **$20**, and the **BEST DEAL** badge
+- [ ] Both plans appear at the store's own prices; yearly shows **$19.99**, the
+      saving against monthly, and the **BEST DEAL** badge — and **no**
+      struck-through price anywhere
 - [ ] Change the device's App Store region to the UK and reopen the paywall —
-      prices switch to **£**, and the $40 strike-through disappears rather than
-      being converted
-- [ ] Buying monthly grants access, and Settings → Membership shows `$5 / month`
-- [ ] Buying yearly grants access, and Settings → Membership shows `$20 / year`
+      prices switch to **£** and the saving is recomputed in that currency,
+      never converted
+- [ ] Buying monthly grants access, and Settings → Membership shows the monthly plan
+- [ ] Buying yearly grants access, and Settings → Membership shows the yearly plan
 - [ ] Cancelling the sheet shows "Purchase cancelled", not an error
 - [ ] **Restore purchase** works on a second device with the same Apple ID
 - [ ] Let a sandbox subscription lapse (about 30 minutes at 5 minutes a

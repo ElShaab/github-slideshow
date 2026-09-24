@@ -63,21 +63,39 @@ describe('the store price is what gets displayed', () => {
 });
 
 describe('the struck-through price', () => {
-  test('shows in a USD storefront, where the "was $40" claim is true', () => {
-    const pricing = planPricing(yearlyPlan, usYearly, { plan: monthlyPlan, storePrice: usMonthly });
-    assert.equal(pricing.listPrice, formatCurrency(40, 'USD'));
-  });
-
-  test('is withheld in another currency rather than converted', () => {
-    // "$40" struck through beside "£17.99" would be incoherent, and inventing
-    // "£35.99" would be quoting a price we have never charged.
-    const pricing = planPricing(yearlyPlan, ukYearly, { plan: monthlyPlan, storePrice: ukMonthly });
-    assert.equal(pricing.listPrice, null);
-  });
-
-  test('never appears on a plan with no offer', () => {
+  test('is never shown, because no such price was ever charged', () => {
+    // A reference price the seller never used is deceptive under App Review
+    // 3.1.1 and under consumer law in the EU, the UK and the US. Both plans
+    // carry listPriceUsd: null, so there is nothing to strike through.
+    assert.equal(planPricing(yearlyPlan, usYearly, { plan: monthlyPlan, storePrice: usMonthly }).listPrice, null);
+    assert.equal(planPricing(yearlyPlan, ukYearly, { plan: monthlyPlan, storePrice: ukMonthly }).listPrice, null);
     assert.equal(planPricing(monthlyPlan, usMonthly).listPrice, null);
     assert.equal(planPricing(monthlyPlan).listPrice, null);
+  });
+
+  test('but the saving against monthly survives, because that one is true', () => {
+    // 12 x 4.99 = 59.88 against 19.99 is a real comparison: both are prices
+    // the customer can actually pay today.
+    const pricing = planPricing(yearlyPlan, usYearly, { plan: monthlyPlan, storePrice: usMonthly });
+    assert.ok(pricing.savingPercent && pricing.savingPercent > 50, `got ${pricing.savingPercent}`);
+  });
+
+  test('the machinery still works if a genuine past price is ever set', () => {
+    // Kept so the capability is not quietly lost: if GetFit really does raise
+    // its price one day, the previous one can be shown again.
+    const everSold = { ...yearlyPlan, listPriceUsd: 29.99 };
+    assert.equal(
+      planPricing(everSold, usYearly, { plan: monthlyPlan, storePrice: usMonthly }).listPrice,
+      formatCurrency(29.99, 'USD'),
+    );
+  });
+
+  test('and is withheld outside USD rather than converted at a rate we invented', () => {
+    const everSold = { ...yearlyPlan, listPriceUsd: 29.99 };
+    assert.equal(
+      planPricing(everSold, ukYearly, { plan: monthlyPlan, storePrice: ukMonthly }).listPrice,
+      null,
+    );
   });
 });
 
@@ -118,9 +136,17 @@ describe('the saving claim', () => {
     assert.equal(pricing.savingPercent, null, 'claimed a saving on a more expensive plan');
   });
 
-  test('falls back to the list-price discount only without a store price', () => {
-    // (40 - 20) / 40 = 50%
-    assert.equal(planPricing(yearlyPlan).savingPercent, 50);
+  test('claims nothing at all when there is neither a store price nor a past price', () => {
+    // The catalogue carries no reference price, so with no monthly plan to
+    // compare against there is no honest saving to state — and silence is the
+    // right answer rather than a number pulled from somewhere.
+    assert.equal(planPricing(yearlyPlan).savingPercent, null);
+  });
+
+  test('falls back to a genuine past price when one exists', () => {
+    // (29.99 - 19.99) / 29.99 = 33%
+    const everSold = { ...yearlyPlan, listPriceUsd: 29.99 };
+    assert.equal(planPricing(everSold).savingPercent, 33);
   });
 });
 
