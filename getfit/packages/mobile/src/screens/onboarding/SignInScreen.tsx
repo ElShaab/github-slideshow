@@ -54,6 +54,11 @@ export function SignInScreen({ navigation }: Props): React.ReactElement {
             loading={busy}
             disabled={email.length === 0 || password.length === 0}
           />
+          <GlassButton
+            label="Forgot your password?"
+            onPress={() => navigation.navigate('ResetPassword')}
+            fullWidth
+          />
           <GlassButton label="Back" onPress={navigation.goBack} fullWidth />
         </View>
       }

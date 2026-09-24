@@ -35,9 +35,11 @@ import {
   accountsAvailable,
   currentAccount,
   sendEmailCode,
+  sendPasswordResetCode,
   setPassword,
   signIn,
   verifyEmailCode,
+  verifyPasswordResetCode,
 } from '../supabase/auth';
 import { deleteAccountEverywhere, signOutAndClearLocal, syncNow } from '../supabase/cloud';
 import { createStoreProvider } from '../state/billing';
@@ -74,6 +76,16 @@ export const authApi = {
   /** Exchanges the emailed code for a session. This is what proves the address. */
   async verifyEmailCode(email: string, code: string): Promise<void> {
     await verifyEmailCode(email, code);
+  },
+
+  /** Emails a code for a forgotten password. Never creates an account. */
+  async sendPasswordResetCode(email: string): Promise<void> {
+    await sendPasswordResetCode(email);
+  },
+
+  /** Exchanges a recovery code for a session, so a new password can be set. */
+  async verifyPasswordResetCode(email: string, code: string): Promise<void> {
+    await verifyPasswordResetCode(email, code);
   },
 
   /**

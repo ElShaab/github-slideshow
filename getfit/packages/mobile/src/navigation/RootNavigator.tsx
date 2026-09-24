@@ -20,6 +20,7 @@ import { MeasurementsScreen } from '../screens/onboarding/MeasurementsScreen';
 import { PhotoScreen } from '../screens/onboarding/PhotoScreen';
 import { ScheduleScreen } from '../screens/onboarding/ScheduleScreen';
 import { SignInScreen } from '../screens/onboarding/SignInScreen';
+import { ResetPasswordScreen } from '../screens/onboarding/ResetPasswordScreen';
 import { WelcomeScreen } from '../screens/onboarding/WelcomeScreen';
 import { ExercisePreferencesScreen } from '../screens/preferences/ExercisePreferencesScreen';
 import { GeneratingProgramScreen } from '../screens/preferences/GeneratingProgramScreen';
@@ -53,6 +54,7 @@ function OnboardingNavigator(): React.ReactElement {
     >
       <OnboardingStack.Screen name="Welcome" component={WelcomeScreen} />
       <OnboardingStack.Screen name="SignIn" component={SignInScreen} />
+      <OnboardingStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <OnboardingStack.Screen name="Basics" component={BasicsScreen} />
       <OnboardingStack.Screen name="Level" component={LevelScreen} />
       <OnboardingStack.Screen name="Location" component={LocationScreen} />

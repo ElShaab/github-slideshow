@@ -3,6 +3,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type OnboardingStackParamList = {
   Welcome: undefined;
   SignIn: undefined;
+  ResetPassword: undefined;
   Basics: undefined;
   Level: undefined;
   Location: undefined;

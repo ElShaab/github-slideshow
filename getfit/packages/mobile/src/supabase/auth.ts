@@ -123,6 +123,35 @@ export async function sendEmailCode(email: string): Promise<void> {
   if (error) throw new AuthError(describeAuthError(error.message));
 }
 
+/**
+ * Emails a code to an account that already exists, for a forgotten password.
+ *
+ * Unlike the setup call this never creates a user: telling someone a code is on
+ * its way to an address that has no account would be a way to find out which
+ * addresses do, and Supabase deliberately answers the same either way.
+ *
+ * The Reset Password template needs `{{ .Token }}` for this to arrive as a code
+ * rather than a link, exactly like the signup one.
+ */
+export async function sendPasswordResetCode(email: string): Promise<void> {
+  const { error } = await requireClient().auth.resetPasswordForEmail(email.trim());
+  if (error) throw new AuthError(describeAuthError(error.message));
+}
+
+/** Exchanges a recovery code for a session, so a new password can be set. */
+export async function verifyPasswordResetCode(email: string, code: string): Promise<Account> {
+  const { data, error } = await requireClient().auth.verifyOtp({
+    email: email.trim(),
+    token: code.trim(),
+    type: 'recovery',
+  });
+  if (error) throw new AuthError(describeAuthError(error.message));
+
+  const account = toAccount(data.user);
+  if (!account) throw new AuthError('That code is not right. Check it and try again.');
+  return account;
+}
+
 /** Exchanges the emailed code for a session. This is what proves the address. */
 export async function verifyEmailCode(email: string, code: string): Promise<Account> {
   const { data, error } = await requireClient().auth.verifyOtp({

@@ -41,16 +41,24 @@ Account setup asks for a six-digit code. Supabase sends a **magic link** unless
 the template says otherwise, and a link cannot be typed into the code field —
 the screen would be unusable.
 
-**Authentication → Emails → Magic Link**: the template body must include
-`{{ .Token }}`. Something like:
+Three templates need it, because Supabase picks between them by situation: a
+brand-new address, a returning one, and a password reset. Edit all three —
+**Confirm signup**, **Magic Link** and **Reset Password** — under
+**Authentication → Emails**. Each body must include `{{ .Token }}`:
 
 ```html
 <p>Your GetFit code is <strong>{{ .Token }}</strong>.</p>
 <p>It expires in an hour. If you didn't ask for it, ignore this email.</p>
 ```
 
-A template left on the default `{{ .ConfirmationURL }}` sends a link, and every
-customer who has just paid will be stuck on a screen they cannot complete.
+Any template left on the default `{{ .ConfirmationURL }}` sends a link instead,
+and whoever hits that path is stuck on a screen they cannot complete — for
+signup that is a customer who has just paid, and for reset it is one who cannot
+reach training they are still being billed for.
+
+Quickest check: put your own address through signup and through "Forgot your
+password?". A six-digit number in the inbox means both are right; a button or a
+link means one template is still on the default.
 
 ### The default email service will not carry your users
 
@@ -152,12 +160,19 @@ not the same as being finished; without a password they could never sign in on
 a second phone. Someone who closes the app between steps 2 and 3 comes back to
 step 3 rather than starting over.
 
-## What is deliberately not here
+## Forgotten passwords
 
-- **Password reset.** Supabase can send a recovery email, but the link lands on
-  a web page rather than back in the app, which needs a redirect URL and a deep
-  link set up first. Until that exists, a forgotten password costs the user
-  their cross-device copy — the data on their current phone is untouched.
+Reached from **Forgot your password?** on the sign-in screen, and it is the same
+three steps as setting up: email, code, new password. No link, no browser, no
+deep link, and no domain to own — which is what makes it work on a phone freshly
+restored from backup, where the account is the only way back to the training
+history.
+
+The screen never says whether an address has an account. It reports that a code
+is on its way either way, because confirming it would turn the screen into a way
+to discover who has one.
+
+## What is deliberately not here
 - **Realtime.** The app syncs on sign-in, on returning to the foreground, and a
   few seconds after a local write. There is no live subscription, because
   nothing in GetFit is collaborative.
