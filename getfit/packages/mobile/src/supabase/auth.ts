@@ -1,5 +1,8 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from './client';
+import { describeAuthError } from './authErrors';
+
+export { describeAuthError };
 
 /**
  * Accounts.
@@ -52,46 +55,6 @@ const toAccount = (user: User | null): Account | null =>
         passwordSet: user.user_metadata?.passwordSet === true,
       }
     : null;
-
-/**
- * Turns a Supabase auth failure into something worth reading.
- *
- * The default arm is deliberate: an unrecognised auth error is not shown
- * verbatim, because the ones that exist are about tokens and grants and would
- * mean nothing to the person reading them.
- */
-export function describeAuthError(message: string): string {
-  const text = message.toLowerCase();
-
-  if (text.includes('already registered') || text.includes('already been registered')) {
-    return 'That email already has an account. Sign in instead.';
-  }
-  if (text.includes('invalid login credentials')) {
-    return 'That email and password do not match an account.';
-  }
-  if (text.includes('email not confirmed')) {
-    return 'Check your email and confirm your address, then sign in.';
-  }
-  if (text.includes('password should be') || text.includes('password is too')) {
-    return 'Choose a password of at least 8 characters.';
-  }
-  if (text.includes('rate limit') || text.includes('too many') || text.includes('for security purposes')) {
-    return 'Too many attempts. Wait a minute and try again.';
-  }
-  if (text.includes('expired') || text.includes('otp_expired')) {
-    return 'That code has expired. Send a new one.';
-  }
-  if (text.includes('invalid') && text.includes('token')) {
-    return 'That code is not right. Check it and try again.';
-  }
-  if (text.includes('email address') && text.includes('invalid')) {
-    return 'That email address does not look right.';
-  }
-  if (text.includes('fetch') || text.includes('network')) {
-    return 'You appear to be offline. Your training is saved on this device.';
-  }
-  return 'Something went wrong. Try again.';
-}
 
 export const accountsAvailable = (): boolean => isSupabaseConfigured && getSupabase() !== null;
 
