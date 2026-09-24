@@ -35,8 +35,9 @@ export function readinessProblems(input: ReadinessInput): ReadinessProblem[] {
       field: 'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
       detail:
         'Accounts are required after payment, and this build carries no Supabase project, ' +
-        'so nobody can create one. These are read at build time — set them in ' +
-        'packages/mobile/.env (or in EAS) and build again.',
+        'so nobody can create one. They are read at build time: put them in ' +
+        'packages/mobile/.env (or in EAS), then rebuild with the Metro cache cleared — ' +
+        'editing .env alone does not invalidate it.',
     });
   }
 

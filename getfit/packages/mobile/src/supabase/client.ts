@@ -15,7 +15,13 @@ export type { SupabaseConfig };
 const SESSION_KEY = 'getfit.supabase.session';
 
 export const supabaseConfig: SupabaseConfig | null = readSupabaseConfig(
-  process.env as Record<string, string | undefined>,
+  {
+    // Written out in full, and not through a variable or a spread. Expo
+    // substitutes this exact expression at build time; anything less literal
+    // ships a lookup that finds nothing on the device.
+    url: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    publishableKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  },
   Constants.expoConfig?.extra as { supabase?: { url?: string; publishableKey?: string } } | null,
 );
 

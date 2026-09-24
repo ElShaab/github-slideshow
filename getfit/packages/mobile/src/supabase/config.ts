@@ -23,16 +23,28 @@ interface ExtraConfig {
   supabase?: { url?: string; publishableKey?: string };
 }
 
+/**
+ * The two values, already read.
+ *
+ * Deliberately takes them rather than the environment object. Expo inlines
+ * `process.env.EXPO_PUBLIC_…` at build time by substituting that exact
+ * expression in the source; handing the whole of `process.env` to a function
+ * and reading a property off the parameter leaves nothing for it to
+ * substitute, so the bundle ships a lookup against an object that is empty on
+ * the device. This function was written that way and the result was a build
+ * that could never be configured, however carefully the .env was filled in.
+ */
+export interface SupabaseEnv {
+  url?: string;
+  publishableKey?: string;
+}
+
 export function readSupabaseConfig(
-  env: Record<string, string | undefined>,
+  env: SupabaseEnv,
   extra: ExtraConfig | null | undefined,
 ): SupabaseConfig | null {
-  const url = (env.EXPO_PUBLIC_SUPABASE_URL ?? extra?.supabase?.url ?? '').trim();
-  const publishableKey = (
-    env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    extra?.supabase?.publishableKey ??
-    ''
-  ).trim();
+  const url = (env.url ?? extra?.supabase?.url ?? '').trim();
+  const publishableKey = (env.publishableKey ?? extra?.supabase?.publishableKey ?? '').trim();
 
   if (!url || !publishableKey) return null;
   // Anything but https would put the user's training history on the wire in

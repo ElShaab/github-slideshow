@@ -19,9 +19,21 @@ const URL = 'https://abcdefghijklmnopqrst.supabase.co';
 const KEY = 'sb_publishable_1TtRObB7-1UUGf-OiKLT1Q_ol-hSWnG';
 
 describe('reading the project configuration', () => {
+  test('takes the values, not the environment object', () => {
+    // It used to take process.env and read properties off the parameter. Expo
+    // inlines `process.env.EXPO_PUBLIC_…` by substituting that exact expression
+    // in the source, so a property read off a parameter left nothing to
+    // substitute and the bundle shipped a lookup that found nothing on the
+    // device. No .env could configure such a build.
+    assert.deepEqual(readSupabaseConfig({ url: URL, publishableKey: KEY }, null), {
+      url: URL,
+      publishableKey: KEY,
+    });
+  });
+
   test('the environment is enough', () => {
     const config = readSupabaseConfig(
-      { EXPO_PUBLIC_SUPABASE_URL: URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: KEY },
+      { url: URL, publishableKey: KEY },
       null,
     );
     assert.deepEqual(config, { url: URL, publishableKey: KEY });
@@ -34,7 +46,7 @@ describe('reading the project configuration', () => {
 
   test('the environment wins, so a build can be pointed elsewhere without a commit', () => {
     const config = readSupabaseConfig(
-      { EXPO_PUBLIC_SUPABASE_URL: URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: KEY },
+      { url: URL, publishableKey: KEY },
       { supabase: { url: 'https://other.supabase.co', publishableKey: 'sb_publishable_other' } },
     );
     assert.equal(config?.url, URL);
@@ -46,15 +58,15 @@ describe('reading the project configuration', () => {
   });
 
   test('half a configuration is no configuration', () => {
-    assert.equal(readSupabaseConfig({ EXPO_PUBLIC_SUPABASE_URL: URL }, null), null);
-    assert.equal(readSupabaseConfig({ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: KEY }, null), null);
+    assert.equal(readSupabaseConfig({ url: URL }, null), null);
+    assert.equal(readSupabaseConfig({ publishableKey: KEY }, null), null);
   });
 
   test('cleartext is refused; iOS would block it and the data would be in the open', () => {
     const config = readSupabaseConfig(
       {
-        EXPO_PUBLIC_SUPABASE_URL: 'http://abcdefghijklmnopqrst.supabase.co',
-        EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: KEY,
+        url: 'http://abcdefghijklmnopqrst.supabase.co',
+        publishableKey: KEY,
       },
       null,
     );
@@ -63,7 +75,7 @@ describe('reading the project configuration', () => {
 
   test('a trailing slash does not become a double slash in every request', () => {
     const config = readSupabaseConfig(
-      { EXPO_PUBLIC_SUPABASE_URL: `${URL}/`, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: KEY },
+      { url: `${URL}/`, publishableKey: KEY },
       null,
     );
     assert.equal(config?.url, URL);
@@ -71,7 +83,7 @@ describe('reading the project configuration', () => {
 
   test('whitespace from a pasted value is trimmed', () => {
     const config = readSupabaseConfig(
-      { EXPO_PUBLIC_SUPABASE_URL: `  ${URL}  `, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ` ${KEY} ` },
+      { url: `  ${URL}  `, publishableKey: ` ${KEY} ` },
       null,
     );
     assert.deepEqual(config, { url: URL, publishableKey: KEY });

@@ -96,6 +96,22 @@ out of it even though a publishable key is designed to ship inside the app — i
 grants nothing without a signed-in user, but keeping it in the build environment
 means it can be rotated without a commit.
 
+**Clear the Metro cache after editing `.env`.** These values are substituted
+into the bundle at build time, and Metro caches the transformed module by file
+content — which `.env` is not part of. Editing it and rebuilding gives you the
+previous values with no warning. Verified, not assumed: the same build produced
+an empty config until the cache was reset, then the right one.
+
+```sh
+npx expo start --clear
+# or, for the Xcode path
+npx expo export:embed --reset-cache --platform ios --entry-file packages/mobile/index.js \
+  --bundle-output /dev/null --assets-dest /tmp/getfit-assets
+```
+
+A release build also refuses to start when these are missing, naming them on the
+misconfiguration screen, so a build without them cannot be submitted by mistake.
+
 ### For EAS builds
 
 `EXPO_PUBLIC_` variables must exist in the build environment to be inlined, and

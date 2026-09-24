@@ -26,12 +26,14 @@ describe('a build with no Supabase project', () => {
     assert.match(problems[0].field, /EXPO_PUBLIC_SUPABASE/);
   });
 
-  test('says where the values go and that a rebuild is needed', () => {
-    // They are inlined at bundle time, so a reload does not pick them up —
-    // the detail has to say so or the next build fails the same way.
+  test('says where the values go, and that the cache has to be cleared', () => {
+    // They are substituted into the bundle at build time, and Metro caches the
+    // transformed module by file content — which .env is not part of. Someone
+    // who edits .env and rebuilds gets the old values and no warning, so the
+    // message has to say so or the next build fails identically.
     const [problem] = readinessProblems({ ...configured, supabaseConfigured: false });
     assert.match(problem.detail, /\.env/);
-    assert.match(problem.detail, /build again/);
+    assert.match(problem.detail, /cache/i);
   });
 });
 
