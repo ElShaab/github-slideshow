@@ -15,7 +15,7 @@ import {
   type SecureKeyValueStore,
 } from '../src/supabase/secureStorage';
 
-const URL = 'https://nnixqsgcbuyqoylffsnt.supabase.co';
+const URL = 'https://abcdefghijklmnopqrst.supabase.co';
 const KEY = 'sb_publishable_1TtRObB7-1UUGf-OiKLT1Q_ol-hSWnG';
 
 describe('reading the project configuration', () => {
@@ -53,7 +53,7 @@ describe('reading the project configuration', () => {
   test('cleartext is refused; iOS would block it and the data would be in the open', () => {
     const config = readSupabaseConfig(
       {
-        EXPO_PUBLIC_SUPABASE_URL: 'http://nnixqsgcbuyqoylffsnt.supabase.co',
+        EXPO_PUBLIC_SUPABASE_URL: 'http://abcdefghijklmnopqrst.supabase.co',
         EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: KEY,
       },
       null,
