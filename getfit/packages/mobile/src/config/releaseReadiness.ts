@@ -1,6 +1,6 @@
 import { legal, missingLegalFields } from './legal';
 import { readinessProblems, type ReadinessProblem } from './readiness';
-import { isSupabaseConfigured } from '../supabase/client';
+import { accountsAvailable } from '../supabase/auth';
 
 /**
  * The configuration a shipped build cannot do without.
@@ -16,7 +16,11 @@ export type { ReadinessProblem };
 
 export function releaseReadiness(): ReadinessProblem[] {
   return readinessProblems({
-    supabaseConfigured: isSupabaseConfigured,
+    // accountsAvailable rather than "the two strings are present": it also
+    // builds the client. A build carrying keys whose client cannot be
+    // constructed would otherwise pass this check and go on skipping the
+    // account step in exactly the same silence.
+    supabaseConfigured: accountsAvailable(),
     missingLegalFields: missingLegalFields(),
   });
 }

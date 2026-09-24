@@ -14,7 +14,8 @@
     "legal": "node scripts/build-legal.mjs",
     "listing": "node scripts/check-listing.mjs",
     "cycles": "node scripts/check-cycles.mjs",
-    "supabase:check": "node scripts/check-supabase.mjs"
+    "supabase:check": "node scripts/check-supabase.mjs",
+    "env:check": "node scripts/check-env.mjs"
   },
   "dependencies": {
     "@getfit/shared": "*",

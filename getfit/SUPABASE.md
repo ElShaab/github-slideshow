@@ -103,11 +103,13 @@ previous values with no warning. Verified, not assumed: the same build produced
 an empty config until the cache was reset, then the right one.
 
 ```sh
-npx expo start --clear
-# or, for the Xcode path
-npx expo export:embed --reset-cache --platform ios --entry-file packages/mobile/index.js \
-  --bundle-output /dev/null --assets-dest /tmp/getfit-assets
+npm run env:check --workspace @getfit/mobile
 ```
+
+That bundles with the cache reset and tells you whether the values reached the
+bundle — about twenty seconds, against ten minutes for an Xcode build that
+answers the same question by not asking for an email. It is the fastest way to
+know a build will work before making one.
 
 A release build also refuses to start when these are missing, naming them on the
 misconfiguration screen, so a build without them cannot be submitted by mistake.
