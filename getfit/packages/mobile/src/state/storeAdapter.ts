@@ -409,7 +409,7 @@ export class NativeStoreProvider implements StoreProvider {
       // Some versions resolve with the transaction itself. Use it and stop
       // waiting; most resolve with nothing and the listener delivers instead.
       const immediate = Array.isArray(result) ? result[0] : result;
-      if (immediate && receiptOf(immediate, this.os)) {
+      if (immediate && identifies(immediate, this.os)) {
         delivered.cancel();
         return this.toStorePurchase(immediate, productId);
       }
@@ -448,7 +448,7 @@ export class NativeStoreProvider implements StoreProvider {
     const purchase = [...purchases]
       .filter((item) => !purchaseHasLapsed(item))
       .sort((a, b) => (b.transactionDate ?? 0) - (a.transactionDate ?? 0))
-      .find((item) => Boolean(receiptOf(item, this.os)));
+      .find((item) => identifies(item, this.os));
 
     return purchase ? this.toStorePurchase(purchase, purchase.productId) : null;
   }
@@ -476,9 +476,7 @@ export class NativeStoreProvider implements StoreProvider {
       ];
       const owned = purchases.find(
         (item) =>
-          item.productId === productId &&
-          !purchaseHasLapsed(item) &&
-          Boolean(receiptOf(item, this.os)),
+          item.productId === productId && !purchaseHasLapsed(item) && identifies(item, this.os),
       );
       return owned ? this.toStorePurchase(owned, productId) : null;
     } catch {
@@ -487,11 +485,12 @@ export class NativeStoreProvider implements StoreProvider {
   }
 
   private toStorePurchase(purchase: IapPurchase, fallbackProductId: string): StorePurchase {
-    const receipt = receiptOf(purchase, this.os);
-    if (!receipt) throw new StoreUnavailable('That purchase could not be verified.');
+    if (!identifies(purchase, this.os)) {
+      throw new StoreUnavailable('That purchase could not be verified.');
+    }
     return {
       platform: this.platform,
-      receipt,
+      receipt: receiptOf(purchase, this.os),
       transactionId: transactionIdOf(purchase),
       productId: purchase.productId ?? fallbackProductId,
       handle: purchase,
@@ -523,9 +522,31 @@ export function purchaseHasLapsed(purchase: IapPurchase, now = Date.now()): bool
   return stated <= now;
 }
 
-/** iOS hands back the app receipt; Android hands back a purchase token. */
+/**
+ * iOS hands back the app receipt; Android hands back a purchase token.
+ *
+ * Under StoreKit 2 there is no receipt at all — the library fills the field
+ * with an empty string and says so — because StoreKit 2 verifies transactions
+ * cryptographically at the source rather than handing out a blob to send
+ * somewhere for checking. So this can legitimately be empty on iOS, and
+ * nothing may treat empty as failure.
+ */
 function receiptOf(purchase: IapPurchase, os: DeviceOs): string {
   return (os === 'ios' ? purchase.transactionReceipt : purchase.purchaseToken) ?? '';
+}
+
+/**
+ * Whether this is a real transaction we can act on.
+ *
+ * This used to ask for a receipt, which was right when a server had to verify
+ * one and wrong the moment StoreKit 2 engaged: every genuine purchase arrived
+ * with an empty receipt and was rejected as unverifiable. Nothing in this app
+ * reads a receipt — entitlement comes from asking the store what the customer
+ * owns — so what matters is only that the transaction can be identified and
+ * finished.
+ */
+function identifies(purchase: IapPurchase, os: DeviceOs): boolean {
+  return Boolean(purchase?.transactionId || receiptOf(purchase, os));
 }
 
 function codeOf(error: unknown): string | undefined {
