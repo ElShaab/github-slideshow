@@ -210,20 +210,34 @@ describe('the range a field accepts', () => {
 });
 
 describe('the neck floor', () => {
-  test('35 cm is the smallest neck accepted', () => {
-    const at = { ...EMPTY_MEASUREMENTS, neckCm: '35' };
-    const below = { ...EMPTY_MEASUREMENTS, neckCm: '34.9' };
-    assert.equal(toMeasurements(at, 'metric').neckCm, 35);
-    assert.equal(toMeasurements(below, 'metric').neckCm, undefined);
+  test('accepts the necks adult women actually have', () => {
+    // The floor was 35 cm, above the average adult female neck of 30-34 cm.
+    // The neck is required to finish the assessment, so that locked a large
+    // share of women out of the thing they had just paid for.
+    for (const cm of ['28', '30', '32', '34']) {
+      assert.equal(
+        toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: cm }, 'metric').neckCm,
+        Number(cm),
+        `${cm} cm should be accepted`,
+      );
+    }
+  });
+
+  test('26 cm is the smallest, and below that is dropped as a mistyped reading', () => {
+    assert.equal(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '26' }, 'metric').neckCm, 26);
+    assert.equal(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '25.9' }, 'metric').neckCm, undefined);
+    assert.equal(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '3' }, 'metric').neckCm, undefined);
   });
 
   test('the field will not let you type below it either', () => {
-    assert.equal(boundsFor('neckCm', 'metric').min, 35);
+    assert.equal(boundsFor('neckCm', 'metric').min, 26);
   });
 
   test('the same floor applies in inches', () => {
-    // 13.5 in is 34.3 cm, under the floor; 14 in is 35.6 cm, over it.
-    assert.equal(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '13.5' }, 'imperial').neckCm, undefined);
-    assert.ok(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '14' }, 'imperial').neckCm);
+    // 10 in is 25.4 cm, under the floor; 11 in is 27.9 cm, over it. A 12.5 in
+    // neck — common for an adult woman — must pass.
+    assert.equal(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '10' }, 'imperial').neckCm, undefined);
+    assert.ok(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '11' }, 'imperial').neckCm);
+    assert.ok(toMeasurements({ ...EMPTY_MEASUREMENTS, neckCm: '12.5' }, 'imperial').neckCm);
   });
 });
