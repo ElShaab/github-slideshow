@@ -112,16 +112,25 @@ export function ResetPasswordScreen({ navigation }: Props): React.ReactElement {
         canSubmit: isValidCode(code),
         action: { label: 'Verify', onPress: verifyCode },
         body: (
-          <TextField
-            label="Code"
-            value={code}
-            onChangeText={(value) => setCode(cleanCode(value))}
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-            textContentType="oneTimeCode"
-            placeholder="123456"
-            maxLength={CODE_LENGTH}
-          />
+          <>
+            <TextField
+              label="Code"
+              value={code}
+              onChangeText={(value) => setCode(cleanCode(value))}
+              keyboardType="number-pad"
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
+              placeholder="123456"
+              maxLength={CODE_LENGTH}
+            />
+            {/* GetFit sends from a Gmail address until it has a domain of its
+                own, so the first email to a given person lands in spam often
+                enough to be worth saying out loud. Someone who does not find
+                it assumes the app is broken. */}
+            <Text variant="caption" color="muted">
+              Can&apos;t find it? Check your spam folder.
+            </Text>
+          </>
         ),
       };
     }

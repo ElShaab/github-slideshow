@@ -142,6 +142,146 @@ run; a sign-up that returns no session tells you email confirmation is on.
   app's private directory; that path is not synced, because it means nothing on
   another device.
 
+## Email templates
+
+Paste these into **Authentication → Emails → Templates**. Every one uses
+`{{ .Token }}`, the six-digit code — **not** `{{ .ConfirmationURL }}`. The app's
+screens ask for a code; a link cannot be typed into them, so a template left on
+the default sends people a dead end.
+
+**Three templates are used. The rest are not:**
+
+| Template | When it fires | Used |
+| --- | --- | --- |
+| **Confirm signup** | the address is new — the main path after payment | yes |
+| **Magic Link** | the address already has an account | yes |
+| **Reset Password** | "Forgot your password?" | yes |
+| Invite user | only from the dashboard, by you | no |
+| Change Email Address | the app has no change-email screen | no |
+| Reauthentication | not used | no |
+
+The three share a shape on purpose: no images, no external stylesheets, one
+piece of information, and everything selectable as plain text. That is also
+what keeps them out of spam — an image-heavy HTML mail from a Gmail address to
+a stranger is the classic profile of one.
+
+### 1. Confirm signup
+
+**Subject**
+
+```
+Your GetFit code is {{ .Token }}
+```
+
+**Body**
+
+```html
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:#0A2540;max-width:480px;margin:0 auto;padding:24px;">
+  <p style="font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:#5A7184;margin:0 0 20px;">GetFit</p>
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 12px;">Confirm your email</h1>
+  <p style="margin:0 0 24px;">Enter this code in the app to finish setting up your account.</p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:8px;margin:0 0 24px;color:#0A3B85;">{{ .Token }}</p>
+  <p style="margin:0 0 24px;">It expires in one hour and can be used once.</p>
+  <p style="font-size:14px;color:#5A7184;margin:0;">If you did not create a GetFit account, you can ignore this email.</p>
+  <p style="font-size:13px;color:#8A9AAB;margin:28px 0 0;">GetFit · getfit.app.support@gmail.com</p>
+</div>
+```
+
+### 2. Magic Link
+
+Fires when the address already has an account. Same code, different heading —
+this person is signing in, not signing up.
+
+**Subject**
+
+```
+Your GetFit code is {{ .Token }}
+```
+
+**Body**
+
+```html
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:#0A2540;max-width:480px;margin:0 auto;padding:24px;">
+  <p style="font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:#5A7184;margin:0 0 20px;">GetFit</p>
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 12px;">Your sign-in code</h1>
+  <p style="margin:0 0 24px;">Enter this code in the app to sign in.</p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:8px;margin:0 0 24px;color:#0A3B85;">{{ .Token }}</p>
+  <p style="margin:0 0 24px;">It expires in one hour and can be used once.</p>
+  <p style="font-size:14px;color:#5A7184;margin:0;">If you did not ask to sign in, you can ignore this email. Your account is unchanged.</p>
+  <p style="font-size:13px;color:#8A9AAB;margin:28px 0 0;">GetFit · getfit.app.support@gmail.com</p>
+</div>
+```
+
+### 3. Reset Password
+
+**Subject**
+
+```
+Your GetFit password reset code is {{ .Token }}
+```
+
+**Body**
+
+```html
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:#0A2540;max-width:480px;margin:0 auto;padding:24px;">
+  <p style="font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:#5A7184;margin:0 0 20px;">GetFit</p>
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 12px;">Reset your password</h1>
+  <p style="margin:0 0 24px;">Enter this code in the app, then choose a new password.</p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:8px;margin:0 0 24px;color:#0A3B85;">{{ .Token }}</p>
+  <p style="margin:0 0 24px;">It expires in one hour and can be used once.</p>
+  <p style="font-size:14px;color:#5A7184;margin:0;">If you did not ask to reset your password, you can ignore this email. Your password stays as it is.</p>
+  <p style="font-size:13px;color:#8A9AAB;margin:28px 0 0;">GetFit · getfit.app.support@gmail.com</p>
+</div>
+```
+
+### Checking them
+
+Put your own address through signup and through "Forgot your password?". Six
+digits in the inbox both times means all three are right. A button or a link
+means one is still on the default.
+
+## URL Configuration
+
+**Authentication → URL Configuration.**
+
+Nothing in this app opens a link from an email, so these settings do not affect
+it. Supabase still requires a Site URL, and the default is `http://localhost:3000`
+— which is a dead address on a customer's phone and appears in any email that
+falls back to a URL. Point it somewhere real instead:
+
+| Setting | Value |
+| --- | --- |
+| **Site URL** | `https://elshaab.github.io/github-slideshow/privacy.html` |
+| **Redirect URLs** | leave empty |
+
+Redirect URLs exist to allow-list where a magic link may send someone. This app
+never sends one, so an empty list is correct — and it is the safer default,
+since an over-broad entry there is what lets an attacker redirect a real sign-in
+link to a site they control.
+
+If you ever switch to magic links, this becomes real work: an app URL scheme, an
+`emailRedirectTo`, handling the incoming link, and this allow-list. That is the
+cost the code flow avoids.
+
+## Staying out of spam
+
+The test landing in spam is not about the template. It is about who the mail is
+from.
+
+Gmail SMTP sends as `getfit.app.support@gmail.com`, and a consumer Gmail address
+sending transactional mail to strangers has no domain reputation to draw on. It
+is also capped around 500 messages a day and is against Gmail's terms for bulk
+sending, so it will not scale past a small launch.
+
+The real fix is a domain you own plus a transactional provider (Resend,
+Postmark, SES), which gives you SPF, DKIM and DMARC aligned to that domain. That
+is what inbox placement actually rests on.
+
+Until then, these templates help as much as a template can: no images, no
+external CSS, no link shorteners, no marketing language, a single clear purpose,
+and everything readable as plain text. Ask your first testers to mark the first
+one "not spam" — with a low-volume sender, that genuinely moves it.
+
 ## Account setup, step by step
 
 After a successful purchase the app requires an account. It cannot be skipped:
