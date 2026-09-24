@@ -36,6 +36,16 @@ export interface SessionState {
   stage: SessionStage;
   userId: string | null;
   isGuest: boolean;
+  /**
+   * The signed-in account's address, or null when there is no account.
+   *
+   * `isGuest` cannot answer that: a build with no Supabase project reports
+   * every user as not-a-guest, because there is nothing to upgrade to. An
+   * email is unambiguous — it exists only when an account does — which matters
+   * for anything that would remove local data on the promise of getting it
+   * back.
+   */
+  email: string | null;
   profile: UserProfile | null;
   entitlement: Entitlement | null;
   hasAssessment: boolean;
@@ -70,6 +80,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
     stage: 'loading',
     userId: null,
     isGuest: true,
+    email: null,
     profile: null,
     entitlement: null,
     hasAssessment: false,
@@ -93,6 +104,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
         stage: 'onboarding',
         userId: me.userId,
         isGuest: me.isGuest,
+        email: me.email,
         profile: status.profile,
         entitlement: null,
         hasAssessment: false,
@@ -112,6 +124,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
     const base = {
       userId: me.userId,
       isGuest: me.isGuest,
+      email: me.email,
       profile: status.profile,
       entitlement,
       hasAssessment,
@@ -232,6 +245,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }): Re
       stage: 'onboarding',
       userId: null,
       isGuest: true,
+      email: null,
       profile: null,
       entitlement: null,
       hasAssessment: false,

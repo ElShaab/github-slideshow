@@ -183,13 +183,33 @@ describe('when to ask for an account', () => {
     );
   });
 
-  test('a half-finished one is asked every time, even right after postponing', () => {
-    // Verifying the code signs them in, so this account looks done while being
-    // unable to sign in on any other phone. Leaving it is worse than never
-    // having started, so the cooldown does not apply.
+  test('a half-finished account is chased, but postponing it still works', () => {
+    // Asked when nothing has been postponed...
+    assert.equal(
+      shouldAskForAccount({ signedIn: true, passwordSet: false, deferredAt: null }, NOW),
+      true,
+    );
+    // ...and again once the cooldown elapses.
+    assert.equal(
+      shouldAskForAccount(
+        { signedIn: true, passwordSet: false, deferredAt: hoursAgo(ACCOUNT_REMINDER_HOURS + 1) },
+        NOW,
+      ),
+      true,
+    );
+  });
+
+  test('"later" is never a button that does nothing', () => {
+    // It used to be, on the password step: a half-finished account ignored the
+    // cooldown, so postponing sent the user straight back to the same screen
+    // with no way off it.
     assert.equal(
       shouldAskForAccount({ signedIn: true, passwordSet: false, deferredAt: hoursAgo(0) }, NOW),
-      true,
+      false,
+    );
+    assert.equal(
+      shouldAskForAccount({ signedIn: false, passwordSet: false, deferredAt: hoursAgo(0) }, NOW),
+      false,
     );
   });
 

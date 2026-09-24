@@ -37,7 +37,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 export function SettingsScreen({ navigation }: Props): React.ReactElement {
   const { spacing, reduceMotion, setReduceMotionOverride } = useTheme();
   const { units, setUnits } = useUnits();
-  const { signOut, isGuest } = useSession();
+  const { signOut, isGuest, email } = useSession();
   const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +47,19 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+
+  const confirmSignOut = useCallback(() => {
+    Alert.alert(
+      'Sign out?',
+      'Your program, assessments and training history are removed from this phone. ' +
+        'They stay in your account, and come back when you sign in again. ' +
+        'Progress photos are only on this phone and will be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+      ],
+    );
+  }, [signOut]);
 
   const confirmDelete = useCallback(() => {
     Alert.alert(
@@ -251,7 +264,11 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
           label="Your data and photos"
           onPress={() => navigation.navigate('SettingsPrivacy')}
         />
-        <SettingsRow label="Sign out" onPress={() => void signOut()} />
+        {/* Only when there is something to sign out of. Signing out takes the
+            local copy with it — on a shared phone the next person must not be
+            served the previous account's body figures off disk — so offering it
+            to someone with no account would be a button that only destroys. */}
+        {email === null ? null : <SettingsRow label="Sign out" onPress={confirmSignOut} />}
         <SettingsRow
           label={busy ? 'Deleting…' : 'Delete account'}
           destructive

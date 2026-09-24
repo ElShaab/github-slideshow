@@ -140,13 +140,15 @@ export interface AccountPrompt {
  * the app works regardless — the account buys them a copy that survives the
  * phone, and that can wait until they have bars.
  *
- * A half-finished account is the exception. Verifying the emailed code signs
- * them in, so someone who stopped before choosing a password looks signed in
- * while being unable to sign in anywhere else. That is asked about every time,
- * because leaving it is worse than not starting.
+ * A half-finished account counts as unfinished: verifying the emailed code
+ * signs them in, so someone who stopped before choosing a password looks signed
+ * in while being unable to sign in anywhere else. They are chased on the same
+ * schedule as everyone else rather than on every launch — chasing harder made
+ * "later" do nothing on that step, which reads as a broken button and leaves no
+ * way off the screen at all.
  */
 export function shouldAskForAccount(prompt: AccountPrompt, now = new Date()): boolean {
-  if (prompt.signedIn) return !prompt.passwordSet;
+  if (prompt.signedIn && prompt.passwordSet) return false;
   if (!prompt.deferredAt) return true;
 
   const deferred = Date.parse(prompt.deferredAt);

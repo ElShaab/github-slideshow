@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { GlassButton, PrimaryButton, Screen, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
 import { AuthError, currentAccount } from '../../supabase/auth';
@@ -36,6 +37,19 @@ import { useTheme } from '../../theme';
 export function CreateAccountScreen(): React.ReactElement {
   const { spacing } = useTheme();
   const { refresh } = useSession();
+  // This screen appears two ways: as the stage the app is held at after
+  // payment, and pushed from Settings by someone coming back to finish. Pushed,
+  // a refresh changes no stage and would leave them on a screen with no way
+  // off, so anything that ends the flow steps back when there is a back to
+  // step to.
+  const navigation = useNavigation();
+  const leave = useCallback(async () => {
+    // Always refresh: it is what moves the stage on when this screen is the
+    // gate, and what stops Settings still offering to create an account that
+    // now exists. Then step back, if there is anywhere to step back to.
+    await refresh();
+    if (navigation.canGoBack()) navigation.goBack();
+  }, [navigation, refresh]);
 
   const [state, setState] = useState<AccountSetupState>({ step: 'email', email: '' });
   const [email, setEmail] = useState('');
@@ -104,12 +118,12 @@ export function CreateAccountScreen(): React.ReactElement {
     setBusy(true);
     try {
       await authApi.deferAccount();
-      await refresh();
+      await leave();
     } catch (caught) {
       show(caught);
       setBusy(false);
     }
-  }, [refresh, show]);
+  }, [leave, show]);
 
   const choosePassword = useCallback(async () => {
     const problem = passwordProblem(password);
@@ -124,13 +138,13 @@ export function CreateAccountScreen(): React.ReactElement {
       // Sets the password, records that setup finished, and pushes everything
       // already on this phone up to the new account.
       await authApi.completeAccount(password);
-      await refresh();
+      await leave();
     } catch (caught) {
       show(caught);
     } finally {
       setBusy(false);
     }
-  }, [password, refresh, show]);
+  }, [leave, password, show]);
 
   const { title, subtitle, body, action, canSubmit } = useMemo(() => {
     if (state.step === 'code') {
