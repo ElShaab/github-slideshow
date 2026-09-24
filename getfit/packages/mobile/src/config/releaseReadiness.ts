@@ -1,4 +1,6 @@
 import { legal, missingLegalFields } from './legal';
+import { readinessProblems, type ReadinessProblem } from './readiness';
+import { isSupabaseConfigured } from '../supabase/client';
 
 /**
  * The configuration a shipped build cannot do without.
@@ -10,33 +12,13 @@ import { legal, missingLegalFields } from './legal';
  * Surfacing them at launch, in the build itself, is the only way they get found
  * before submission rather than after.
  */
-export interface ReadinessProblem {
-  field: string;
-  detail: string;
-}
+export type { ReadinessProblem };
 
 export function releaseReadiness(): ReadinessProblem[] {
-  const problems: ReadinessProblem[] = [];
-
-  // No API URL is checked because there is no API. Every read and write goes
-  // to local storage, so a build with no network configuration is correct.
-  for (const field of missingLegalFields()) {
-    problems.push({
-      field,
-      detail:
-        'App Review requires a working link to this from inside the app. Set it in app.json under extra.legal.',
-    });
-  }
-
-  return problems;
-}
-
-/**
- * Whether this build is fit to submit. Development builds are exempt: the
- * localhost fallback is the point of them.
- */
-export function isReleaseReady(): boolean {
-  return __DEV__ || releaseReadiness().length === 0;
+  return readinessProblems({
+    supabaseConfigured: isSupabaseConfigured,
+    missingLegalFields: missingLegalFields(),
+  });
 }
 
 export { legal };
