@@ -28,6 +28,13 @@ export function describeAuthError(message: string): string {
   // wants twelve sends someone to type eight and be refused again, with the
   // same sentence, forever.
   if (text.includes('password')) {
+    // Supabase refuses a password identical to the current one. It reads as a
+    // rejected password and is the opposite: the password was already set, so
+    // an earlier attempt succeeded further than it appeared to.
+    if (text.includes('different from the old password') || text.includes('same_password')) {
+      return 'That is already your password — it was set on an earlier try. Use it to sign in.';
+    }
+
     const length = /at least (\d+) characters?/.exec(text);
     if (length) return `Choose a password of at least ${length[1]} characters.`;
 

@@ -58,6 +58,10 @@ export function CreateAccountScreen(): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What the server actually said, under the sentence written for the user.
+  // A rewrite that guesses wrong is otherwise invisible: it reads as confident
+  // and useless, and the only way out is a round trip with whoever built it.
+  const [cause, setCause] = useState<string | null>(null);
 
   // Resume where they left off rather than starting the email again, which
   // would send a second code and confuse the one already in their inbox.
@@ -83,11 +87,13 @@ export function CreateAccountScreen(): React.ReactElement {
         ? caught.message
         : 'Something went wrong.',
     );
+    setCause(caught instanceof AuthError ? caught.cause : null);
   }, []);
 
   const sendCode = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setCause(null);
     setNotice(null);
     try {
       await authApi.sendEmailCode(email);
@@ -103,6 +109,7 @@ export function CreateAccountScreen(): React.ReactElement {
   const verifyCode = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setCause(null);
     setNotice(null);
     try {
       await authApi.verifyEmailCode(state.email, code);
@@ -134,6 +141,7 @@ export function CreateAccountScreen(): React.ReactElement {
 
     setBusy(true);
     setError(null);
+    setCause(null);
     try {
       // Sets the password, records that setup finished, and pushes everything
       // already on this phone up to the new account.
@@ -225,9 +233,16 @@ export function CreateAccountScreen(): React.ReactElement {
       footer={
         <View style={{ gap: spacing.md }}>
           {error ? (
-            <Text variant="caption" color="danger" align="center" accessibilityLiveRegion="polite">
-              {error}
-            </Text>
+            <>
+              <Text variant="caption" color="danger" align="center" accessibilityLiveRegion="polite">
+                {error}
+              </Text>
+              {cause ? (
+                <Text variant="caption" color="muted" align="center" selectable>
+                  {cause}
+                </Text>
+              ) : null}
+            </>
           ) : notice ? (
             <Text variant="caption" color="muted" align="center" accessibilityLiveRegion="polite">
               {notice}

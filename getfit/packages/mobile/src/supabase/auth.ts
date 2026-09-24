@@ -19,9 +19,20 @@ export { describeAuthError };
  */
 
 export class AuthError extends Error {
-  constructor(message: string) {
+  /**
+   * What the server actually said.
+   *
+   * `message` is rewritten for the person reading it, and a rewrite that
+   * guesses wrong is invisible — it reads as a confident, useless instruction.
+   * Keeping the original means a screenshot says which rule was broken instead
+   * of which sentence this app chose.
+   */
+  readonly cause: string | null;
+
+  constructor(message: string, cause: string | null = null) {
     super(message);
     this.name = 'AuthError';
+    this.cause = cause;
   }
 }
 
@@ -83,7 +94,7 @@ export async function sendEmailCode(email: string): Promise<void> {
     email: email.trim(),
     options: { shouldCreateUser: true },
   });
-  if (error) throw new AuthError(describeAuthError(error.message));
+  if (error) throw new AuthError(describeAuthError(error.message), error.message);
 }
 
 /**
@@ -98,7 +109,7 @@ export async function sendEmailCode(email: string): Promise<void> {
  */
 export async function sendPasswordResetCode(email: string): Promise<void> {
   const { error } = await requireClient().auth.resetPasswordForEmail(email.trim());
-  if (error) throw new AuthError(describeAuthError(error.message));
+  if (error) throw new AuthError(describeAuthError(error.message), error.message);
 }
 
 /** Exchanges a recovery code for a session, so a new password can be set. */
@@ -108,7 +119,7 @@ export async function verifyPasswordResetCode(email: string, code: string): Prom
     token: code.trim(),
     type: 'recovery',
   });
-  if (error) throw new AuthError(describeAuthError(error.message));
+  if (error) throw new AuthError(describeAuthError(error.message), error.message);
 
   const account = toAccount(data.user);
   if (!account) throw new AuthError('That code is not right. Check it and try again.');
@@ -122,7 +133,7 @@ export async function verifyEmailCode(email: string, code: string): Promise<Acco
     token: code.trim(),
     type: 'email',
   });
-  if (error) throw new AuthError(describeAuthError(error.message));
+  if (error) throw new AuthError(describeAuthError(error.message), error.message);
 
   const account = toAccount(data.user);
   if (!account) throw new AuthError('That code is not right. Check it and try again.');
@@ -141,7 +152,7 @@ export async function setPassword(password: string): Promise<Account> {
     password,
     data: { passwordSet: true },
   });
-  if (error) throw new AuthError(describeAuthError(error.message));
+  if (error) throw new AuthError(describeAuthError(error.message), error.message);
 
   const account = toAccount(data.user);
   if (!account) throw new AuthError('Something went wrong. Try again.');
@@ -153,7 +164,7 @@ export async function signIn(email: string, password: string): Promise<Account> 
     email: email.trim(),
     password,
   });
-  if (error) throw new AuthError(describeAuthError(error.message));
+  if (error) throw new AuthError(describeAuthError(error.message), error.message);
 
   const account = toAccount(data.user);
   if (!account) throw new AuthError('That email and password do not match an account.');

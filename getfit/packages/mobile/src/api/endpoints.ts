@@ -103,7 +103,18 @@ export const authApi = {
    */
   async completeAccount(password: string): Promise<AuthTokens> {
     await setPassword(password);
-    await syncNow();
+
+    // The account is complete from here. A failure syncing is not a failure to
+    // create it, and reporting one as the other is how someone ends up retyping
+    // a password that already worked — which Supabase then refuses for being
+    // the same, in a sentence about passwords, which reads as the first error
+    // all over again.
+    try {
+      await syncNow();
+    } catch (error) {
+      console.warn('GetFit: account created, first sync deferred:', error);
+    }
+
     const { userId } = await localApi.me();
     return { accessToken: userId, userId, isGuest: false } as AuthTokens;
   },

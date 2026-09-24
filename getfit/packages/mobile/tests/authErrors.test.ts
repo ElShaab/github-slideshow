@@ -35,6 +35,16 @@ describe('password rules', () => {
     );
   });
 
+  test('a password that is already the account\'s is not called a bad password', () => {
+    // Supabase refuses one identical to the current password. It reads as a
+    // rejection and means the opposite: an earlier attempt set it after all,
+    // and the person is retyping something that already worked.
+    assert.equal(
+      describeAuthError('New password should be different from the old password.'),
+      'That is already your password — it was set on an earlier try. Use it to sign in.',
+    );
+  });
+
   test('an unrecognised password complaint does not invent a rule', () => {
     assert.equal(
       describeAuthError('Password is too weak'),

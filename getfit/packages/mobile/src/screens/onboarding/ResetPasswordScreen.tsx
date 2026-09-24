@@ -43,6 +43,10 @@ export function ResetPasswordScreen({ navigation }: Props): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What the server actually said, under the sentence written for the user.
+  // A rewrite that guesses wrong is otherwise invisible: it reads as confident
+  // and useless, and the only way out is a round trip with whoever built it.
+  const [cause, setCause] = useState<string | null>(null);
 
   const show = useCallback((caught: unknown) => {
     setError(
@@ -50,11 +54,13 @@ export function ResetPasswordScreen({ navigation }: Props): React.ReactElement {
         ? caught.message
         : 'Something went wrong.',
     );
+    setCause(caught instanceof AuthError ? caught.cause : null);
   }, []);
 
   const sendCode = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setCause(null);
     setNotice(null);
     try {
       await authApi.sendPasswordResetCode(email);
@@ -72,6 +78,7 @@ export function ResetPasswordScreen({ navigation }: Props): React.ReactElement {
   const verifyCode = useCallback(async () => {
     setBusy(true);
     setError(null);
+    setCause(null);
     setNotice(null);
     try {
       await authApi.verifyPasswordResetCode(state.email, code);
@@ -92,6 +99,7 @@ export function ResetPasswordScreen({ navigation }: Props): React.ReactElement {
 
     setBusy(true);
     setError(null);
+    setCause(null);
     try {
       // The recovery code already signed them in, so this sets the password and
       // pulls the account's data down in the same step.
@@ -182,9 +190,16 @@ export function ResetPasswordScreen({ navigation }: Props): React.ReactElement {
       footer={
         <View style={{ gap: spacing.md }}>
           {error ? (
-            <Text variant="caption" color="danger" align="center" accessibilityLiveRegion="polite">
-              {error}
-            </Text>
+            <>
+              <Text variant="caption" color="danger" align="center" accessibilityLiveRegion="polite">
+                {error}
+              </Text>
+              {cause ? (
+                <Text variant="caption" color="muted" align="center" selectable>
+                  {cause}
+                </Text>
+              ) : null}
+            </>
           ) : notice ? (
             <Text variant="caption" color="muted" align="center" accessibilityLiveRegion="polite">
               {notice}
