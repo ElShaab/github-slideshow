@@ -74,6 +74,23 @@ eas env:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value sb_publishabl
 `plaintext` is right here: the value ends up readable inside the app either way,
 and marking it secret would only hide it from the build logs.
 
+## Checking it actually works
+
+```sh
+npm run supabase:check --workspace @getfit/mobile
+```
+
+Reads the same two variables the app does, from the environment or from
+`packages/mobile/.env`. It creates two throwaway accounts, has one write a
+profile and a body assessment, and then checks the part that matters: that the
+other account sees none of it, that a signed-out caller sees none of it, and
+that neither can write into it. Then it deletes both through
+`delete_own_account`, and confirms the data went with them.
+
+It runs against the same REST and auth endpoints the app uses, so a pass means
+the app's path works too. A missing table tells you the migration has not been
+run; a sign-up that returns no session tells you email confirmation is on.
+
 ## How the sync behaves
 
 - **The device is the working copy.** Every screen reads and writes local

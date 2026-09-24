@@ -13,7 +13,8 @@
     "preflight": "node scripts/preflight.mjs",
     "legal": "node scripts/build-legal.mjs",
     "listing": "node scripts/check-listing.mjs",
-    "cycles": "node scripts/check-cycles.mjs"
+    "cycles": "node scripts/check-cycles.mjs",
+    "supabase:check": "node scripts/check-supabase.mjs"
   },
   "dependencies": {
     "@getfit/shared": "*",
