@@ -1,6 +1,6 @@
 # GetFit Privacy Policy
 
-**Last updated: 23 September 2026**
+**Last updated: 25 September 2026**
 
 > **Before publishing:** host this at a public HTTPS URL and enter that URL in
 > App Store Connect and Play Console. This document describes what the software

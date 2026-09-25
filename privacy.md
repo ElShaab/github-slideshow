@@ -7,7 +7,7 @@ permalink: /privacy
 
 <!-- Generated from the markdown in getfit/ by `npm run legal`. Do not edit. -->
 
-**Last updated: 23 September 2026**
+**Last updated: 25 September 2026**
 
 GetFit is operated by **Mohamed Hussein** ("we", "us"), who can be reached at
 **getfit.app.support@gmail.com** about anything in this policy. It
