@@ -1,0 +1,442 @@
+# Shipping GetFit
+
+Everything between a working checkout and an app in review. Steps marked
+**[you]** need credentials, a hosted URL or a device, and cannot be done from
+CI or by anyone but the account holder.
+
+## Before you build
+
+Run this first. It checks what App Review checks, and names exactly what is
+missing:
+
+```bash
+cd packages/mobile
+npm run preflight -- --profile production
+```
+
+A fresh checkout fails it with five items, and every one of them is something
+only you can supply — two hosted URLs and three App Store Connect identifiers:
+
+| What | Where it goes | Section |
+| --- | --- | --- |
+| Your hosted privacy policy | `app.json` → `extra.legal.privacyPolicyUrl` | 3 |
+| Your support page | `app.json` → `extra.legal.supportUrl` | 3 |
+| Apple ID, `ascAppId`, team ID | `eas.json` → `submit.production.ios` | 1 and 5 |
+
+**There is no server to deploy.** GetFit reads and writes local storage, and
+computes body composition and every training decision on the device. Nothing in
+the app makes a network request except the App Store and Play Billing.
+
+Your own terms are optional: leave `extra.legal.termsOfUseUrl` unset and the app
+links to Apple's standard EULA, which is always live. `TERMS.md` is there if you
+would rather host your own.
+
+**None of this fails loudly on its own.** A missing privacy-policy link is a
+rejection two days after upload, not a build error — so a release build that
+fails these checks refuses to start and names the missing field, rather than
+shipping and being rejected.
+
+---
+
+## 1. Turn on payments with Apple
+
+**[you] Do this before anything else — it has a waiting period, and nothing
+about in-app purchase works until it is finished.**
+
+1. **Apple Developer Program** — $99/year. Enrolment is reviewed, so budget a
+   day or two.
+2. **App Store Connect → Business → Agreements.** Sign the **Paid Applications
+   Agreement**, then complete the **banking** and **tax** forms attached to it.
+
+> **This is the step that wastes people's weeks.** Until the Paid Applications
+> agreement shows **Active**, `getSubscriptions()` returns an **empty array** and
+> every purchase fails — with no error that points at the cause. The app looks
+> broken, the code is fine. If products do not appear on a device, check this
+> before you debug anything else.
+
+3. **Create the app record** with bundle ID `com.getfit.app`, and copy its
+   Apple ID into `eas.json` as `ascAppId`.
+4. **Sandbox tester:** Users and Access → Sandbox → Testers. Use an email you
+   control that has **never** been an Apple ID. This account is for testing
+   only; never sign into the real App Store with it.
+
+Google Play is the same shape: a $25 one-off registration, then Payments
+profile under Setup → Payments, then the app record.
+
+---
+
+## 2. Create the store products
+
+Product IDs must match `SUBSCRIPTION_PLANS` in
+`packages/shared/src/constants.ts` **exactly**, or purchases fail with
+"That membership is not available on this device."
+
+**[you] App Store Connect → Subscriptions.** One group containing both:
+
+| Product ID | US price | Duration |
+| --- | --- | --- |
+| `getfit_membership_monthly` | **$4.99** | 1 month |
+| `getfit_membership_yearly` | **$19.99** | 1 year |
+
+**Whatever price point you pick, `priceUsd` in `SUBSCRIPTION_PLANS` has to
+match the US price exactly.** Guideline 3.1.2 requires the price on screen to
+be the price actually charged, and a $4.99 product behind a "$5" label is a
+mismatch a reviewer finds by reading the receipt. The price schedules in App
+Store Connect are $4.99 and $19.99, so that is what the constants say.
+
+The app asks the store for the real price and shows whatever it answers, in
+the customer's own currency. `priceUsd` is only the fallback for the moment
+before the store replies — but it is what a reviewer sees if the store is slow,
+so it still has to be right.
+
+Rank the yearly plan higher in the group so an upgrade takes effect
+immediately. Add **no** introductory offer — GetFit has no free trial, and the
+saving shown against monthly is computed by the app, not a store offer.
+
+**Sell worldwide if you want to.** The paywall asks the store what it will
+charge and renders that string, so a customer in the UK sees Apple's `£4.49`
+and one in Japan sees `¥800`. GetFit never converts currency — Apple and Google
+set each storefront's price from the point you choose above, and displaying
+anything else would be the 3.1.2 mismatch again. The bundled `$4.99` / `$19.99`
+show only in the moment before the store answers.
+
+Two things follow from that:
+
+- **No struck-through reference price is shown at all.** GetFit has never
+  charged more than it charges now, so there is no earlier price to strike
+  through, and quoting one the product was never sold at is deceptive under
+  App Review 3.1.1 and under consumer law in the EU, the UK and the US. The
+  yearly card instead states its saving against twelve months at that
+  storefront's own monthly rate — a comparison between two prices the customer
+  can actually pay today, which holds in every currency.
+- Apple's generated local prices are *approximate* equivalents, not conversions,
+  and they change when Apple adjusts its price matrix. That is expected and
+  needs nothing from you.
+
+**[you] Play Console → Monetise → Subscriptions.** The same two IDs, each with
+a base plan at the matching price. Android requires an **active** base plan
+offer; without one `getSubscriptions` returns a product with no offer token and
+the purchase cannot start.
+
+---
+
+## 3. Publish the privacy policy and support page
+
+Both pages are published from this repository by GitHub Pages, at:
+
+| Page | URL |
+| --- | --- |
+| Privacy Policy | `https://elshaab.github.io/github-slideshow/privacy.html` |
+| Support | `https://elshaab.github.io/github-slideshow/support.html` |
+
+Those URLs are already in `app.json` under `extra.legal`. What is left is the
+content.
+
+**[you] Fill in the three placeholders** in `PRIVACY.md` and `SUPPORT.md` —
+`[LEGAL ENTITY NAME]`, `[REGISTERED ADDRESS]` and `[SUPPORT EMAIL]`. Nobody can
+invent these: a privacy policy is a binding document naming the data
+controller, and a made-up company is worse than no page at all. Then:
+
+```bash
+npm run legal --workspace @getfit/mobile   # writes privacy.md and support.md
+```
+
+That renders both pages from the markdown, strips the "Before publishing" notes
+and refuses to write anything while a placeholder remains. Commit the two
+generated files, merge to the branch GitHub Pages serves, and turn Pages on in
+**Settings → Pages** if it is not already. Preflight fails the build until the
+placeholders are filled, so a policy naming nobody cannot ship.
+
+**Open both URLs in a browser before you submit.** App Review opens them, and a
+404 is a rejection that costs a review cycle.
+
+Enter the privacy URL in **three** places: App Store Connect, Play Console, and
+`app.json`. That third one is not optional — Guideline 3.1.2 requires an
+auto-renewable subscription app to carry a **working link to the privacy policy
+inside the binary**, on the purchase screen. The paywall and Settings render it
+from that field; a blank field means a release build refuses to start.
+
+GetFit uses **Apple's standard EULA**, so `extra.legal.termsOfUseUrl` is
+deliberately empty and the paywall links to Apple's terms. `TERMS.md` is in the
+repo unused; to publish your own instead, fill it in, add it to `PAGES` in
+`packages/mobile/scripts/legalPages.mjs`, and set that field.
+
+### App privacy answers (App Store Connect)
+
+Answer these to match what the app does:
+
+| Question | Answer |
+| --- | --- |
+| Health & Fitness data collected | **Yes** — linked to identity, app functionality |
+| Photos collected | **No** — a progress photo is optional, stays in the app's private directory on the device, and is never uploaded. Apple counts data as collected only when it leaves the device |
+| Contact info (email) | **Yes** — linked to identity, app functionality. Required to take out a membership, and verified by emailed code |
+| Purchases | **Yes** — linked to identity |
+| Used for tracking | **No** |
+| Used for third-party advertising | **No** |
+| Data used to train models | **No** — nothing is sent to any model |
+
+---
+
+## 4. Test purchases locally, free
+
+Before any of the Apple setup above, you can run real purchase flows on a
+simulator **or your own iPhone** with **no Apple Developer account and nothing
+in App Store Connect**, using `packages/mobile/GetFit.storekit`. It carries
+both plans at their real ids and prices.
+
+```bash
+cd packages/mobile
+npx expo prebuild --platform ios      # regenerates ios/ from app.json
+open ios/GetFit.xcworkspace
+```
+
+**Nothing to configure in Xcode.** Three things that would otherwise be hand
+edits are applied by prebuild:
+
+| What | Where it comes from |
+| --- | --- |
+| Run scheme points at `GetFit.storekit` | `plugins/withStoreKitConfiguration.js` |
+| App target deploys to iOS 15.1 | `expo-build-properties` in `app.json` |
+| **Every pod target** deploys to 15.1 | `plugins/withPodDeploymentTarget.js` |
+| Signing team is set | `ios.appleTeamId` in `app.json` |
+
+Press Run and the paywall opens a real StoreKit sheet that completes.
+
+### Why the pod deployment target needs its own plugin
+
+Xcode 16 warns and Xcode 27 refuses when a target deploys below its supported
+range. Several pods still declare iOS 13.4 in their podspec — RNCAsyncStorage
+among them — and a podspec's own floor is not overridden by `platform :ios` in
+the Podfile.
+
+`expo-build-properties` sets the Podfile's platform line and the **app**
+target. It does not touch pod targets, and in particular not **resource bundle
+targets**, which CocoaPods generates per pod and which inherit the podspec's
+floor. `RNCAsyncStorage_resources` is exactly that case.
+
+So the plugin injects a `post_install` hook that walks every target in every
+generated project and raises anything below the app's target. It only raises,
+so a pod needing something newer keeps it. It goes **inside** the Podfile's
+existing `post_install` block rather than adding a second one, because a
+Podfile keeps a single post-install callback and declaring it twice silently
+discards the first — React Native's own post-install work included.
+
+That is a plugin rather than a line in this file because **prebuild regenerates
+`ios/` wholesale** — a scheme edited by hand through *Product → Scheme → Edit
+Scheme → Run → Options* survives exactly until the next prebuild, and the
+symptom when it is lost is the paywall failing with "That membership is not
+available on this device". `ios/` is gitignored for the same reason: it is
+output, not source.
+
+The **Debug → StoreKit** menu then drives the cases that are painful to reach
+any other way: expire a subscription, force a renewal, decline a purchase, turn
+on Ask to Buy, or simulate an interrupted purchase. Tests keep the file's
+product ids and prices matching `SUBSCRIPTION_PLANS` and keep the scheme XML
+valid, because a drifted id fails silently — the paywall simply shows nothing
+to buy.
+
+### Why the app pins the old React Native architecture
+
+`app.json` sets `newArchEnabled: false`, deliberately. It is not a leftover.
+
+`react-native-iap` 12 is a legacy bridge module and never gained New
+Architecture support — the request for it sat unanswered and the project was
+archived in August 2026. One call in particular does not survive the move:
+selecting StoreKit 2 asks the native module whether it is available over a
+*blocking synchronous* bridge call, and where that kind of call is not exposed
+the method is simply absent, so it throws `undefined is not a function` rather
+than answering "no". Worse, the library points itself at the StoreKit 2 module
+before making that call, so the throw leaves it aimed at a module it never
+confirmed and every later billing call throws the same error.
+
+The adapter guards against that and falls back to StoreKit 1 (see
+`enableStoreKit2` in `src/state/storeAdapter.ts`), so the app keeps working
+either way — but the fallback decides membership from a receipt that does not
+always state an expiry, which means a lapsed subscriber can keep access. The
+old architecture is what lets StoreKit 2 engage properly, so it is what ships.
+
+Turning the flag back on means first replacing `react-native-iap` with a
+billing library that supports the new architecture, then confirming on a device
+that the StoreKit 1 fallback warning does **not** appear in the console.
+
+### When you want the real sandbox instead
+
+This is not a substitute for a sandbox purchase on a device. StoreKit
+Configuration never talks to Apple, so it cannot tell you that your products
+are live, that your Paid Applications agreement is active, or that your bundle
+id matches. It tells you the app handles what StoreKit sends.
+
+So when you are ready to test against Apple, take the file back off:
+
+```bash
+GETFIT_NO_STOREKIT_CONFIG=1 npx expo prebuild --platform ios --clean
+```
+
+EAS builds do this on their own — the plugin detaches the reference whenever
+`EAS_BUILD` is set, so a `preview` or `production` build always reaches the
+real store.
+
+---
+
+## 5. Build and test the purchase flow
+
+**This is the step that cannot be skipped.** In-app purchases have never run on
+a real device in this project. The store adapter is written against
+`react-native-iap` and compiles, but no sandbox purchase has been made.
+
+**In-app purchases cannot be tested in Expo Go.** `react-native-iap` is a
+native module, so Expo Go falls back to the mock store. You need a real build:
+
+```bash
+cd packages/mobile
+eas build --platform ios --profile preview     # [you] internal distribution
+```
+
+On the device, **sign out of the App Store first** (Settings → your name →
+Media & Purchases → Sign Out). The sandbox prompt appears at purchase time.
+Sandbox subscriptions renew on a compressed clock — a month is 5 minutes, a
+year is an hour — so renewal and expiry are testable in one sitting.
+
+### How sandbox is chosen
+
+**There is no sandbox setting, and no switch to flip.** The same binary talks to
+sandbox or production depending on how it was signed and who is signed in:
+
+| Build | Store it reaches |
+| --- | --- |
+| Run from Xcode after a plain `expo prebuild` | Neither — local simulation, because the plugin attached `GetFit.storekit` |
+| Run from Xcode after `GETFIT_NO_STOREKIT_CONFIG=1 expo prebuild --clean` | **Sandbox** |
+| Ad-hoc or TestFlight from EAS | **Sandbox**, automatically |
+| Downloaded from the App Store | Production |
+| Android from a Play track, licensed tester account | **Sandbox** (no charge) |
+
+Sandbox subscriptions also renew on a compressed clock — a month is 5 minutes,
+a year is an hour — so renewal and expiry are testable in one sitting. Six
+renewals then stop.
+
+**[you]** With a sandbox tester account signed in, verify each of:
+
+- [ ] Both plans appear at the store's own prices; yearly shows **$19.99**, the
+      saving against monthly, and the **BEST DEAL** badge — and **no**
+      struck-through price anywhere
+- [ ] Change the device's App Store region to the UK and reopen the paywall —
+      prices switch to **£** and the saving is recomputed in that currency,
+      never converted
+- [ ] Buying monthly grants access, and Settings → Membership shows the monthly plan
+- [ ] Buying yearly grants access, and Settings → Membership shows the yearly plan
+- [ ] Cancelling the sheet shows "Purchase cancelled", not an error
+- [ ] **Restore purchase** works on a second device with the same Apple ID
+- [ ] Let a sandbox subscription lapse (about 30 minutes at 5 minutes a
+      renewal) and confirm the app **locks** — this is the one StoreKit 1 got
+      wrong, so it is worth watching happen
+- [ ] The transaction is **finished** — it must not reappear on relaunch
+- [ ] An expired membership blocks the app and shows the renewal screen
+- [ ] **Manage or cancel in App Store** opens Apple's subscription settings —
+      the app never cancels a store subscription itself
+- [ ] Settings → Membership shows the plan you actually bought, not always $5/month
+- [ ] The paywall shows the price, the period, the auto-renewal wording and
+      working **Privacy Policy** and **Terms of Use** links
+- [ ] Settings → Health disclaimer opens and reads correctly
+- [ ] An assessment completes with **measurements only and no photo**
+- [ ] An assessment with no tape reading is labelled **Estimated**, not Measured
+- [ ] Symmetry reads a figure marked **Estimated** when no limb pair was
+      entered, and **Measured** once both sides of one are
+- [ ] Camera and photo-library permission prompts appear with our wording
+- [ ] Account deletion empties the device and returns you to onboarding
+
+---
+
+## 6. Submit
+
+```bash
+cd packages/mobile
+npm run preflight -- --profile production   # must pass before you spend build minutes
+eas build --platform ios --profile production
+
+# The Apple account email is deliberately not in eas.json — it is a personal
+# address and this repository is readable. Supply it here instead.
+EXPO_APPLE_ID=you@example.com \
+  eas submit --platform ios --profile production   # [you] Apple password + 2FA
+```
+
+`eas.json` carries the two identifiers that address the upload — `ascAppId`
+(the app record's numeric Apple ID) and `appleTeamId` — because neither is a
+secret and a wrong one uploads to the wrong app.
+
+**[you]** Still required in App Store Connect, and none of it can be automated:
+
+- Apple Developer Program membership ($99/year)
+- App record and bundle ID `com.getfit.app` — done; its Apple ID is in
+  `eas.json` as `ascAppId`
+- **Screenshots** — 6.7" and 6.5" iPhone, captured on a real device or
+  simulator. Good six: the hologram result, the measurements screen, Home, a
+  guided workout, Progress, and the paywall
+- Description, keywords, support URL, marketing URL
+- **Age rating: 12+.** Answer "Infrequent/Mild" to *Medical/Treatment
+  Information* — the app reports body-composition estimates — and "None" to
+  every other category
+- **Export compliance:** already answered. `ITSAppUsesNonExemptEncryption` is
+  `false` in `app.json`, because the app uses only HTTPS, which is exempt
+- A **sandbox account for the reviewer**, and the review notes below
+
+### Reviewer notes (paste into App Review Information)
+
+> GetFit calculates body composition from tape measurements and builds a
+> training program around it.
+>
+> To review the full flow: complete onboarding and enter any plausible waist
+> and neck measurement (for example 85 cm and 38 cm) on the measurements
+> screen, then view the analysis. The analysis is shown **before** any payment
+> is requested. A membership is then required to generate a training program.
+>
+> The measurements are optional — continuing without them produces a
+> height-and-weight estimate that the app labels "Estimated" rather than
+> "Measured". The body-fat figure comes from the published US Navy
+> circumference formula computed on our own server; **no third-party service,
+> AI or otherwise, receives any user data.**
+>
+> The progress photo is entirely optional and is **never analysed**. It is
+> stored privately so the user has a before/after reference, is never shown to
+> other users, and is never displayed in the app's Progress or History screens.
+> You can complete the whole review without taking one. Account deletion is
+> available in Settings → Privacy & data and removes all photos and data
+> immediately.
+>
+> Subscriptions are managed entirely by the App Store. Settings → Membership
+> opens Apple's subscription settings rather than cancelling in-app, because
+> Apple owns the billing relationship. The paywall carries the price, the
+> period, the auto-renewal terms and links to our privacy policy and terms.
+>
+> There is no free trial. Pricing is $5.00/month or $20.00/year.
+
+---
+
+## What is already handled
+
+Not a to-do list — these are done, and listed so you do not redo them:
+
+- **Privacy manifest** (`app.json` → `ios.privacyManifests`), declaring the
+  collected data types and the required-reason APIs. Apple rejects uploads
+  without one
+- **Guideline 3.1.2 disclosures** on the paywall: title, length, price,
+  auto-renewal wording, and in-binary privacy and terms links
+- **Subscription management** routed to the store, never cancelled in-app
+- **Account deletion** in Settings → Privacy & data, with a two-step
+  confirmation — Guideline 5.1.1(v)
+- **Restore purchase** on the paywall, verified server-side
+- **Health disclaimer** in Settings → About
+- **Specific permission strings** for camera and photo library
+- **Export compliance** answered in `app.json`
+
+---
+
+## Known gaps
+
+Honest list of what has **not** been verified, so nothing is assumed:
+
+- **No purchase has ever completed on a device.** The IAP adapter is written
+  and type-checked but never exercised against StoreKit or Play Billing.
+- The app has not been run on a physical device or simulator — it is verified
+  by an automated test suite, type checking and a clean production bundle.
+- **No screenshots exist.** They have to be captured from a running build and
+  are a required field in App Store Connect.

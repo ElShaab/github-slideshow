@@ -1,0 +1,152 @@
+{
+  "expo": {
+    "name": "GetFit",
+    "slug": "getfit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "getfit",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "backgroundColor": "#0A3B85",
+    "splash": {
+      "backgroundColor": "#0A3B85",
+      "resizeMode": "contain",
+      "image": "./assets/splash.png"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.getfit.app",
+      "appleTeamId": "9V8U88UQCU",
+      "infoPlist": {
+        "NSCameraUsageDescription": "GetFit uses your camera to take an optional progress photo, stored privately for your own before-and-after comparison.",
+        "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo to keep as a private progress photo.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "1",
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeHealthAndFitness",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePurchaseHistory",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          }
+        ],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "E174.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "35F9.1"
+            ]
+          }
+        ]
+      }
+    },
+    "android": {
+      "package": "com.getfit.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#062A66",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
+      "versionCode": 1
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GetFit lets you choose an existing photo to keep as a private progress photo.",
+          "cameraPermission": "GetFit uses your camera to take an optional progress photo, stored privately for your own before-and-after comparison."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "react-native-iap",
+        {
+          "paymentProvider": "Play Store"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "./plugins/withStoreKitConfiguration",
+      "./plugins/withPodDeploymentTarget"
+    ],
+    "extra": {
+      "legal": {
+        "privacyPolicyUrl": "https://elshaab.github.io/github-slideshow/privacy.html",
+        "termsOfUseUrl": "",
+        "supportUrl": "https://elshaab.github.io/github-slideshow/support.html"
+      }
+    },
+    "icon": "./assets/icon.png",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
