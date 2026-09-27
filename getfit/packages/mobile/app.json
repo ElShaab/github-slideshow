@@ -18,14 +18,14 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.getfit.app",
+      "bundleIdentifier": "com.buildyourbestyou.app",
       "appleTeamId": "9V8U88UQCU",
       "infoPlist": {
         "NSCameraUsageDescription": "GetFit uses your camera to take an optional progress photo, stored privately for your own before-and-after comparison.",
         "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo to keep as a private progress photo.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "1",
+      "buildNumber": "9",
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
@@ -135,7 +135,8 @@
         }
       ],
       "./plugins/withStoreKitConfiguration",
-      "./plugins/withPodDeploymentTarget"
+      "./plugins/withPodDeploymentTarget",
+      "./plugins/withSceneLifecycle"
     ],
     "extra": {
       "legal": {

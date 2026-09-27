@@ -190,7 +190,7 @@ npx expo prebuild --platform ios      # regenerates ios/ from app.json
 open ios/GetFit.xcworkspace
 ```
 
-**Nothing to configure in Xcode.** Three things that would otherwise be hand
+**Nothing to configure in Xcode.** Four things that would otherwise be hand
 edits are applied by prebuild:
 
 | What | Where it comes from |
@@ -198,6 +198,7 @@ edits are applied by prebuild:
 | Run scheme points at `GetFit.storekit` | `plugins/withStoreKitConfiguration.js` |
 | App target deploys to iOS 15.1 | `expo-build-properties` in `app.json` |
 | **Every pod target** deploys to 15.1 | `plugins/withPodDeploymentTarget.js` |
+| **UIScene life cycle** is adopted | `plugins/withSceneLifecycle.js` |
 | Signing team is set | `ios.appleTeamId` in `app.json` |
 
 Press Run and the paywall opens a real StoreKit sheet that completes.
@@ -234,6 +235,63 @@ on Ask to Buy, or simulate an interrupted purchase. Tests keep the file's
 product ids and prices matching `SUBSCRIPTION_PLANS` and keep the scheme XML
 valid, because a drifted id fails silently — the paywall simply shows nothing
 to buy.
+
+### Why iOS 27 needs a SceneDelegate
+
+An app linked against the **iOS 27 SDK** must adopt the UIScene life cycle. If
+`UIApplicationSceneManifest` is missing from `Info.plist`, UIKit runs
+`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` as the first
+scene connects and traps the process with a bare `brk 0`. The crash report
+reads:
+
+```
+Exception Type:  EXC_BREAKPOINT (SIGTRAP)
+0   UIKit  ___UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption_block_invoke
+...
+23  UIKit  UIApplicationMain
+```
+
+No exception, no message, and `main.m` at the bottom of the stack, so it looks
+like the app died before any of our code ran — which it did. The same binary
+launches normally on iOS 18, because older releases do not enforce the
+requirement. **Build with Xcode 27 and the app is affected even if nothing
+about it changed.**
+
+Expo SDK 52 predates the requirement and its iOS template writes no manifest,
+so every prebuild produced an app that could not launch on iOS 27.
+`plugins/withSceneLifecycle.js` adds the two pieces Expo added in a much later
+SDK:
+
+1. `UIApplicationSceneManifest` in `Info.plist`, naming `SceneDelegate` for the
+   one window-scene role, with multiple scenes off.
+2. A `SceneDelegate` class, appended to `AppDelegate.mm`.
+
+The manifest alone is not enough, and the failure it leaves is worse than the
+crash: declaring scenes changes who owns the window, and UIKit will not display
+a window attached to no scene. React Native still builds its window in
+`application:didFinishLaunchingWithOptions:` — `RCTAppDelegate`'s
+`loadReactNativeWindow:` — and that still runs first. What is missing is the
+hand-off, so the SceneDelegate **adopts that existing window** instead of
+building its own; replacing it would discard the root view controller React
+Native had just populated and launch to a black screen.
+
+Adopting scenes also moves two callbacks off `UIApplicationDelegate`:
+`application:openURL:options:` is no longer called, and neither is
+`application:continueUserActivity:restorationHandler:`. `AppDelegate.mm`
+implements exactly those two to drive `RCTLinkingManager`, which is what the
+`getfit://` scheme and `Linking.getInitialURL` run on, so the SceneDelegate
+forwards both back to the app delegate. Without that, deep links would stop
+arriving with nothing to show for it — a silent regression, not a crash.
+
+The class goes into `AppDelegate.mm` rather than its own file because a new
+file has to be registered in `project.pbxproj` to be compiled, and editing that
+archive during prebuild is far more fragile than adding a second class to a
+translation unit the project already builds. UIKit resolves
+`UISceneDelegateClassName` through the Objective-C runtime, which does not care
+which file the class came from.
+
+Tests hold the manifest's class name and the generated class name together. A
+rename on one side is not a build error — it is a crash on every device.
 
 ### Why the app pins the old React Native architecture
 
