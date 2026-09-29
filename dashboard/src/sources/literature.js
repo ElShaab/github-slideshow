@@ -138,6 +138,7 @@ async function poll() {
   const totals = { fetched: 0, added: 0, duplicates: 0, unmatched: 0 };
   const failures = new Map();
   let dropped = 0;
+  let answered = 0;
 
   for (const term of batch) {
     const results = await Promise.allSettled(
@@ -154,6 +155,7 @@ async function poll() {
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         lists.push(result.value);
+        answered += 1;
         return;
       }
       // One database failing never stops the sweep; it is counted and
@@ -188,6 +190,16 @@ async function poll() {
     totals.unmatched += stats.unmatched;
 
     await sleep(400);
+  }
+
+  if (!answered) {
+    // Every database failed for every keyword: that is a broken sweep, not an
+    // empty one, and the dashboard should show it as such.
+    throw new Error(
+      `no database answered: ${[...failures]
+        .map(([label, count]) => `${label} ×${count}`)
+        .join(', ')}`
+    );
   }
 
   const notes = [

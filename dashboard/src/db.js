@@ -398,7 +398,10 @@ const DEFAULT_SETTINGS = {
   'draft.effort': 'high',
   'draft.max_tokens': '16000',
 
-  'pubmed.enabled': 'true',
+  // The daily literature sweep covers PubMed along with five other
+  // databases, so the standalone poll is off by default; turn it on in
+  // Sources if you want PubMed on its own faster schedule as well.
+  'pubmed.enabled': 'false',
   'pubmed.interval_minutes': '360',
   'pubmed.reldate_days': '30',
   'pubmed.max_results': '25',

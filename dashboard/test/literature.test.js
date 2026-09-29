@@ -247,3 +247,22 @@ test('the precise publication date survives a merge', () => {
   ]);
   assert.equal(merged[0].published_on, '2026-09-24');
 });
+
+test('a sweep where every database failed is an error, not a quiet success', async () => {
+  research.resetRateLimiter();
+  settings.set('literature.max_keywords', '1');
+  state.setCursor('literature', 0);
+  const mock = mockFetch({
+    'esearch.fcgi': { status: 503, body: { error: 'down' } },
+    'ebi.ac.uk/europepmc': { status: 503, body: { error: 'down' } },
+    'api.crossref.org': { status: 503, body: { error: 'down' } },
+    'api.semanticscholar.org': { status: 503, body: { error: 'down' } },
+    'api.openalex.org': { status: 503, body: { error: 'down' } },
+    'clinicaltrials.gov/api/v2': { status: 503, body: { error: 'down' } },
+  });
+  try {
+    await assert.rejects(() => literature.poll(), /no database answered/);
+  } finally {
+    mock.restore();
+  }
+});
