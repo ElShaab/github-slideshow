@@ -118,6 +118,9 @@ function providerFor(item) {
 
 function status(req) {
   const linked = new Map(connections.list().map((c) => [c.provider, c]));
+  const manual = new Map(
+    require('../lib/manualAccounts').list().map((a) => [a.provider, a])
+  );
   return PROVIDERS.map((provider) => ({
     id: provider.id,
     label: provider.label,
@@ -126,6 +129,7 @@ function status(req) {
     scopes: provider.scopes,
     redirect_uri: redirectUri(provider.id, req),
     connection: linked.get(provider.id) || null,
+    manual_account: manual.get(provider.id) || null,
   }));
 }
 

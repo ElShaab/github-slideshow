@@ -66,6 +66,29 @@ module.exports = {
     return { id: channel.id, name: channel.snippet ? channel.snippet.title : channel.id };
   },
 
+  /** Accepts a channel @handle, a channel URL, or a plain channel name. */
+  normalizeHandle(raw) {
+    const value = String(raw || '').trim();
+    if (!value) {
+      const err = new Error('A channel name or @handle is required');
+      err.status = 400;
+      throw err;
+    }
+    const fromUrl = value.match(/youtube\.com\/(@[A-Za-z0-9_.-]+)/i);
+    const handle = fromUrl ? fromUrl[1] : value.startsWith('@') ? value : null;
+    if (handle) {
+      return { handle, profile_url: `https://www.youtube.com/${handle}` };
+    }
+    const channelId = value.match(/(UC[A-Za-z0-9_-]{20,24})/);
+    if (channelId) {
+      return {
+        handle: channelId[1],
+        profile_url: `https://www.youtube.com/channel/${channelId[1]}`,
+      };
+    }
+    return { handle: value.slice(0, 80), profile_url: null };
+  },
+
   canReplyTo(item) {
     return item.source === 'youtube' && /^(comment|video):/.test(item.external_id || '');
   },

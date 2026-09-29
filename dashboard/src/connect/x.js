@@ -75,6 +75,22 @@ module.exports = {
     return { id: user.id, name: user.username ? `@${user.username}` : user.name };
   },
 
+  /** Accepts "drsmith", "@drsmith" or a profile URL. */
+  normalizeHandle(raw) {
+    const name = String(raw || '')
+      .trim()
+      .replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, '')
+      .replace(/^@/, '')
+      .replace(/\/.*$/, '')
+      .trim();
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(name)) {
+      const err = new Error(`"${raw}" is not an X handle`);
+      err.status = 400;
+      throw err;
+    }
+    return { handle: `@${name}`, profile_url: `https://x.com/${name}` };
+  },
+
   canReplyTo(item) {
     return item.source === 'x' && /^\d+$/.test(item.external_id || '');
   },

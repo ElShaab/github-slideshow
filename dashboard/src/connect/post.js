@@ -6,6 +6,7 @@ const drafts = require('../lib/drafts');
 const items = require('../lib/items');
 const replies = require('../lib/replies');
 const settings = require('../lib/settings');
+const manualAccounts = require('../lib/manualAccounts');
 
 /**
  * What the dashboard can tell the physician before they press send: which
@@ -35,6 +36,7 @@ function target(itemId) {
   }
 
   const connection = connections.get(provider.id);
+  const manual = manualAccounts.get(provider.id);
   return {
     item_id: item.id,
     can_reply: !!connection && settings.getBool('reply.enabled', true),
@@ -43,12 +45,17 @@ function target(itemId) {
     registered: provider.isRegistered(),
     connected: !!connection,
     account_name: connection ? connection.account_name : null,
+    // Declared by hand where no app could be registered: the dashboard knows
+    // who you post as and keeps the record, you paste the reply yourself.
+    manual_account: manual ? { handle: manual.handle, profile_url: manual.profile_url } : null,
     // Shown verbatim in the confirmation, so the destination is never a guess.
     description: provider.describeTarget(item),
     target_id: item.external_id,
     target_url: item.url,
     reason: !connection
-      ? `No ${provider.label} account is linked yet.`
+      ? manual
+        ? `Posting for you needs a linked ${provider.label} app; copy and paste the reply as ${manual.handle}.`
+        : `No ${provider.label} account is linked yet.`
       : !settings.getBool('reply.enabled', true)
         ? 'Replying is switched off in settings.'
         : null,
@@ -135,4 +142,46 @@ async function send({ draftId, confirm }) {
   }
 }
 
-module.exports = { target, send };
+/**
+ * Close the loop on a reply you pasted in yourself: the dashboard did not
+ * send it, but it records what went out, under which account, and marks the
+ * draft and question used.
+ */
+function recordManual({ draftId, url }) {
+  const draft = drafts.get(draftId);
+  if (!draft) {
+    const err = new Error('Draft not found');
+    err.status = 404;
+    throw err;
+  }
+  const item = items.get(draft.item_id);
+  if (!item) {
+    const err = new Error('The question this draft belongs to is gone');
+    err.status = 404;
+    throw err;
+  }
+  const provider = connect.providerFor(item);
+  if (!provider) {
+    const err = new Error('This item cannot be replied to');
+    err.status = 400;
+    throw err;
+  }
+  const account = manualAccounts.get(provider.id);
+
+  const reply = replies.record({
+    item_id: item.id,
+    draft_id: draft.id,
+    provider: provider.id,
+    target_id: item.external_id,
+    content: String(draft.content || '').trim(),
+    status: 'posted',
+    method: 'manual',
+    remote_id: account ? account.handle : null,
+    url: url ? String(url).trim() : item.url,
+  });
+  drafts.setStatus(draft.id, 'used');
+  items.setStatus(item.id, 'used');
+  return { reply, draft: drafts.get(draft.id), account: account ? account.handle : null };
+}
+
+module.exports = { target, send, recordManual };

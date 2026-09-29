@@ -780,10 +780,14 @@ function connectionsCard(info) {
     who.append(el('strong', '', provider.label));
 
     if (provider.connection) {
-      who.append(el('span', '', `Connected as ${provider.connection.account_name}`));
+      who.append(el('span', '', `Connected as ${provider.connection.account_name} — posts for you`));
       if (provider.connection.last_error) {
         who.append(el('span', 'error', provider.connection.last_error));
       }
+    } else if (provider.manual_account) {
+      who.append(
+        el('span', '', `${provider.manual_account.handle} — you paste and post the reply yourself`)
+      );
     } else if (!provider.registered) {
       who.append(el('span', '', `Not set up yet — ${provider.registration}`));
       const uriRow = el('div', 'row');
@@ -832,10 +836,58 @@ function connectionsCard(info) {
       connect.addEventListener('click', () => startConnect(provider));
       actions.append(connect);
     }
+
+    // Available whether or not an app was ever registered.
+    const manualButton = el(
+      'button',
+      'tiny ghost',
+      provider.manual_account ? 'Change account' : 'Add account by hand'
+    );
+    manualButton.title = `Record the ${provider.label} account you post from, without OAuth`;
+    manualButton.addEventListener('click', () => setManualAccount(provider));
+    actions.append(manualButton);
+
+    if (provider.manual_account) {
+      const forget = el('button', 'tiny danger', 'Forget');
+      forget.addEventListener('click', async () => {
+        try {
+          await api(`/connections/${provider.id}/manual`, { method: 'DELETE' });
+          toast(`${provider.label} account removed`);
+          loadSources();
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+      actions.append(forget);
+    }
     row.append(actions);
     card.append(row);
   }
   return card;
+}
+
+async function setManualAccount(provider) {
+  const examples = {
+    reddit: 'AmputeeAssit, u/AmputeeAssit or a profile link',
+    x: 'drsmith, @drsmith or a profile link',
+    youtube: '@YourChannel, a channel link, or the channel name',
+  };
+  const current = provider.manual_account ? provider.manual_account.handle : '';
+  const entered = prompt(
+    `Which ${provider.label} account do you post from?\n\n${examples[provider.id] || ''}`,
+    current
+  );
+  if (entered === null || !entered.trim()) return;
+  try {
+    const saved = await api(`/connections/${provider.id}/manual`, {
+      method: 'PUT',
+      body: { handle: entered },
+    });
+    toast(`Replies will be posted as ${saved.handle}`);
+    loadSources();
+  } catch (err) {
+    toast(err.message, true);
+  }
 }
 
 function startConnect(provider) {
@@ -1294,7 +1346,8 @@ function renderReply() {
     const box = el('div', `reply-sent${sent.status === 'failed' ? ' failed' : ''}`);
     box.append(
       document.createTextNode(
-        `Replied ${relativeTime(sent.posted_at)} as ${SOURCE_LABELS[sent.provider] || sent.provider}. `
+        `Replied ${relativeTime(sent.posted_at)} on ${SOURCE_LABELS[sent.provider] || sent.provider}` +
+          `${sent.method === 'manual' ? ` by hand${sent.remote_id ? ` as ${sent.remote_id}` : ''}` : ''}. `
       )
     );
     if (sent.url) {
@@ -1309,11 +1362,28 @@ function renderReply() {
 
   const dest = el('div', 'dest');
   if (!target.can_reply) {
-    dest.textContent = target.reason || 'This item cannot be replied to from the dashboard.';
+    if (target.manual_account) {
+      dest.append(document.createTextNode('You post as '));
+      dest.append(el('b', '', target.manual_account.handle));
+      dest.append(
+        document.createTextNode(
+          ` to ${target.description}. Copy the draft, paste it there, then mark it replied.`
+        )
+      );
+    } else {
+      dest.textContent = target.reason || 'This item cannot be replied to from the dashboard.';
+    }
     bar.append(dest);
     const row = el('div', 'row');
     if (target.provider && !target.connected) {
-      const connect = el('button', 'tiny ghost', `Link a ${target.provider_label} account`);
+      const connect = el(
+        'button',
+        'tiny ghost',
+        target.manual_account
+          ? 'Set up one-click posting'
+          : `Link a ${target.provider_label} account`
+      );
+      connect.title = `Register a ${target.provider_label} app so the dashboard can post for you`;
       connect.addEventListener('click', () => showTab('sources'));
       row.append(connect);
     }
@@ -1321,6 +1391,8 @@ function renderReply() {
     if (manual) row.append(manual);
     const link = threadLink(target);
     if (link) row.append(link);
+    const done = markRepliedButton(target);
+    if (done) row.append(done);
     if (row.children.length) bar.append(row);
     return;
   }
@@ -1343,6 +1415,38 @@ function renderReply() {
   const link = threadLink(target);
   if (link) row.append(link);
   bar.append(row);
+}
+
+/**
+ * Records a reply pasted in by hand, so the feed and the reply log stay
+ * accurate even where the dashboard cannot post for you.
+ */
+function markRepliedButton(target) {
+  const draft = state.workbench.draft;
+  if (!target.provider || !draft || !draft.content.trim()) return null;
+
+  const button = el('button', 'tiny ghost', 'Mark as replied');
+  button.title = 'Record that you posted this yourself';
+  button.addEventListener('click', async () => {
+    const who = target.manual_account ? target.manual_account.handle : `your ${target.provider_label} account`;
+    if (!confirm(`Record this draft as posted to ${target.description} as ${who}?`)) return;
+    const url = prompt(
+      'Link to your reply (optional — paste it so the record points at the right comment):',
+      ''
+    );
+    try {
+      const result = await api(`/drafts/${draft.id}/mark-replied`, {
+        method: 'POST',
+        body: { url: url || undefined },
+      });
+      toast(result.account ? `Recorded as ${result.account}` : 'Recorded');
+      await loadWorkbench();
+      refreshCounts();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+  return button;
 }
 
 /** Opens the original thread, or the source page for a research result. */

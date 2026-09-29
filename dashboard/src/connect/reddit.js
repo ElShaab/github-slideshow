@@ -66,6 +66,23 @@ module.exports = {
   },
 
   /** Reddit fullnames are what the feed already stores: t3_ posts, t1_ comments. */
+  /** Accepts "AmputeeAssit", "u/AmputeeAssit" or a profile URL. */
+  normalizeHandle(raw) {
+    const name = String(raw || '')
+      .trim()
+      .replace(/^https?:\/\/(www\.|old\.)?reddit\.com/i, '')
+      .replace(/^\/?(u|user)\//i, '')
+      .replace(/^u\//i, '')
+      .replace(/\/.*$/, '')
+      .trim();
+    if (!/^[A-Za-z0-9_-]{3,20}$/.test(name)) {
+      const err = new Error(`"${raw}" is not a Reddit username`);
+      err.status = 400;
+      throw err;
+    }
+    return { handle: `u/${name}`, profile_url: `https://www.reddit.com/user/${name}/` };
+  },
+
   canReplyTo(item) {
     return item.source === 'reddit' && /^t[13]_/.test(item.external_id || '');
   },

@@ -5,6 +5,7 @@ const connect = require('../connect');
 const connections = require('../lib/connections');
 const post = require('../connect/post');
 const replies = require('../lib/replies');
+const manualAccounts = require('../lib/manualAccounts');
 
 const router = express.Router();
 
@@ -88,6 +89,23 @@ router.get('/connections/:provider/callback', async (req, res) => {
   }
 });
 
+/** Declare the account you post from by hand, without OAuth. */
+router.put('/connections/:provider/manual', (req, res) => {
+  const provider = connect.get(req.params.provider);
+  if (!provider) return res.status(404).json({ error: 'Unknown provider' });
+  const raw = (req.body || {}).handle;
+  if (!raw) return res.status(400).json({ error: 'handle is required' });
+  const normalized = provider.normalizeHandle(raw);
+  res.json(manualAccounts.save(provider.id, normalized));
+});
+
+router.delete('/connections/:provider/manual', (req, res) => {
+  if (!manualAccounts.remove(req.params.provider)) {
+    return res.status(404).json({ error: 'No account recorded for that platform' });
+  }
+  res.status(204).end();
+});
+
 router.delete('/connections/:provider', (req, res) => {
   if (!connect.get(req.params.provider)) {
     return res.status(404).json({ error: 'Unknown provider' });
@@ -108,6 +126,15 @@ router.post('/drafts/:id/post', async (req, res) => {
   const result = await post.send({
     draftId: Number(req.params.id),
     confirm: (req.body || {}).confirm === true,
+  });
+  res.status(201).json(result);
+});
+
+/** Record a reply you pasted in yourself. */
+router.post('/drafts/:id/mark-replied', (req, res) => {
+  const result = post.recordManual({
+    draftId: Number(req.params.id),
+    url: (req.body || {}).url,
   });
   res.status(201).json(result);
 });

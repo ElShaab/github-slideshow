@@ -186,6 +186,27 @@ A reviewed draft can be posted straight back to the thread it came from, as
 | X | developer.x.com → OAuth 2.0, Read and write (PKCE) | `tweet.write`, `offline.access`, … |
 | YouTube | Google Cloud → OAuth client ID (Web application) | `youtube.force-ssl` |
 
+### Accounts declared by hand
+
+Registering an app is a hard prerequisite for posting through any of these
+APIs, and it is not always available — a new Reddit account with an unverified
+email cannot create one, for instance. **Add account by hand** on the same card
+records which account you post from without any OAuth:
+
+- The Workbench names it: "You post as u/AmputeeAssit to a post in r/amputee."
+- **Copy draft & open thread** copies the reply and opens the thread, so you
+  paste and post it yourself.
+- **Mark as replied** records it against that account, optionally with a link
+  to your comment, and moves the draft and the question to Used — so the feed
+  and the reply log stay accurate even where the dashboard cannot send.
+
+Replies logged this way are stored with `method = 'manual'`, so they are
+distinguishable from ones the dashboard sent itself. Declaring an account by
+hand never enables API posting; when you do get an app registered, connect it
+and the same questions gain the one-click path.
+
+### Linking for one-click posting
+
 Set `PUBLIC_URL` to the address this dashboard is reachable at, then copy the
 redirect URI each card shows into the platform's app settings — they must match
 exactly. Pressing **Connect** opens that platform's own consent screen; the
@@ -358,6 +379,9 @@ staggered so every API is not called at once.
 | GET    | `/api/connections/:provider/start` | Begin linking (redirects to the platform) |
 | GET    | `/api/connections/:provider/callback` | OAuth return leg |
 | DELETE | `/api/connections/:provider` | Unlink an account |
+| PUT    | `/api/connections/:provider/manual` | Record the account you post from by hand |
+| DELETE | `/api/connections/:provider/manual` | Forget that account |
+| POST   | `/api/drafts/:id/mark-replied` | Log a reply you pasted in yourself |
 | GET    | `/api/items/:id/reply-target` | Where a reply would go, and as whom |
 | POST   | `/api/drafts/:id/post` | Send the reply (requires `{confirm: true}`) |
 | GET    | `/api/replies` | Everything sent, newest first |
@@ -371,7 +395,7 @@ Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
 `keywords`, `keyword_sources`, `items`, `item_keywords`, `seen_items`,
 `source_state`, `settings`, `subreddits`, `youtube_channels`, `search_sites`,
 `api_usage`, `poll_log`, `research_matches`, `drafts`, `connections`,
-`oauth_states`, `replies`. The schema is created on
+`oauth_states`, `replies`, `manual_accounts`. The schema is created on
 boot by `src/db.js`; deleting `data/dashboard.db` resets everything. Cached
 research and drafts are removed with their question by foreign key.
 

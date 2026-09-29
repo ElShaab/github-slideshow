@@ -4,8 +4,8 @@ const { db } = require('../db');
 
 const stmts = {
   insert: db.prepare(
-    `INSERT INTO replies (item_id, draft_id, provider, target_id, content, status, remote_id, url, error)
-     VALUES (@item_id, @draft_id, @provider, @target_id, @content, @status, @remote_id, @url, @error)`
+    `INSERT INTO replies (item_id, draft_id, provider, target_id, content, status, method, remote_id, url, error)
+     VALUES (@item_id, @draft_id, @provider, @target_id, @content, @status, @method, @remote_id, @url, @error)`
   ),
   byId: db.prepare('SELECT * FROM replies WHERE id = ?'),
   forItem: db.prepare('SELECT * FROM replies WHERE item_id = ? ORDER BY id DESC'),
@@ -24,6 +24,8 @@ function record(entry) {
     target_id: entry.target_id,
     content: entry.content,
     status: entry.status,
+    // 'api' when the dashboard posted it, 'manual' when you pasted it yourself.
+    method: entry.method || 'api',
     remote_id: entry.remote_id || null,
     url: entry.url || null,
     error: entry.error ? String(entry.error).slice(0, 1000) : null,

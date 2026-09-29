@@ -153,6 +153,16 @@ CREATE TABLE IF NOT EXISTS connections (
   last_error    TEXT
 );
 
+-- Accounts declared by hand, for platforms where no app could be registered.
+-- No tokens: the dashboard knows who you post as and keeps the record, but
+-- you paste and post the reply yourself.
+CREATE TABLE IF NOT EXISTS manual_accounts (
+  provider    TEXT PRIMARY KEY,
+  handle      TEXT NOT NULL,
+  profile_url TEXT,
+  added_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Short-lived CSRF state (and PKCE verifier) for an in-flight connect.
 CREATE TABLE IF NOT EXISTS oauth_states (
   state      TEXT PRIMARY KEY,
@@ -170,6 +180,7 @@ CREATE TABLE IF NOT EXISTS replies (
   target_id TEXT    NOT NULL,
   content   TEXT    NOT NULL,
   status    TEXT    NOT NULL CHECK (status IN ('posted', 'failed')),
+  method    TEXT    NOT NULL DEFAULT 'api',
   remote_id TEXT,
   url       TEXT,
   error     TEXT,
@@ -254,9 +265,28 @@ function migrateLegacySourceChecks() {
   );
 }
 
+/** Adds a column to an existing table when the schema has grown. */
+function ensureColumn(table, column, definition) {
+  const exists = db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .some((c) => c.name === column);
+  if (exists) return false;
+  const hasTable = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(table);
+  if (!hasTable) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  console.log(`[db] added ${table}.${column}`);
+  return true;
+}
+
 migrateLegacySourceChecks();
 
 db.exec(SCHEMA);
+
+// Replies used to be API-only; manual sends are recorded the same way.
+ensureColumn('replies', 'method', "TEXT NOT NULL DEFAULT 'api'");
 
 const SOURCES = ['reddit', 'x', 'youtube', 'pubmed', 'websearch'];
 
