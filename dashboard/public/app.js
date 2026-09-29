@@ -786,8 +786,20 @@ function connectionsCard(info) {
       }
     } else if (!provider.registered) {
       who.append(el('span', '', `Not set up yet — ${provider.registration}`));
-      const uri = el('span', 'redirect', provider.redirect_uri);
-      who.append(uri);
+      const uriRow = el('div', 'row');
+      uriRow.append(el('span', 'redirect', provider.redirect_uri));
+      const copyUri = el('button', 'tiny ghost', 'Copy');
+      copyUri.title = 'Copy the redirect URI to paste into the platform';
+      copyUri.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(provider.redirect_uri);
+          toast('Redirect URI copied');
+        } catch {
+          toast('Copy failed — select the address and copy it manually', true);
+        }
+      });
+      uriRow.append(copyUri);
+      who.append(uriRow);
     } else {
       who.append(el('span', '', 'Not connected'));
     }
@@ -1307,6 +1319,8 @@ function renderReply() {
     }
     const manual = manualReplyButton(target);
     if (manual) row.append(manual);
+    const link = threadLink(target);
+    if (link) row.append(link);
     if (row.children.length) bar.append(row);
     return;
   }
@@ -1326,14 +1340,19 @@ function renderReply() {
   const manual = manualReplyButton(target);
   if (manual) row.append(manual);
 
-  if (target.target_url) {
-    const link = el('a', '', 'Open the thread ↗');
-    link.href = target.target_url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    row.append(link);
-  }
+  const link = threadLink(target);
+  if (link) row.append(link);
   bar.append(row);
+}
+
+/** Opens the original thread, or the source page for a research result. */
+function threadLink(target) {
+  if (!target.target_url) return null;
+  const link = el('a', '', target.provider ? 'Open the thread ↗' : 'Open the source ↗');
+  link.href = target.target_url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  return link;
 }
 
 /**
@@ -1343,7 +1362,9 @@ function renderReply() {
  */
 function manualReplyButton(target) {
   const draft = state.workbench.draft;
-  if (!draft || !draft.content.trim() || !target.target_url) return null;
+  // Research results have no reply box to paste into.
+  if (!target.provider || !target.target_url) return null;
+  if (!draft || !draft.content.trim()) return null;
 
   const button = el('button', 'tiny ghost', 'Copy draft & open thread');
   button.title = 'Copies the draft, then opens the thread so you can paste and post it yourself';

@@ -25,6 +25,7 @@ function target(itemId) {
     return {
       item_id: item.id,
       can_reply: false,
+      target_url: item.url,
       reason:
         item.source === 'pubmed' || item.source === 'websearch'
           ? 'This is a research result, not a question anyone posted.'
