@@ -4,6 +4,8 @@ const express = require('express');
 const scheduler = require('../scheduler');
 const state = require('../lib/state');
 const subreddits = require('../lib/subreddits');
+const feeds = require('../lib/feeds');
+const feedSource = require('../sources/feeds');
 const youtubeChannels = require('../lib/youtubeChannels');
 const youtube = require('../sources/youtube');
 const searchSites = require('../lib/searchSites');
@@ -49,6 +51,46 @@ router.patch('/reddit/subreddits/:id', (req, res) => {
 router.delete('/reddit/subreddits/:id', (req, res) => {
   if (!subreddits.remove(Number(req.params.id))) {
     return res.status(404).json({ error: 'Subreddit not found' });
+  }
+  res.status(204).end();
+});
+
+/* ---- Feeds: any RSS or Atom address ---- */
+
+router.get('/feeds/feeds', (req, res) => {
+  res.json(feeds.list());
+});
+
+/**
+ * Takes a feed address or the page that advertises one, checks it answers,
+ * and stores it with the title the feed gives itself.
+ */
+router.post('/feeds/feeds', async (req, res) => {
+  const body = req.body || {};
+  try {
+    const resolved = await feedSource.resolve(body.url);
+    const saved = feeds.add({
+      url: resolved.url,
+      label: body.label || resolved.label,
+      siteUrl: resolved.siteUrl,
+    });
+    res.status(201).json({ ...saved, items_seen: resolved.items });
+  } catch (err) {
+    res.status(err.status && err.status < 500 ? err.status : 502).json({
+      error: err.message || 'Could not read that feed',
+    });
+  }
+});
+
+router.patch('/feeds/feeds/:id', (req, res) => {
+  const ok = feeds.setEnabled(Number(req.params.id), (req.body || {}).enabled);
+  if (!ok) return res.status(404).json({ error: 'Feed not found' });
+  res.json({ ok: true });
+});
+
+router.delete('/feeds/feeds/:id', (req, res) => {
+  if (!feeds.remove(Number(req.params.id))) {
+    return res.status(404).json({ error: 'Feed not found' });
   }
   res.status(204).end();
 });

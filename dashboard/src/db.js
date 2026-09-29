@@ -99,6 +99,18 @@ CREATE TABLE IF NOT EXISTS subreddits (
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Any RSS or Atom feed the physician wants questions pulled from.
+CREATE TABLE IF NOT EXISTS feeds (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  url             TEXT    NOT NULL UNIQUE,
+  label           TEXT,
+  site_url        TEXT,
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  last_fetched_at TEXT,
+  last_error      TEXT,
+  created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Domains the licensed-search-API source runs site: queries against.
 CREATE TABLE IF NOT EXISTS search_sites (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -321,7 +333,7 @@ function retireStandalonePubmedPoll() {
 
 retireStandalonePubmedPoll();
 
-const SOURCES = ['reddit', 'x', 'youtube', 'pubmed', 'websearch', 'literature'];
+const SOURCES = ['reddit', 'x', 'youtube', 'feeds', 'pubmed', 'websearch', 'literature'];
 
 const DEFAULT_SETTINGS = {
   'reddit.enabled': 'true',
@@ -344,6 +356,10 @@ const DEFAULT_SETTINGS = {
   'youtube.max_search_keywords': '4',
 
   // Licensed search APIs have small free tiers, so this polls twice a day.
+  'feeds.enabled': 'true',
+  'feeds.interval_minutes': '30',
+  'feeds.max_items': '50',
+
   'websearch.enabled': 'false',
   'websearch.interval_minutes': '720',
   'websearch.provider': 'brave',

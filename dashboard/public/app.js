@@ -5,6 +5,7 @@ const SOURCE_LABELS = {
   reddit: 'Reddit',
   x: 'X (Twitter)',
   youtube: 'YouTube',
+  feeds: 'Feeds',
   pubmed: 'PubMed',
   websearch: 'Web search',
   literature: 'Research sweep',
@@ -13,7 +14,7 @@ const SOURCE_LABELS = {
 const STATUSES = ['new', 'reviewed', 'used'];
 
 /** The feed column is a question list: people asking things, nowhere else. */
-const COMMUNITY_SOURCES = ['reddit', 'x', 'youtube', 'websearch'];
+const COMMUNITY_SOURCES = ['reddit', 'x', 'youtube', 'feeds', 'websearch'];
 /** Literature belongs to the research column, not the question list. */
 const LITERATURE_SOURCES = ['literature', 'pubmed'];
 
@@ -663,6 +664,7 @@ function sourceCard(source) {
   if (source.id === 'reddit') card.append(redditControls(source));
   if (source.id === 'x') card.append(xControls(source));
   if (source.id === 'youtube') card.append(youtubeControls(source));
+  if (source.id === 'feeds') card.append(feedControls(source));
   if (source.id === 'websearch') card.append(websearchControls(source));
   if (source.id === 'pubmed' || source.id === 'literature') {
     card.append(literatureControls(source));
@@ -859,6 +861,97 @@ function youtubeControls(source) {
     line.append(` ${label}`);
     wrap.append(line);
   }
+  return wrap;
+}
+
+/**
+ * Any RSS or Atom address, which is how most forums publish their new posts.
+ * No credentials, no quota — the one question source that needs nothing.
+ */
+function feedControls(source) {
+  const wrap = el('div');
+  wrap.append(el('h3', '', 'Feeds'));
+
+  const list = el('div', 'feed-list');
+  for (const feed of source.details.feeds) {
+    const row = el('div', `feed-row${feed.enabled ? '' : ' disabled'}`);
+    const who = el('div', 'who');
+    who.append(el('strong', '', feed.label || feed.url));
+    who.append(el('span', '', feed.url));
+    if (feed.last_error) who.append(el('span', 'error', feed.last_error));
+    else if (feed.last_fetched_at) {
+      who.append(el('span', '', `read ${relativeTime(feed.last_fetched_at)}`));
+    }
+    row.append(who);
+
+    const actions = el('div', 'row');
+    const toggle = el('button', 'tiny ghost', feed.enabled ? 'Pause' : 'Resume');
+    toggle.addEventListener('click', async () => {
+      await api(`/sources/feeds/feeds/${feed.id}`, {
+        method: 'PATCH',
+        body: { enabled: !feed.enabled },
+      });
+      loadSources();
+    });
+    const drop = el('button', 'tiny danger', 'Remove');
+    drop.addEventListener('click', async () => {
+      if (!confirm(`Stop reading ${feed.label || feed.url}?`)) return;
+      await api(`/sources/feeds/feeds/${feed.id}`, { method: 'DELETE' });
+      loadSources();
+    });
+    actions.append(toggle, drop);
+    row.append(actions);
+    list.append(row);
+  }
+  if (!source.details.feeds.length) {
+    list.append(
+      el(
+        'div',
+        'subtle',
+        'No feeds yet. Most forums publish one: paste the forum address and the feed is found automatically.'
+      )
+    );
+  }
+  wrap.append(list);
+
+  const form = el('form', 'row');
+  const input = el('input');
+  input.type = 'text';
+  input.placeholder = 'https://forum.example.org/latest.rss  (or the forum address)';
+  input.className = 'grow';
+  const submit = el('button', 'tiny', 'Add feed');
+  submit.type = 'submit';
+  form.append(input, submit);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!input.value.trim()) return;
+    submit.disabled = true;
+    submit.textContent = 'Checking…';
+    try {
+      const added = await api('/sources/feeds/feeds', {
+        method: 'POST',
+        body: { url: input.value.trim() },
+      });
+      toast(`Added ${added.label} — ${added.items_seen} item(s) in the feed right now`);
+      input.value = '';
+      loadSources();
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Add feed';
+    }
+  });
+  wrap.append(form);
+  wrap.append(
+    el(
+      'p',
+      'subtle',
+      'Reddit, Discourse and most forum software publish a feed of new posts. ' +
+        'A subreddit feed lives at reddit.com/r/<name>/new/.rss, a Discourse ' +
+        'forum at /latest.rss. Items are keyword-matched like every other source.'
+    )
+  );
   return wrap;
 }
 

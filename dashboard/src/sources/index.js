@@ -15,6 +15,7 @@ const modules = [
   require('./reddit'),
   require('./x'),
   require('./youtube'),
+  require('./feeds'),
   require('./pubmed'),
   require('./websearch'),
   require('./literature'),

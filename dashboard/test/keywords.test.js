@@ -29,6 +29,7 @@ test('scope "all" expands to every source', () => {
     'reddit',
     'x',
     'youtube',
+    'feeds',
     'pubmed',
     'websearch',
     'literature',

@@ -341,6 +341,7 @@ button.tiny { padding: 0.2rem 0.5rem; font-size: 0.78rem; }
 .badge.source-x { color: var(--text); }
 .badge.source-youtube { color: #c4302b; }
 .badge.source-pubmed { color: #2b6cb0; }
+.badge.source-feeds { color: #b45309; }
 .badge.source-websearch { color: #6b46c1; }
 .badge.source-literature { color: #0f766e; }
 .badge.kw { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
@@ -419,6 +420,16 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-size: 0.82rem;
 }
 .reply-sent.failed { border-left-color: var(--err); }
+
+.feed-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.6rem; }
+.feed-row {
+  display: flex; gap: 0.6rem; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; padding: 0.5rem 0.6rem; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--surface-2);
+}
+.feed-row.disabled { opacity: 0.55; }
+.feed-row .who { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.feed-row .who span { font-size: 0.76rem; color: var(--text-dim); overflow-wrap: anywhere; }
 
 .connection {
   display: flex; gap: 0.6rem; align-items: center; justify-content: space-between;

@@ -63,8 +63,9 @@ survives restarts.
 3. **Ingest** matches text against the live keyword list, skips anything
    already in the `seen_items` ledger, and writes the rest into `items`.
 4. **The console** is one screen with three columns. The **Questions** feed on
-   the right lists what people asked — Reddit, X, YouTube and the web-search
-   source that covers Quora, Inspire and any other domain you add — filterable
+   the right lists what people asked — Reddit, X, YouTube, any RSS or Atom
+   feed you add, and the web-search source that covers Quora, Inspire and any
+   other domain you add — filterable
    by source, keyword, status and free text, with a New / Reviewed / Used
    status per item. Literature never appears here. Clicking a question loads
    it into the middle column, where the draft reply is written and posted, and
@@ -374,6 +375,40 @@ is held back, and the expensive keyword search is skipped rather than
 overspending. `quotaExceeded` from the API backs the whole source off; a
 single channel with comments disabled is just reported.
 
+### Feeds (RSS / Atom) — no credentials, no quota
+
+The one question source that needs nothing at all. Add any RSS or Atom
+address in the Sources tab and its items are keyword-matched and filed in the
+question feed like every other source.
+
+Paste either the feed itself or the page it belongs to: if the address does
+not answer with a feed, the `<link rel="alternate" type="application/rss+xml">`
+tag publishers put in their `<head>` to advertise one is followed, once. That
+is feed discovery — the mechanism that tag exists for. Nothing is read out of
+the page itself, and a site that advertises no feed is rejected with a message
+saying so rather than being scraped.
+
+Where to find them:
+
+| Community | Feed |
+| --------- | ---- |
+| A subreddit | `reddit.com/r/<name>/new/.rss`, or `/comments/.rss` for replies |
+| Discourse forums | `<forum>/latest.rss`, or `/c/<category>.rss` for one category |
+| phpBB / vBulletin | usually `/feed.php` or `/external.php?type=RSS2` |
+| A blog or news site | the address alone; discovery finds it |
+
+RSS 2.0 and Atom are read into the same shape, tolerantly — feeds in the wild
+are frequently malformed, and a missing field costs one item rather than the
+poll. Escaped HTML in `<description>` or `<content>` is flattened to text with
+paragraph breaks kept. Items are deduplicated on their own `<guid>` or
+`<id>`, so the same post in two feeds is captured once. One dead feed is
+recorded against that feed and reported as a note; every feed failing marks
+the source as an error. Requests are spaced ~1s apart, since these are often
+small community servers.
+
+A bare address is assumed to be `https`. For an `http`-only forum, type the
+scheme.
+
 ### PubMed — no key required
 
 Uses NCBI E-utilities: `esearch` over `[Title/Abstract]` for every keyword
@@ -470,8 +505,11 @@ staggered so every API is not called at once.
 | GET    | `/api/replies` | Everything sent, newest first |
 
 Subreddits live under `/api/sources/reddit/subreddits`, YouTube channels under
-`/api/sources/youtube/channels`, and web-search domains under
-`/api/sources/websearch/sites` (all support GET/POST/PATCH/DELETE).
+`/api/sources/youtube/channels`, RSS and Atom feeds under
+`/api/sources/feeds/feeds`, and web-search domains under
+`/api/sources/websearch/sites` (all support GET/POST/PATCH/DELETE). A POST to
+the feeds endpoint resolves the address first and answers 400 if it is
+neither a feed nor a page advertising one.
 
 ## Database
 
