@@ -1299,11 +1299,15 @@ function renderReply() {
   if (!target.can_reply) {
     dest.textContent = target.reason || 'This item cannot be replied to from the dashboard.';
     bar.append(dest);
+    const row = el('div', 'row');
     if (target.provider && !target.connected) {
       const connect = el('button', 'tiny ghost', `Link a ${target.provider_label} account`);
       connect.addEventListener('click', () => showTab('sources'));
-      bar.append(connect);
+      row.append(connect);
     }
+    const manual = manualReplyButton(target);
+    if (manual) row.append(manual);
+    if (row.children.length) bar.append(row);
     return;
   }
 
@@ -1319,6 +1323,9 @@ function renderReply() {
   send.addEventListener('click', () => postReply(target));
   row.append(send);
 
+  const manual = manualReplyButton(target);
+  if (manual) row.append(manual);
+
   if (target.target_url) {
     const link = el('a', '', 'Open the thread ↗');
     link.href = target.target_url;
@@ -1327,6 +1334,36 @@ function renderReply() {
     row.append(link);
   }
   bar.append(row);
+}
+
+/**
+ * The no-API path: copy the draft and open the thread so it can be pasted
+ * into the platform's own reply box. Useful before an account is linked, and
+ * as a fallback when a token has expired mid-session.
+ */
+function manualReplyButton(target) {
+  const draft = state.workbench.draft;
+  if (!draft || !draft.content.trim() || !target.target_url) return null;
+
+  const button = el('button', 'tiny ghost', 'Copy draft & open thread');
+  button.title = 'Copies the draft, then opens the thread so you can paste and post it yourself';
+  button.addEventListener('click', async () => {
+    const text = $('#wb-draft-text').value;
+    let copied = true;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      copied = false;
+    }
+    window.open(target.target_url, '_blank', 'noopener');
+    toast(
+      copied
+        ? 'Draft copied — paste it into the reply box'
+        : 'Could not copy automatically — select the draft and copy it manually',
+      !copied
+    );
+  });
+  return button;
 }
 
 async function postReply(target) {
