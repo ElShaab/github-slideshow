@@ -659,6 +659,9 @@ function xControls(source) {
     loadSources();
   });
   wrap.append(select);
+  if (source.details.tier_note) {
+    wrap.append(el('p', 'error', source.details.tier_note));
+  }
   wrap.append(
     el(
       'p',

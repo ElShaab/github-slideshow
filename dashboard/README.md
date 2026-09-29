@@ -326,8 +326,11 @@ Sources tab:
 | basic | 15 min           | 2                    | 100             |
 | pro   | 5 min            | 5                    | 100             |
 
-Recent search is not included in X's free tier at all; if you are on free, the
-poll will return an authorization error until you upgrade.
+**Recent search is not in X's Free tier.** A Free-tier bearer token
+authenticates fine and then fails the search request with HTTP 403 — the
+source names that case explicitly rather than reporting a generic error, and
+the Sources card says so before you go looking for a token. Basic or above is
+required for this source to capture anything.
 
 ### YouTube — `YOUTUBE_API_KEY`
 

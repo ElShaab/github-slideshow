@@ -139,10 +139,37 @@ async function poll() {
     });
     if (sinceId) params.set('since_id', sinceId);
 
-    const { data, headers } = await fetchJson(`${ENDPOINT}?${params}`, {
-      headers: { Authorization: `Bearer ${config.x.bearerToken}` },
-      retries: 1,
-    });
+    let data;
+    let headers;
+    try {
+      ({ data, headers } = await fetchJson(`${ENDPOINT}?${params}`, {
+        headers: { Authorization: `Bearer ${config.x.bearerToken}` },
+        retries: 1,
+      }));
+    } catch (err) {
+      if (err.status === 403) {
+        // A valid token on a plan without recent search fails here, not at
+        // authentication, so the message has to name the real cause.
+        const detail = err.body && (err.body.detail || err.body.title);
+        const accessError = new Error(
+          'X rejected the search request (HTTP 403)' +
+            (detail ? `: ${String(detail).slice(0, 160)}` : '') +
+            '. Recent search is not included in the Free tier - it needs Basic ' +
+            'or above. The token itself may be fine.'
+        );
+        accessError.status = 403;
+        throw accessError;
+      }
+      if (err.status === 401) {
+        const authError = new Error(
+          'X rejected the bearer token (HTTP 401). Regenerate it in the X ' +
+            'developer portal and update X_BEARER_TOKEN.'
+        );
+        authError.status = 401;
+        throw authError;
+      }
+      throw err;
+    }
 
     const backedOff = applyRateLimitHeaders(headers);
     if (backedOff) notes.push(`rate window nearly spent, pausing ${backedOff}s`);
@@ -200,6 +227,12 @@ module.exports = {
     const configured = settings.getNumber('x.interval_minutes', 30);
     return {
       tier: tier(),
+      // Stated up front: a Free-tier token authenticates but cannot search.
+      search_available: tier() !== 'free',
+      tier_note:
+        tier() === 'free'
+          ? 'The Free tier does not include recent search, so this source cannot capture anything. Basic or above is required.'
+          : null,
       min_interval_minutes: limits.minIntervalMinutes,
       effective_interval_minutes: Math.max(configured, limits.minIntervalMinutes),
       max_queries_per_poll: limits.maxQueriesPerPoll,

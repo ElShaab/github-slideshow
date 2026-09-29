@@ -93,3 +93,41 @@ test('x query batching respects the character budget', () => {
   assert.ok(queries.length > 1);
   for (const q of queries) assert.ok(q.query.length <= 200, q.query.length);
 });
+
+test('a Free-tier 403 explains that recent search is not included', async () => {
+  const mock = mockFetch({
+    'api.x.com/2/tweets/search/recent': {
+      status: 403,
+      body: {
+        title: 'Client Forbidden',
+        detail: 'When authenticating requests to the Twitter API v2 endpoints, you must use keys and tokens from a Twitter developer App that is attached to a Project.',
+      },
+    },
+  });
+  try {
+    await assert.rejects(() => x.poll(), /Recent search is not included in the Free tier/);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('a rejected token is reported as a token problem, not a tier one', async () => {
+  const mock = mockFetch({
+    'api.x.com/2/tweets/search/recent': { status: 401, body: { title: 'Unauthorized' } },
+  });
+  try {
+    await assert.rejects(() => x.poll(), /Regenerate it in the X developer portal/);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('the card warns about the Free tier before a token is bought', () => {
+  const settings = require('../src/lib/settings');
+  settings.set('x.tier', 'free');
+  assert.equal(x.describe().search_available, false);
+  assert.match(x.describe().tier_note, /does not include recent search/);
+  settings.set('x.tier', 'basic');
+  assert.equal(x.describe().search_available, true);
+  assert.equal(x.describe().tier_note, null);
+});
