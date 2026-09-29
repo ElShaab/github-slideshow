@@ -73,6 +73,22 @@ router.post('/items/:id/drafts', async (req, res) => {
   }
 });
 
+/**
+ * A draft written by hand, with no model involved. Without this the whole
+ * reply workflow would depend on an Anthropic key: the physician could type
+ * a reply but never save it, so the copy-and-post path never appeared.
+ */
+router.post('/items/:id/drafts/manual', (req, res) => {
+  const item = items.get(Number(req.params.id));
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+
+  const content = String((req.body || {}).content || '');
+  if (!content.trim()) return res.status(400).json({ error: 'content is required' });
+
+  const saved = drafts.create({ item_id: item.id, content, model: null });
+  res.status(201).json({ draft: saved });
+});
+
 router.put('/drafts/:id', (req, res) => {
   const body = req.body || {};
   if (typeof body.content !== 'string') {

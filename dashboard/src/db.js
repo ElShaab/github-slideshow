@@ -333,6 +333,43 @@ function retireStandalonePubmedPoll() {
 
 retireStandalonePubmedPoll();
 
+/**
+ * Web search used to default to off, because an unconfigured source looked
+ * like a broken one. It is skipped with a message rather than an error, so
+ * leaving it on means Quora and Inspire start the moment a search key
+ * appears instead of waiting to be noticed. Applied once, so a deliberate
+ * pause later is never undone.
+ */
+function adoptWebsearchOnByDefault() {
+  const marker = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('websearch.default_on_applied');
+  if (marker) return;
+
+  const current = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('websearch.enabled');
+  const hasHistory = db
+    .prepare('SELECT 1 FROM source_state WHERE source = ? AND last_run_at IS NOT NULL')
+    .get('websearch');
+
+  // Only where it was never used: an install that has polled it has an
+  // opinion about the switch, and that opinion is kept.
+  if (current && current.value === 'false' && !hasHistory) {
+    db.prepare("UPDATE settings SET value = 'true' WHERE key = 'websearch.enabled'").run();
+    console.log(
+      '[db] web search (Quora, Inspire) is now on by default; it stays idle ' +
+        'until a search API key is set.'
+    );
+  }
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+    'websearch.default_on_applied',
+    new Date().toISOString()
+  );
+}
+
+adoptWebsearchOnByDefault();
+
 const SOURCES = ['reddit', 'x', 'youtube', 'feeds', 'pubmed', 'websearch', 'literature'];
 
 const DEFAULT_SETTINGS = {
@@ -360,7 +397,7 @@ const DEFAULT_SETTINGS = {
   'feeds.interval_minutes': '30',
   'feeds.max_items': '50',
 
-  'websearch.enabled': 'false',
+  'websearch.enabled': 'true',
   'websearch.interval_minutes': '720',
   'websearch.provider': 'brave',
   'websearch.results_per_query': '10',

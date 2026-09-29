@@ -280,6 +280,37 @@ test('ticking every paper is the same as ticking none', async () => {
   assert.match(sent.messages[0].content, /no strong match/);
 });
 
+test('a draft can be written by hand with no model involved', async () => {
+  const written = await call(`/api/items/${question.id}/drafts/manual`, {
+    method: 'POST',
+    body: { content: 'Written by hand, no API key needed.' },
+  });
+  assert.equal(written.status, 201);
+  assert.equal(written.data.draft.model, null);
+  assert.equal(written.data.draft.status, 'draft');
+  assert.equal(written.data.draft.content, 'Written by hand, no API key needed.');
+
+  // It behaves like any other draft from there on.
+  const edited = await call(`/api/drafts/${written.data.draft.id}`, {
+    method: 'PUT',
+    body: { content: 'Reworded by hand.' },
+  });
+  assert.equal(edited.data.status, 'edited');
+
+  assert.equal(
+    (await call(`/api/items/${question.id}/drafts/manual`, { method: 'POST', body: { content: '  ' } }))
+      .status,
+    400,
+    'an empty draft is not stored'
+  );
+  assert.equal(
+    (await call('/api/items/99999/drafts/manual', { method: 'POST', body: { content: 'x' } })).status,
+    404
+  );
+
+  await call(`/api/drafts/${written.data.draft.id}`, { method: 'DELETE' });
+});
+
 test('existing feed and keyword endpoints still work', async () => {
   assert.equal((await call('/api/items')).data.items.length, 1);
   assert.equal((await call('/api/keywords')).data.keywords.length, 1);

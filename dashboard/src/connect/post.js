@@ -8,6 +8,24 @@ const replies = require('../lib/replies');
 const settings = require('../lib/settings');
 const manualAccounts = require('../lib/manualAccounts');
 
+/** Community sources with a thread but no API to reply through. */
+const BY_HAND_SOURCES = new Set(['websearch', 'feeds']);
+/** Sources that are articles rather than anything anyone asked. */
+const LITERATURE_SOURCES = new Set(['pubmed', 'literature']);
+
+function hostOf(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'this site';
+  }
+}
+
+function describeByHand(item) {
+  const where = item.origin || hostOf(item.url);
+  return item.kind === 'search result' ? `a thread on ${where}` : `a post on ${where}`;
+}
+
 /**
  * What the dashboard can tell the physician before they press send: which
  * account the reply would go out as, exactly what it would be replying to,
@@ -23,12 +41,20 @@ function target(itemId) {
 
   const provider = connect.providerFor(item);
   if (!provider) {
+    // Quora, Inspire and any forum read through a feed are real threads with
+    // no API to answer them through. The dashboard cannot post, but it can
+    // hand over the draft, open the thread and keep the record - which is
+    // the whole workflow for those sites.
+    const byHand = BY_HAND_SOURCES.has(item.source) && !!item.url;
     return {
       item_id: item.id,
       can_reply: false,
+      manual_only: byHand,
       target_url: item.url,
-      reason:
-        item.source === 'pubmed' || item.source === 'websearch'
+      description: byHand ? describeByHand(item) : null,
+      reason: byHand
+        ? `${hostOf(item.url)} has no reply API. Copy the draft, post it there yourself, then mark it replied.`
+        : LITERATURE_SOURCES.has(item.source)
           ? 'This is a research result, not a question anyone posted.'
           : 'This source has no reply endpoint.',
       already_posted: replies.postedForItem(item.id),
@@ -161,27 +187,33 @@ function recordManual({ draftId, url }) {
     throw err;
   }
   const provider = connect.providerFor(item);
-  if (!provider) {
+  if (!provider && !BY_HAND_SOURCES.has(item.source)) {
     const err = new Error('This item cannot be replied to');
     err.status = 400;
     throw err;
   }
-  const account = manualAccounts.get(provider.id);
+  // A by-hand source has no linked account to name, so the record carries the
+  // site it was posted on instead.
+  const account = provider ? manualAccounts.get(provider.id) : null;
 
   const reply = replies.record({
     item_id: item.id,
     draft_id: draft.id,
-    provider: provider.id,
+    provider: provider ? provider.id : item.source,
     target_id: item.external_id,
     content: String(draft.content || '').trim(),
     status: 'posted',
     method: 'manual',
-    remote_id: account ? account.handle : null,
+    remote_id: account ? account.handle : provider ? null : hostOf(item.url),
     url: url ? String(url).trim() : item.url,
   });
   drafts.setStatus(draft.id, 'used');
   items.setStatus(item.id, 'used');
-  return { reply, draft: drafts.get(draft.id), account: account ? account.handle : null };
+  return {
+    reply,
+    draft: drafts.get(draft.id),
+    account: account ? account.handle : provider ? null : hostOf(item.url),
+  };
 }
 
 module.exports = { target, send, recordManual };

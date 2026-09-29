@@ -79,28 +79,19 @@ function forgetToken() {
   appToken = null;
 }
 
-/* ------------------------- public Atom feeds, the no-credential fallback -- */
+/* ------------- public Atom feeds, the path that needs no credentials ----- */
 
 /**
- * Reddit refuses the public JSON endpoints from a growing share of clients,
- * but every subreddit also publishes an Atom feed at the same paths with
- * `.rss`. It carries less metadata - no score, no comment count - but it is
- * an official, public feed and it needs no app registration.
+ * Reddit refuses the public JSON endpoints for a growing share of clients,
+ * answering with an HTML block page. Every subreddit also publishes an Atom
+ * feed at the same paths with `.rss` - an official, public interface that is
+ * not blocked the same way.
  *
- * Once the JSON endpoint has refused us, the rest of the poll goes straight
- * to the feeds rather than collecting a 403 per subreddit; the block is
- * re-tested after this window.
+ * So without app credentials the feed is the primary path, not a fallback:
+ * trying JSON first only buys a 403 per subreddit per poll. The JSON endpoint
+ * is still tried if the feed itself fails, since it carries more (score,
+ * comment count, flair) where it does answer.
  */
-const JSON_BLOCK_MEMORY_MS = 6 * 3600 * 1000;
-let jsonBlockedUntil = 0;
-
-function jsonLooksBlocked() {
-  return Date.now() < jsonBlockedUntil;
-}
-
-function rememberJsonBlocked() {
-  jsonBlockedUntil = Date.now() + JSON_BLOCK_MEMORY_MS;
-}
 
 /** `/r/x/new.json` -> `/r/x/new/.rss`, the feed for the same listing. */
 function feedUrl(path, limit) {
@@ -143,6 +134,11 @@ async function fetchFeed(path, limit, subreddit) {
       Accept: 'application/atom+xml, application/xml;q=0.9, */*;q=0.8',
     },
   });
+  // A block page answers 200 as readily as 403; anything that is not a feed
+  // is a failure, so the caller can try the other path.
+  if (!/<feed\b/i.test(String(text || ''))) {
+    throw new Error('the feed address did not answer with a feed');
+  }
   return atom.entries(text).map((entry) => normalizeFeedEntry(entry, subreddit));
 }
 
@@ -198,21 +194,22 @@ function normalizeComment(child, subreddit) {
  */
 async function fetchListing(path, limit, subreddit, normalize) {
   const headers = { 'User-Agent': redditUserAgent() };
-  let url;
 
-  // The JSON endpoint refused us recently; do not collect another 403 per
-  // subreddit before falling back.
-  if (!usingOAuth() && jsonLooksBlocked()) {
-    return fetchFeed(path, limit, subreddit);
+  // No app credentials: the feed first, the JSON endpoint only if it fails.
+  let feedError = null;
+  if (!usingOAuth()) {
+    try {
+      return await fetchFeed(path, limit, subreddit);
+    } catch (err) {
+      feedError = err;
+    }
   }
 
-  if (usingOAuth()) {
-    // /r/x/new.json -> /r/x/new on the OAuth host.
-    url = `${OAUTH_BASE}${path.replace(/\.json$/, '')}?limit=${limit}&raw_json=1`;
-    headers.Authorization = `Bearer ${await appOnlyToken()}`;
-  } else {
-    url = `${BASE}${path}?limit=${limit}&raw_json=1`;
-  }
+  const url = usingOAuth()
+    ? // /r/x/new.json -> /r/x/new on the OAuth host.
+      `${OAUTH_BASE}${path.replace(/\.json$/, '')}?limit=${limit}&raw_json=1`
+    : `${BASE}${path}?limit=${limit}&raw_json=1`;
+  if (usingOAuth()) headers.Authorization = `Bearer ${await appOnlyToken()}`;
 
   let data;
   try {
@@ -222,21 +219,16 @@ async function fetchListing(path, limit, subreddit, normalize) {
       // The cached token was rejected; drop it so the next poll re-authorizes.
       forgetToken();
     }
-    if (err.status === 403 && !usingOAuth()) {
-      rememberJsonBlocked();
-      try {
-        return await fetchFeed(path, limit, subreddit);
-      } catch (feedErr) {
-        const blocked = new Error(
-          'Reddit refused both the public JSON endpoint and the public feed ' +
-            `(${err.status}, then ${feedErr.status || 'failed'}). It blocks these from ` +
-            'datacenter IPs such as Replit\u2019s. Register a Reddit app and set ' +
-            'REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET to read through the OAuth API ' +
-            'instead, or run the dashboard from a home connection.'
-        );
-        blocked.status = 403;
-        throw blocked;
-      }
+    if (feedError) {
+      const blocked = new Error(
+        'Reddit refused both the public feed and the public JSON endpoint ' +
+          `(${describeAttempt(feedError)}, then ${describeAttempt(err)}). It blocks ` +
+          'these from datacenter IPs such as Replit\u2019s. Register a Reddit app and ' +
+          'set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET to read through the OAuth API ' +
+          'instead, or run the dashboard from a home connection.'
+      );
+      blocked.status = err.status || 403;
+      throw blocked;
     }
     throw err;
   }
@@ -245,6 +237,12 @@ async function fetchListing(path, limit, subreddit, normalize) {
     ? data.data.children
     : [];
   return children.map((child) => normalize(child, subreddit));
+}
+
+/** Short form of one failed attempt, for the two-path error above. */
+function describeAttempt(err) {
+  if (err && err.status) return `HTTP ${err.status}`;
+  return (err && err.message) || 'failed';
 }
 
 async function poll() {
@@ -323,9 +321,7 @@ module.exports = {
     subreddits: subreddits.list(),
     reads_via: usingOAuth()
       ? 'oauth.reddit.com (app credentials)'
-      : jsonLooksBlocked()
-        ? 'public Atom feeds (.rss) — the JSON endpoint refused us'
-        : 'public JSON endpoints, falling back to the Atom feeds if refused',
+      : 'the public Atom feeds (.rss), falling back to the JSON endpoint',
     user_agent: redditUserAgent(),
     include_comments: settings.getBool('reddit.include_comments', true),
     listing_limit: settings.getNumber('reddit.listing_limit', 50),
@@ -334,9 +330,4 @@ module.exports = {
   redditUserAgent,
   usingOAuth,
   forgetToken,
-  /** Re-probe the JSON endpoint on the next poll instead of waiting out the
-   *  remembered block. */
-  forgetJsonBlock: () => {
-    jsonBlockedUntil = 0;
-  },
 };

@@ -217,6 +217,18 @@ main { max-width: 1720px; margin: 0 auto; padding: 1.25rem; }
 }
 .item-text.tight { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
+.poll-report { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.8rem; font-size: 0.8rem; }
+.poll-line {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ok);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.poll-line.bad { border-left-color: var(--err); }
+.poll-line b { font-weight: 600; }
+
 .pick-line { display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.75rem; color: var(--text-dim); }
 .pick-line input { margin: 0.15rem 0 0; }
 .picked-note {

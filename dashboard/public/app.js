@@ -17,6 +17,8 @@ const STATUSES = ['new', 'reviewed', 'used'];
 const COMMUNITY_SOURCES = ['reddit', 'x', 'youtube', 'feeds', 'websearch'];
 /** Literature belongs to the research column, not the question list. */
 const LITERATURE_SOURCES = ['literature', 'pubmed'];
+/** Community sources with a real thread but no API to reply through. */
+const BY_HAND_SOURCES = new Set(['websearch', 'feeds']);
 
 const state = {
   tab: 'feed',
@@ -224,6 +226,7 @@ async function loadFeed() {
     state.feed.total = data.total;
     state.feed.items = data.items;
     renderItems($('#feed-list'), data.items, emptyFeedMessage());
+    if (!data.items.length) $('#feed-list').append(pollEverythingButton());
     const from = data.total === 0 ? 0 : f.offset + 1;
     const to = Math.min(f.offset + f.limit, data.total);
     $('#feed-range').textContent = `${from}-${to} of ${data.total}`;
@@ -277,6 +280,53 @@ function emptyFeedMessage() {
     `Nothing captured yet from ${live.join(', ')}. Poll one from the Sources tab.` +
     (missing.length ? ` Still needs credentials: ${missing.join(', ')}.` : '')
   );
+}
+
+/**
+ * "Nothing is arriving" is the hardest state to debug from a dashboard, so
+ * the empty column offers to run every source and say what each one did.
+ */
+function pollEverythingButton() {
+  const wrap = el('div');
+  const row = el('div', 'row');
+  row.style.justifyContent = 'center';
+  const button = el('button', '', 'Poll every source now');
+  const report = el('div', 'poll-report');
+
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    button.textContent = 'Polling…';
+    report.innerHTML = '';
+    try {
+      const { results } = await api('/sources/poll-all?force=true', { method: 'POST' });
+      for (const result of results) {
+        const line = el('div', `poll-line${result.ok ? '' : ' bad'}`);
+        line.append(el('b', '', result.label || result.source));
+        line.append(
+          document.createTextNode(
+            result.ok
+              ? `: ${result.added || 0} new from ${result.fetched || 0} fetched${
+                  result.notes ? ` — ${result.notes}` : ''
+                }`
+              : `: ${result.error || result.message || result.skipped}`
+          )
+        );
+        report.append(line);
+      }
+      await refreshHealth();
+      refreshCounts();
+      loadFeed();
+    } catch (err) {
+      report.append(el('div', 'error', err.message));
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Poll every source now';
+    }
+  });
+
+  row.append(button);
+  wrap.append(row, report);
+  return wrap;
 }
 
 async function refreshCounts() {
@@ -665,7 +715,10 @@ function sourceCard(source) {
   if (source.id === 'x') card.append(xControls(source));
   if (source.id === 'youtube') card.append(youtubeControls(source));
   if (source.id === 'feeds') card.append(feedControls(source));
-  if (source.id === 'websearch') card.append(websearchControls(source));
+  if (source.id === 'websearch') {
+    card.append(websearchControls(source));
+    card.append(searchTestControls(source));
+  }
   if (source.id === 'pubmed' || source.id === 'literature') {
     card.append(literatureControls(source));
   }
@@ -986,6 +1039,36 @@ function websearchControls(source) {
     )
   );
 
+  if (!source.configured) {
+    const help = el('div', 'banner');
+    help.append(
+      el(
+        'p',
+        '',
+        'Quora and Inspire have no API of their own, so they are reached ' +
+          'through a licensed search index. That needs one key, and nothing ' +
+          'from this source arrives until it is set:'
+      )
+    );
+    const options = el('ul');
+    const brave = el('li');
+    brave.append(document.createTextNode('Brave Search API — 2,000 queries a month free. Set '));
+    brave.append(el('code', '', 'BRAVE_SEARCH_API_KEY'));
+    brave.append(document.createTextNode('.'));
+    const google = el('li');
+    google.append(
+      document.createTextNode('Google Programmable Search — 100 queries a day free. Set ')
+    );
+    google.append(el('code', '', 'GOOGLE_SEARCH_API_KEY'));
+    google.append(document.createTextNode(' and '));
+    google.append(el('code', '', 'GOOGLE_SEARCH_CX'));
+    google.append(document.createTextNode(', and switch the provider above.'));
+    options.append(brave, google);
+    help.append(options);
+    help.append(el('p', 'subtle', 'Restart the dashboard after setting either one.'));
+    wrap.append(help);
+  }
+
   wrap.append(el('h3', '', 'Sites searched'));
   wrap.append(
     chipList(d.sites, {
@@ -1048,6 +1131,95 @@ function websearchControls(source) {
     controls.append(line);
   }
   wrap.append(controls);
+  return wrap;
+}
+
+/**
+ * Runs one real query and shows what came back, so a site can be checked
+ * without waiting for the next poll.
+ */
+function searchTestControls(source) {
+  const wrap = el('div');
+  wrap.append(el('h3', '', 'Check a site'));
+
+  const row = el('div', 'row');
+  const site = el('select');
+  for (const entry of source.details.sites) {
+    const option = el('option', '', entry.label || entry.domain);
+    option.value = entry.domain;
+    site.append(option);
+  }
+  const term = el('select');
+  for (const keyword of state.keywords) {
+    if (!keyword.enabled) continue;
+    const option = el('option', '', keyword.term);
+    option.value = keyword.term;
+    term.append(option);
+  }
+  const run = el('button', 'tiny', 'Test search');
+  run.disabled = !source.configured || !source.details.sites.length;
+  run.title = source.configured
+    ? 'Runs one query now and shows the results'
+    : 'Set a search API key first';
+  row.append(site, term, run);
+  wrap.append(row);
+
+  const output = el('div');
+  wrap.append(output);
+
+  run.addEventListener('click', async () => {
+    run.disabled = true;
+    run.textContent = 'Searching…';
+    output.innerHTML = '';
+    try {
+      const result = await api('/sources/websearch/test', {
+        method: 'POST',
+        body: { domain: site.value, term: term.value },
+      });
+      output.append(el('pre', 'query', result.query));
+      output.append(
+        el(
+          'div',
+          'subtle',
+          `${result.provider} returned ${result.count} result(s) · ${result.quota}`
+        )
+      );
+      if (!result.count) {
+        output.append(
+          el(
+            'div',
+            'subtle',
+            'Nothing matched. The site may simply have no recent posts using that term.'
+          )
+        );
+      }
+      for (const hit of result.results) {
+        const line = el('div', 'cite');
+        const link = el('a', '', hit.title || hit.url);
+        link.href = hit.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        line.append(link);
+        output.append(line);
+      }
+    } catch (err) {
+      output.append(el('div', 'error', err.message));
+    } finally {
+      run.disabled = false;
+      run.textContent = 'Test search';
+    }
+  });
+
+  // A test costs one query from the same allowance the polls draw on.
+  wrap.append(
+    el(
+      'p',
+      'subtle',
+      'One query, looking back a year rather than the freshness window above, ' +
+        'so an empty result means the search itself found nothing. It counts ' +
+        'against the same free-tier allowance as a poll.'
+    )
+  );
   return wrap;
 }
 
@@ -1671,10 +1843,18 @@ function renderReply() {
 
   for (const sent of target.already_posted || []) {
     const box = el('div', `reply-sent${sent.status === 'failed' ? ' failed' : ''}`);
+    // A by-hand reply on Quora or a forum names the site, not the source that
+    // found it: "on quora.com" reads better than "on Web search as quora.com".
+    const bySite = BY_HAND_SOURCES.has(sent.provider) && sent.remote_id;
+    const where = bySite ? sent.remote_id : SOURCE_LABELS[sent.provider] || sent.provider;
     box.append(
       document.createTextNode(
-        `Replied ${relativeTime(sent.posted_at)} on ${SOURCE_LABELS[sent.provider] || sent.provider}` +
-          `${sent.method === 'manual' ? ` by hand${sent.remote_id ? ` as ${sent.remote_id}` : ''}` : ''}. `
+        `Replied ${relativeTime(sent.posted_at)} on ${where}` +
+          `${
+            sent.method === 'manual'
+              ? ` by hand${!bySite && sent.remote_id ? ` as ${sent.remote_id}` : ''}`
+              : ''
+          }. `
       )
     );
     if (sent.url) {
@@ -1689,7 +1869,11 @@ function renderReply() {
 
   const dest = el('div', 'dest');
   if (!target.can_reply) {
-    if (target.manual_account) {
+    if (target.manual_only) {
+      // A real thread with no API: the dashboard hands over the draft and
+      // keeps the record, the physician posts it.
+      dest.append(document.createTextNode(target.reason));
+    } else if (target.manual_account) {
       dest.append(document.createTextNode('You post as '));
       dest.append(el('b', '', target.manual_account.handle));
       dest.append(
@@ -1750,12 +1934,17 @@ function renderReply() {
  */
 function markRepliedButton(target) {
   const draft = state.workbench.draft;
-  if (!target.provider || !draft || !draft.content.trim()) return null;
+  if (!target.provider && !target.manual_only) return null;
+  if (!draft || !draft.content.trim()) return null;
 
   const button = el('button', 'tiny ghost', 'Mark as replied');
   button.title = 'Record that you posted this yourself';
   button.addEventListener('click', async () => {
-    const who = target.manual_account ? target.manual_account.handle : `your ${target.provider_label} account`;
+    const who = target.manual_account
+      ? target.manual_account.handle
+      : target.provider_label
+        ? `your ${target.provider_label} account`
+        : 'you';
     if (!confirm(`Record this draft as posted to ${target.description} as ${who}?`)) return;
     const url = prompt(
       'Link to your reply (optional — paste it so the record points at the right comment):',
@@ -1779,7 +1968,11 @@ function markRepliedButton(target) {
 /** Opens the original thread, or the source page for a research result. */
 function threadLink(target) {
   if (!target.target_url) return null;
-  const link = el('a', '', target.provider ? 'Open the thread ↗' : 'Open the source ↗');
+  const link = el(
+    'a',
+    '',
+    target.provider || target.manual_only ? 'Open the thread ↗' : 'Open the source ↗'
+  );
   link.href = target.target_url;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
@@ -1794,7 +1987,8 @@ function threadLink(target) {
 function manualReplyButton(target) {
   const draft = state.workbench.draft;
   // Research results have no reply box to paste into.
-  if (!target.provider || !target.target_url) return null;
+  if (!target.provider && !target.manual_only) return null;
+  if (!target.target_url) return null;
   if (!draft || !draft.content.trim()) return null;
 
   const button = el('button', 'tiny ghost', 'Copy draft & open thread');
@@ -2021,17 +2215,42 @@ async function generateDraft() {
 
 async function saveDraft() {
   const draft = state.workbench.draft;
-  if (!draft) return;
+  const content = $('#wb-draft-text').value;
+
+  // Nothing generated yet: save what was typed as a draft of its own, so the
+  // reply workflow does not depend on having an Anthropic key.
+  if (!draft) {
+    if (!content.trim() || !state.workbench.itemId) return;
+    try {
+      const created = await api(`/items/${state.workbench.itemId}/drafts/manual`, {
+        method: 'POST',
+        body: { content },
+      });
+      state.workbench.drafts = [created.draft, ...state.workbench.drafts];
+      state.workbench.draft = created.draft;
+      renderDraft();
+      renderReply();
+      $('#wb-draft-saved').textContent = 'Saved';
+      setTimeout(() => {
+        $('#wb-draft-saved').textContent = '';
+      }, 2000);
+    } catch (err) {
+      toast(err.message, true);
+    }
+    return;
+  }
+
   try {
     const updated = await api(`/drafts/${draft.id}`, {
       method: 'PUT',
-      body: { content: $('#wb-draft-text').value },
+      body: { content },
     });
     state.workbench.draft = updated;
     state.workbench.drafts = state.workbench.drafts.map((d) =>
       d.id === updated.id ? updated : d
     );
     renderDraft();
+    renderReply();
     $('#wb-draft-saved').textContent = 'Saved';
     setTimeout(() => {
       $('#wb-draft-saved').textContent = '';

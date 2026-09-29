@@ -211,6 +211,58 @@ function nextPairs(pairs, take) {
   return picked;
 }
 
+/**
+ * Runs one query, now, and reports exactly what came back.
+ *
+ * The point is that "is Quora actually working?" should be answerable in one
+ * click rather than by waiting for a poll and reading a log. It looks back a
+ * year rather than using the freshness setting, so an empty result means the
+ * search found nothing at all, not that nothing was posted this month.
+ */
+async function testQuery({ domain, term } = {}) {
+  if (!isConfigured()) {
+    const err = new Error(
+      `${provider().label} is not configured: set ${provider().env}` +
+        (providerId() === 'google' ? ' and GOOGLE_SEARCH_CX' : '')
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const all = sites.list();
+  const site = domain
+    ? all.find((s) => s.domain === sites.normalize(domain))
+    : sites.enabled()[0] || all[0];
+  if (!site) {
+    const err = new Error('No sites are configured to search');
+    err.status = 400;
+    throw err;
+  }
+
+  const matcher = matcherFor('websearch');
+  const chosen = term || (matcher.keywords[0] && matcher.keywords[0].term);
+  if (!chosen) {
+    const err = new Error('No keywords apply to web search');
+    err.status = 400;
+    throw err;
+  }
+
+  const query = buildQuery(site, chosen);
+  quota.record('websearch', 1);
+  const results = await runSearch(query, { count: 5, freshnessDays: 365 });
+
+  const q = quotaState();
+  return {
+    query,
+    provider: provider().label,
+    site: site.label || site.domain,
+    term: chosen,
+    count: results.length,
+    results: results.slice(0, 5).map((r) => ({ title: r.title, url: r.url })),
+    quota: `${q.used}/${q.limit} this ${q.period}`,
+  };
+}
+
 async function poll() {
   if (!isConfigured()) {
     throw new Error(
@@ -353,6 +405,7 @@ module.exports = {
     quota: quotaState(),
   }),
   poll,
+  testQuery,
   buildQuery,
   normalizeUrl,
 };

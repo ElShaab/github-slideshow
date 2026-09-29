@@ -63,6 +63,16 @@ const article = capture('pubmed', {
   timestamp: '2026-09-01T00:00:00Z',
   kind: 'article',
 });
+// A Quora thread: a real question, with no API to answer it through.
+const quoraThread = capture('websearch', {
+  external_id: 'url:https://www.quora.com/What-helps-phantom-limb-pain',
+  author: 'Quora',
+  text: 'What actually helps phantom limb pain at night?',
+  url: 'https://www.quora.com/What-helps-phantom-limb-pain',
+  timestamp: '2026-09-20T00:00:00Z',
+  kind: 'search result',
+  origin: 'www.quora.com',
+});
 
 function link(provider, name) {
   connections.save(
@@ -91,6 +101,46 @@ test('research results are not repliable', () => {
   const target = post.target(article.id);
   assert.equal(target.can_reply, false);
   assert.match(target.reason, /not a question anyone posted/);
+});
+
+test('a Quora or Inspire thread is answerable by hand, not by API', () => {
+  const target = post.target(quoraThread.id);
+  assert.equal(target.can_reply, false, 'nothing is ever posted for these');
+  assert.equal(target.manual_only, true);
+  assert.equal(target.target_url, 'https://www.quora.com/What-helps-phantom-limb-pain');
+  assert.equal(target.description, 'a thread on www.quora.com');
+  assert.match(target.reason, /quora\.com has no reply API/);
+  assert.ok(
+    !/not a question anyone posted/.test(target.reason),
+    'a community thread is not filed as literature'
+  );
+});
+
+test('a reply pasted into Quora by hand is recorded against the thread', () => {
+  const draft = draftFor(quoraThread, 'Mirror therapy has reasonable evidence [1].');
+  const result = post.recordManual({
+    draftId: draft.id,
+    url: 'https://www.quora.com/What-helps-phantom-limb-pain/answer/me',
+  });
+
+  assert.equal(result.account, 'quora.com');
+  assert.equal(result.reply.method, 'manual');
+  assert.equal(result.reply.provider, 'websearch');
+  assert.equal(result.draft.status, 'used');
+  assert.equal(items.get(quoraThread.id).status, 'used');
+
+  // And it shows up as already answered next time the thread is opened.
+  const after = post.target(quoraThread.id);
+  assert.equal(after.already_posted.length, 1);
+  assert.match(after.already_posted[0].url, /answer\/me$/);
+});
+
+test('by-hand sources still refuse an API send', async () => {
+  const draft = draftFor(quoraThread, 'Some text.');
+  await assert.rejects(
+    () => post.send({ draftId: draft.id, confirm: true }),
+    /cannot be replied to/
+  );
 });
 
 test('an unlinked platform says so rather than offering to send', () => {

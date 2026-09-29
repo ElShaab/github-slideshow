@@ -224,7 +224,174 @@ test('a missing provider key is reported rather than silently skipped', () => {
   settings.set('websearch.provider', 'brave');
 });
 
+test('quora and inspire are both seeded and both produce questions', () => {
+  // A fresh install tracks both community sites out of the box.
+  const seeded = sites.list().map((s) => s.domain);
+  assert.ok(seeded.includes('quora.com'), 'quora.com is seeded');
+  assert.ok(seeded.includes('inspire.com'), 'inspire.com is seeded');
+
+  assert.equal(
+    websearch.buildQuery({ domain: 'quora.com' }, 'phantom limb pain'),
+    'site:quora.com "phantom limb pain"'
+  );
+  assert.equal(
+    websearch.buildQuery({ domain: 'inspire.com' }, 'prosthetic socket'),
+    'site:inspire.com "prosthetic socket"'
+  );
+});
+
+test('a poll across both sites files each question under the site it came from', async () => {
+  db.prepare('DELETE FROM items').run();
+  db.prepare('DELETE FROM seen_items').run();
+  db.prepare('DELETE FROM search_sites').run();
+  sites.add('quora.com', 'Quora');
+  sites.add('inspire.com', 'Inspire');
+  state.setCursor('websearch', 0);
+  quota.record('websearch', -quota.monthUsed('websearch'));
+  settings.setMany({
+    'websearch.provider': 'brave',
+    'websearch.max_queries_per_poll': '4',
+  });
+
+  const byQuery = {
+    'site:quora.com "phantom limb pain"': [
+      {
+        title: 'What actually helps <strong>phantom limb pain</strong> at night?',
+        description: 'Amputees describe what worked for them after a BKA.',
+        url: 'https://www.quora.com/What-actually-helps-phantom-limb-pain-at-night',
+        page_age: '2026-09-25T08:00:00Z',
+        meta_url: { hostname: 'www.quora.com' },
+      },
+    ],
+    'site:inspire.com "phantom limb pain"': [
+      {
+        title: 'Phantom limb pain two years on — does it ever stop?',
+        description: 'A discussion in the limb loss community.',
+        url: 'https://www.inspire.com/groups/amputee-coalition/discussion/phantom-two-years/',
+        page_age: '2026-09-24T08:00:00Z',
+        meta_url: { hostname: 'www.inspire.com' },
+      },
+    ],
+    'site:quora.com "prosthetic socket"': [
+      {
+        title: 'How many refits is normal for a new <strong>prosthetic socket</strong>?',
+        description: 'Answers from prosthetists and users.',
+        url: 'https://www.quora.com/How-many-refits-is-normal',
+        meta_url: { hostname: 'www.quora.com' },
+      },
+    ],
+    'site:inspire.com "prosthetic socket"': [
+      {
+        title: 'Prosthetic socket rubbing after weight loss',
+        description: 'What the group suggested.',
+        url: 'https://www.inspire.com/groups/amputee-coalition/discussion/socket-rubbing/',
+        meta_url: { hostname: 'www.inspire.com' },
+      },
+    ],
+  };
+
+  const queries = [];
+  const mock = mockFetch({
+    'api.search.brave.com': (url) => {
+      const query = new URL(url).searchParams.get('q');
+      queries.push(query);
+      return { body: { web: { results: byQuery[query] || [] } } };
+    },
+  });
+  let result;
+  try {
+    result = await websearch.poll();
+  } finally {
+    mock.restore();
+  }
+
+  assert.equal(result.added, 4, 'every site/keyword pair produced a question');
+  assert.deepEqual(queries.sort(), Object.keys(byQuery).sort());
+
+  const captured = items.query({ source: 'websearch' }).items;
+  const quora = captured.filter((i) => i.author === 'Quora');
+  const inspire = captured.filter((i) => i.author === 'Inspire');
+  assert.equal(quora.length, 2);
+  assert.equal(inspire.length, 2);
+
+  // The question itself is the title, and the keyword that found it is
+  // attributed even where the snippet does not repeat it.
+  const night = quora.find((i) => i.url.includes('at-night'));
+  assert.match(night.text, /^What actually helps phantom limb pain at night\?/);
+  assert.deepEqual(night.keywords_matched, ['phantom limb pain']);
+  assert.equal(night.origin, 'www.quora.com');
+  assert.equal(night.kind, 'search result');
+
+  const twoYears = inspire.find((i) => i.url.includes('phantom-two-years'));
+  assert.deepEqual(twoYears.keywords_matched, ['phantom limb pain']);
+  assert.equal(twoYears.origin, 'www.inspire.com');
+});
+
+test('the site check runs one query and reports what came back', async () => {
+  const mock = mockFetch({
+    'api.search.brave.com': {
+      body: {
+        web: {
+          results: [
+            {
+              title: 'Does anyone else get <strong>phantom limb pain</strong> in the cold?',
+              description: 'A thread in the amputee community.',
+              url: 'https://www.inspire.com/groups/amputee-coalition/discussion/cold/',
+              meta_url: { hostname: 'www.inspire.com' },
+            },
+          ],
+        },
+      },
+    },
+  });
+  let checked;
+  try {
+    checked = await websearch.testQuery({ domain: 'inspire.com', term: 'phantom limb pain' });
+  } finally {
+    mock.restore();
+  }
+
+  assert.equal(checked.query, 'site:inspire.com "phantom limb pain"');
+  assert.equal(checked.site, 'Inspire');
+  assert.equal(checked.count, 1);
+  assert.match(checked.results[0].title, /^Does anyone else get phantom limb pain/);
+  assert.match(checked.quota, /this month$/);
+});
+
+test('the site check says what is missing instead of failing obscurely', async () => {
+  const config = require('../src/config');
+  const key = config.search.brave.apiKey;
+  config.search.brave.apiKey = '';
+  try {
+    await assert.rejects(
+      () => websearch.testQuery({ domain: 'quora.com', term: 'phantom limb pain' }),
+      /BRAVE_SEARCH_API_KEY/
+    );
+  } finally {
+    config.search.brave.apiKey = key;
+  }
+});
+
 test('domains are normalized and validated', () => {
   assert.equal(sites.add('https://www.Example.com/groups/x').domain, 'example.com');
   assert.throws(() => sites.add('not a domain'), /is not a domain/);
+});
+
+test('an install that never used web search adopts the new on-by-default', () => {
+  // The marker is written once, and a deliberate pause afterwards stands.
+  const marker = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('websearch.default_on_applied');
+  assert.ok(marker, 'the migration recorded that it ran');
+  assert.equal(settings.get('websearch.enabled'), 'true');
+
+  settings.set('websearch.enabled', 'false');
+  delete require.cache[require.resolve('../src/db')];
+  require('../src/db');
+  assert.equal(
+    settings.get('websearch.enabled'),
+    'false',
+    'a pause after the migration is not undone'
+  );
+  settings.set('websearch.enabled', 'true');
 });

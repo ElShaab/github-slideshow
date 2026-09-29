@@ -190,4 +190,17 @@ function status() {
   });
 }
 
-module.exports = { start, stop, reschedule, runSource, status };
+/**
+ * Runs every source once, in turn. Behind the "poll everything" button, whose
+ * job is to answer "why is nothing arriving?" in one click: runSource never
+ * throws, so each source reports for itself.
+ */
+async function runAll(options = {}) {
+  const results = [];
+  for (const source of sources.list()) {
+    results.push({ ...(await runSource(source.id, options)), label: source.label });
+  }
+  return results;
+}
+
+module.exports = { start, stop, reschedule, runSource, runAll, status };

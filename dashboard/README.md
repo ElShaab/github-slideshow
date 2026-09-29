@@ -304,18 +304,18 @@ endpoints. One private or banned subreddit is reported as a note; if *every*
 subreddit fails, the whole poll is marked as an error, stating the shared
 cause once rather than repeating it per subreddit.
 
-**If the public JSON endpoint returns HTTP 403**, Reddit is refusing it for
-the host you are running on — it blocks these from datacenter IP ranges,
-Replit's included, and answers with an HTML block page rather than a JSON
-error. The source then falls back on its own to the **public Atom feeds** the
-same listings publish at `/r/<sub>/new/.rss` and `/r/<sub>/comments/.rss`.
-These need no credentials and are an official, published interface, but they
-carry less: no score, no comment count, no flair, and a smaller page of
-results. Once refused, the rest of the poll goes straight to the feeds and the
-JSON endpoint is re-tried six hours later, so a block costs one 403 rather
-than one per subreddit. The Sources card says which path is in use.
+**Without app credentials the public Atom feeds are the primary path**, not a
+fallback. Reddit refuses the public JSON endpoints for a growing share of
+clients — it blocks them from datacenter IP ranges, Replit's included, and
+answers with an HTML block page rather than a JSON error — so trying JSON
+first only buys a 403 per subreddit per poll. The same listings publish feeds
+at `/r/<sub>/new/.rss` and `/r/<sub>/comments/.rss`: an official, public
+interface that needs no app registration. The JSON endpoint is still tried
+when a feed fails, since it carries more where it answers (score, comment
+count, flair). A block page served with HTTP 200 counts as a failure, so it is
+never mistaken for an empty feed. The Sources card says which path is in use.
 
-If the feeds are refused too, both ways out remain:
+If both are refused, the two ways out remain:
 
 1. **Read through the OAuth API** (recommended, and what the endpoints are
    for). Register an app at reddit.com/prefs/apps and set `REDDIT_CLIENT_ID`
@@ -375,6 +375,20 @@ is held back, and the expensive keyword search is skipped rather than
 overspending. `quotaExceeded` from the API backs the whole source off; a
 single channel with comments disabled is just reported.
 
+### Replying where there is no API
+
+Quora, Inspire and anything read through a feed are real threads with no way
+to post to them programmatically. The dashboard does not pretend otherwise: it
+hands over the draft and keeps the record. **Copy draft & open thread** copies
+the reply and opens the thread so you paste it yourself, and **Mark as
+replied** records it against that site — optionally with a link to your
+answer — and moves the draft and the question to Used. Research results, which
+nobody asked, get neither.
+
+Drafts do not need the Anthropic key either: type a reply into the box and
+**Save** stores it like any other draft, which is what makes the copy-and-post
+path available with no credentials set at all.
+
 ### Feeds (RSS / Atom) — no credentials, no quota
 
 The one question source that needs nothing at all. Add any RSS or Atom
@@ -420,8 +434,18 @@ the resulting query, and the articles land in the feed under **PubMed**.
 
 ### Web search — `BRAVE_SEARCH_API_KEY` *or* `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX`
 
-Covers communities that have no API of their own — Quora and Inspire are
-seeded, and any domain can be added. It asks a licensed search index for
+Covers communities that have no API of their own — **Quora and Inspire are
+seeded and enabled**, and any domain can be added. The source stays idle and
+says what is missing until one of the two keys is set; it needs no further
+switching on. **Check a site** on the Sources card runs one real query against
+a chosen site and keyword and shows what came back, so "is Quora actually
+working?" is answerable in one click rather than by waiting for a poll. That
+check looks back a year rather than using the freshness window, so an empty
+result means the search found nothing, and it costs one query from the same
+free-tier allowance.
+
+Free tiers: Brave allows 2,000 queries a month, Google Programmable Search
+100 a day. It asks a licensed search index for
 site-scoped matches and stores **only what that search API returns**: title,
 snippet and link. The result pages themselves are never fetched, so this does
 not scrape a site that prohibits it. You get told which threads are worth
@@ -480,6 +504,8 @@ staggered so every API is not called at once.
 | DELETE | `/api/items/:id` | Dismiss (stays deduplicated) |
 | GET    | `/api/sources` | Per-source status, config, credentials, recent poll log |
 | POST   | `/api/sources/:source/poll` | Poll now (`?force=true` ignores backoff) |
+| POST   | `/api/sources/poll-all` | Poll every source in turn and report each result |
+| POST   | `/api/sources/websearch/test` | One live query; `{domain, term}` both optional |
 | POST   | `/api/sources/:source/clear-backoff` | Clear a rate-limit backoff |
 | GET/PUT| `/api/settings` | Intervals, limits, toggles |
 | GET    | `/api/health` | Liveness plus per-source status |
@@ -488,6 +514,7 @@ staggered so every API is not called at once.
 | DELETE | `/api/items/:id/research` | Drop the cached match |
 | GET    | `/api/research/providers` | Databases, enabled state, cache summary |
 | GET    | `/api/items/:id/drafts` | Drafts for a question, newest first |
+| POST   | `/api/items/:id/drafts/manual` | Store a draft written by hand, no model involved |
 | POST   | `/api/items/:id/drafts` | Generate a draft; optional `{use: [0, 2]}` limits it to those matched papers |
 | PUT    | `/api/drafts/:id` | Save edited text (Draft becomes Edited) |
 | PATCH  | `/api/drafts/:id` | `{status: "draft" \| "edited" \| "used"}` |

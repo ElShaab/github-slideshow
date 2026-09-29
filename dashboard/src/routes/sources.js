@@ -9,11 +9,17 @@ const feedSource = require('../sources/feeds');
 const youtubeChannels = require('../lib/youtubeChannels');
 const youtube = require('../sources/youtube');
 const searchSites = require('../lib/searchSites');
+const websearch = require('../sources/websearch');
 
 const router = express.Router();
 
 router.get('/', (req, res) => {
   res.json({ sources: scheduler.status(), logs: state.recentLogs(25) });
+});
+
+/** Every source, in turn, so an empty feed can be diagnosed in one click. */
+router.post('/poll-all', async (req, res) => {
+  res.json({ results: await scheduler.runAll({ manual: true, force: req.query.force === 'true' }) });
 });
 
 router.post('/:source/poll', async (req, res) => {
@@ -128,6 +134,17 @@ router.delete('/youtube/channels/:id', (req, res) => {
 });
 
 /* ---- Web search: site list ---- */
+
+/** One live query against one site, so "does Quora work?" is answerable. */
+router.post('/websearch/test', async (req, res) => {
+  try {
+    res.json(await websearch.testQuery(req.body || {}));
+  } catch (err) {
+    res.status(err.status && err.status < 500 ? err.status : 502).json({
+      error: err.message || 'The search failed',
+    });
+  }
+});
 
 router.get('/websearch/sites', (req, res) => {
   res.json(searchSites.list());

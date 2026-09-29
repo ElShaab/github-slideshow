@@ -162,6 +162,7 @@ test('a 403 block page becomes an actionable error, not a wall of CSS', async ()
 
   assert.match(message, /datacenter IPs/);
   assert.match(message, /REDDIT_CLIENT_ID/);
+  assert.match(message, /both the public feed and the public JSON endpoint/);
   assert.ok(!message.includes('--rem360'), 'the block page markup must not reach the log');
   // One cause, stated once, rather than repeated per subreddit.
   assert.equal(message.match(/datacenter IPs/g).length, 1);
@@ -186,10 +187,11 @@ ${entries
 </feed>`;
 }
 
-test('a refused JSON endpoint falls back to the public Atom feed', async () => {
-  reddit.forgetJsonBlock();
+test('without credentials the public Atom feed is read, not the JSON endpoint', async () => {
   const mock = mockFetch({
-    '/new.json': { status: 403, body: '<body class=theme-beta></body>', headers: { 'content-type': 'text/html' } },
+    '/new.json': () => {
+      throw new Error('the JSON endpoint must not be tried first');
+    },
     '/new/.rss': {
       body: atomFeed([
         {
@@ -240,22 +242,22 @@ test('a refused JSON endpoint falls back to the public Atom feed', async () => {
   assert.equal(comment.text, 'My prosthetic liner fixed it.');
 });
 
-test('the refusal is remembered, so later polls skip straight to the feed', async () => {
+test('a block page served as 200 is not mistaken for an empty feed', async () => {
+  // Reddit answers some blocks with a page and a 200, so "no entries" must
+  // not be read as "nothing new" - it falls through to the JSON endpoint.
   const mock = mockFetch({
-    '/new.json': () => {
-      throw new Error('the JSON endpoint must not be called again');
-    },
-    '/new/.rss': { body: atomFeed([]), headers: { 'content-type': 'application/atom+xml' } },
-    '/comments/.rss': { body: atomFeed([]), headers: { 'content-type': 'application/atom+xml' } },
+    '/new/.rss': { body: '<html><body>blocked</body></html>', headers: { 'content-type': 'text/html' } },
+    '/comments/.rss': { body: '<html><body>blocked</body></html>', headers: { 'content-type': 'text/html' } },
+    '/r/amputee/new.json': redditPosts,
+    '/r/amputee/comments.json': redditComments,
   });
   try {
     const result = await reddit.poll();
-    assert.equal(result.added, 0);
-    assert.ok(!mock.calls.some((c) => c.includes('/new.json')), 'no further JSON request');
-    assert.ok(mock.calls.some((c) => c.includes('/new/.rss')), 'the feed was read');
+    assert.ok(mock.calls.some((c) => c.includes('/new.json')), 'the JSON endpoint was tried');
+    assert.equal(result.added, 0, 'the same posts are already in the ledger');
+    assert.equal(result.fetched, 3);
   } finally {
     mock.restore();
-    reddit.forgetJsonBlock();
   }
 });
 
