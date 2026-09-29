@@ -93,6 +93,39 @@ items that matched no keyword. Dismissing an item from the feed deletes the
 Because the key includes the source, the same ID appearing on two sources is
 still stored twice.
 
+## Daily research sweep
+
+The keyword bar drives a scheduled sweep of the same six databases the
+per-question matcher uses. Once a day (`literature.interval_minutes`, default
+1440) each keyword is run against PubMed, Europe PMC, Crossref, Semantic
+Scholar, OpenAlex and ClinicalTrials.gov, restricted to work published in the
+last `literature.lookback_days` (default 30), and anything new is filed in the
+unified feed as a **Research sweep** item.
+
+- **Date filtering is asked for and then checked.** Each provider gets its own
+  documented filter — `reldate` + `datetype=edat` for PubMed, `FIRST_PDATE`
+  for Europe PMC, `from-pub-date` for Crossref, `publicationDateOrYear` for
+  Semantic Scholar, `from_publication_date` for OpenAlex, a
+  `LastUpdatePostDate` range for ClinicalTrials.gov — and results are checked
+  against the cutoff again locally, because an API that silently ignores a
+  filter would otherwise flood the feed with decade-old papers.
+- **Relevance is enforced.** Keyword search on these APIs is broad, so
+  anything scoring below `literature.min_relevance` against the term that
+  found it is dropped rather than filed.
+- **One keyword at a time**, so every captured article carries the term that
+  found it. With more keywords than `literature.max_keywords`, the sweep
+  rotates so each term comes round on successive days.
+- **Deduplicated across runs and databases** by DOI, then PMID or NCT id, then
+  a hash of the title, so an article found in four databases is filed once
+  with four source badges and never reappears.
+- One database failing is counted against the run and reported in the poll
+  log; the others still merge.
+
+Because the sweep covers PubMed along with five other databases, the
+standalone PubMed poll is switched off automatically the first time the sweep
+appears — leaving both on would capture the same articles twice under
+different source labels. Re-enable it in Sources if you want it back.
+
 ## Research matching
 
 Every captured question can be matched against six research databases at once,
@@ -342,8 +375,8 @@ described above; X is covered through its official API.
 
 Each source has its own timer that re-reads its interval from the database
 after every run, so changing an interval in the UI takes effect without a
-restart. Defaults: Reddit 15 min, X 30 min, YouTube 30 min, PubMed 6 h, web
-search 12 h.
+restart. Defaults: Reddit 15 min, X 30 min, YouTube 30 min, web search 12 h,
+research sweep 24 h (PubMed's standalone 6 h poll is superseded by the sweep).
 
 Failures are isolated. `runSource` never throws: a failing source records its
 error and the other timers keep running. A 429 or 503 sets `next_allowed_at`

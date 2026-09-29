@@ -34,7 +34,7 @@ test('health reports every source', async () => {
   assert.equal(status, 200);
   assert.deepEqual(
     data.sources.map((s) => s.id),
-    ['reddit', 'x', 'youtube', 'pubmed', 'websearch']
+    ['reddit', 'x', 'youtube', 'pubmed', 'websearch', 'literature']
   );
 });
 
@@ -68,6 +68,7 @@ test('keyword CRUD round trip', async () => {
     'youtube',
     'pubmed',
     'websearch',
+    'literature',
   ]);
 
   const listed = await call('/api/keywords');

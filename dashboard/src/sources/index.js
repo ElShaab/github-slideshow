@@ -17,6 +17,7 @@ const modules = [
   require('./youtube'),
   require('./pubmed'),
   require('./websearch'),
+  require('./literature'),
 ];
 
 const registry = new Map(modules.map((m) => [m.id, m]));

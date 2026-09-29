@@ -21,6 +21,10 @@ async function search(terms, options = {}) {
     search: terms.join(' '),
     'per-page': String(limit),
   });
+  if (options.since) {
+    params.set('filter', `from_publication_date:${options.since.toISOString().slice(0, 10)}`);
+    params.set('sort', 'publication_date:desc');
+  }
   // OpenAlex routes requests with a contact address into a faster pool.
   const email = client.contactEmail();
   if (email) params.set('mailto', email);
@@ -46,6 +50,7 @@ async function search(terms, options = {}) {
       abstract: abstractFromInvertedIndex(work.abstract_inverted_index),
       venue,
       year: work.publication_year || null,
+      published_on: work.publication_date || null,
       doi: work.doi || null,
       pmid: work.ids && work.ids.pmid ? String(work.ids.pmid).split('/').pop() : null,
       url: work.doi || (work.ids && work.ids.openalex) || work.id || null,

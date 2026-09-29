@@ -19,6 +19,11 @@ async function search(terms, options = {}) {
     pageSize: String(limit),
     format: 'json',
   });
+  if (options.since) {
+    const from = options.since.toISOString().slice(0, 10);
+    params.set('filter.advanced', `AREA[LastUpdatePostDate]RANGE[${from},MAX]`);
+    params.set('sort', 'LastUpdatePostDate:desc');
+  }
 
   const { data } = await client.get('clinicaltrials', `${BASE}?${params}`, {
     minIntervalMs: 300,
@@ -71,6 +76,10 @@ async function search(terms, options = {}) {
         // the evidence grader and the UI both key off.
         registry: true,
         status: status.overallStatus || null,
+        published_on:
+          (status.lastUpdatePostDateStruct && status.lastUpdatePostDateStruct.date) ||
+          (status.startDateStruct && status.startDateStruct.date) ||
+          null,
         phases,
       };
     })

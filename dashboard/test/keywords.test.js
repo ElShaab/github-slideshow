@@ -31,6 +31,7 @@ test('scope "all" expands to every source', () => {
     'youtube',
     'pubmed',
     'websearch',
+    'literature',
   ]);
 });
 

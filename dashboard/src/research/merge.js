@@ -49,6 +49,17 @@ function pickLonger(a, b) {
   return String(b).length > String(a).length ? b : a;
 }
 
+/** Prefers the more precise date: a full day beats a bare year. */
+function bestDate(a, b) {
+  const score = (value) => {
+    if (!value) return 0;
+    const text = String(value);
+    if (Number.isNaN(new Date(text).getTime())) return 0;
+    return text.length;
+  };
+  return score(b) > score(a) ? b : a || b || null;
+}
+
 function maxNumber(a, b) {
   if (typeof a !== 'number') return typeof b === 'number' ? b : null;
   if (typeof b !== 'number') return a;
@@ -64,6 +75,9 @@ function mergeInto(target, incoming) {
   target.abstract = pickLonger(target.abstract, incoming.abstract);
   target.venue = target.venue || incoming.venue;
   target.year = target.year || incoming.year;
+  // One database often carries a full publication date where another has
+  // only the year; keep the better of the two.
+  target.published_on = bestDate(target.published_on, incoming.published_on);
   target.url = target.url || incoming.url;
   target.authors = target.authors || incoming.authors;
   target.citations = maxNumber(target.citations, incoming.citations);
@@ -141,4 +155,4 @@ function mergeWorks(lists) {
   return merged;
 }
 
-module.exports = { mergeWorks, normalizeDoi, similarity, titleKey, FUZZY_THRESHOLD };
+module.exports = { mergeWorks, normalizeDoi, similarity, titleKey, bestDate, FUZZY_THRESHOLD };

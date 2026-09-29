@@ -288,7 +288,40 @@ db.exec(SCHEMA);
 // Replies used to be API-only; manual sends are recorded the same way.
 ensureColumn('replies', 'method', "TEXT NOT NULL DEFAULT 'api'");
 
-const SOURCES = ['reddit', 'x', 'youtube', 'pubmed', 'websearch'];
+/**
+ * The literature sweep covers PubMed along with five other databases, so the
+ * standalone PubMed poller would duplicate its results under a second source
+ * label. Switch it off once, the first time the sweep appears.
+ */
+function retireStandalonePubmedPoll() {
+  const marker = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('literature.superseded_pubmed');
+  if (marker) return;
+
+  const pubmedEnabled = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('pubmed.enabled');
+  const hasHistory = db
+    .prepare('SELECT 1 FROM source_state WHERE source = ? AND last_run_at IS NOT NULL')
+    .get('pubmed');
+
+  if (pubmedEnabled && pubmedEnabled.value === 'true' && hasHistory) {
+    db.prepare("UPDATE settings SET value = 'false' WHERE key = 'pubmed.enabled'").run();
+    console.log(
+      '[db] the daily literature sweep now covers PubMed, so the standalone ' +
+        'PubMed poll was switched off. Re-enable it in Sources if you want both.'
+    );
+  }
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+    'literature.superseded_pubmed',
+    new Date().toISOString()
+  );
+}
+
+retireStandalonePubmedPoll();
+
+const SOURCES = ['reddit', 'x', 'youtube', 'pubmed', 'websearch', 'literature'];
 
 const DEFAULT_SETTINGS = {
   'reddit.enabled': 'true',
@@ -321,6 +354,21 @@ const DEFAULT_SETTINGS = {
   'websearch.monthly_quota': '2000',
   'websearch.daily_quota': '100',
   'websearch.quota_reserve': '0',
+
+  // Daily literature sweep: the same six databases as the per-question
+  // matcher, but driven by the keyword list on a schedule.
+  'literature.enabled': 'true',
+  'literature.interval_minutes': '1440',
+  'literature.lookback_days': '30',
+  'literature.max_keywords': '8',
+  'literature.per_provider_limit': '15',
+  'literature.min_relevance': '0.3',
+  'literature.provider_pubmed': 'true',
+  'literature.provider_europepmc': 'true',
+  'literature.provider_crossref': 'true',
+  'literature.provider_semanticscholar': 'true',
+  'literature.provider_openalex': 'true',
+  'literature.provider_clinicaltrials': 'true',
 
   // Research matching across the six literature APIs.
   'research.max_results': '8',

@@ -10,12 +10,20 @@ function buildQuery(terms) {
 
 async function search(terms, options = {}) {
   const limit = Math.min(Math.max(Number(options.limit) || 20, 1), 50);
+  let query = buildQuery(terms);
+  if (options.since) {
+    const from = options.since.toISOString().slice(0, 10);
+    const to = new Date().toISOString().slice(0, 10);
+    query = `(${query}) AND (FIRST_PDATE:[${from} TO ${to}])`;
+  }
+
   const params = new URLSearchParams({
-    query: buildQuery(terms),
+    query,
     format: 'json',
     resultType: 'core',
     pageSize: String(limit),
   });
+  if (options.since) params.set('sort', 'P_PDATE_D desc');
   const email = client.contactEmail();
   if (email) params.set('email', email);
 
@@ -51,6 +59,7 @@ async function search(terms, options = {}) {
           ? (r.fullTextUrlList.fullTextUrl.find((u) => u.availability === 'Open access') || {}).url ||
             null
           : null,
+      published_on: r.firstPublicationDate || null,
       publication_types: (r.pubTypeList && r.pubTypeList.pubType) || [],
       type: r.pubType || null,
       // Europe PMC files preprints under the PPR source.

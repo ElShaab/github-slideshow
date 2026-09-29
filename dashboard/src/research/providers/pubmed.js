@@ -33,8 +33,13 @@ async function search(terms, options = {}) {
     term: buildTerm(terms),
     retmode: 'json',
     retmax: String(limit),
-    sort: 'relevance',
+    sort: options.sinceDays ? 'date' : 'relevance',
   });
+  if (options.sinceDays) {
+    // Entrez date, i.e. when PubMed indexed it - what "new to me" means here.
+    searchParams.set('datetype', 'edat');
+    searchParams.set('reldate', String(options.sinceDays));
+  }
   const { data } = await client.get('pubmed', `${BASE}/esearch.fcgi?${searchParams}`, {
     minIntervalMs: MIN_INTERVAL(),
   });
@@ -81,6 +86,13 @@ async function search(terms, options = {}) {
         abstract: abstracts.get(String(summary.uid)) || null,
         venue: summary.fulljournalname || summary.source || null,
         year: Number(String(summary.sortpubdate || summary.pubdate || '').slice(0, 4)) || null,
+        // sortpubdate looks like "2026/09/24 00:00"; keep the day, not just
+        // the year, so the feed can order articles properly.
+        published_on: (() => {
+          const raw = String(summary.sortpubdate || summary.epubdate || '').trim();
+          const match = raw.match(/^(\d{4})[/-](\d{2})[/-](\d{2})/);
+          return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+        })(),
         doi: doi ? doi.value : null,
         pmid: String(summary.uid),
         url: `https://pubmed.ncbi.nlm.nih.gov/${summary.uid}/`,

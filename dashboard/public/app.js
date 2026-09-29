@@ -7,6 +7,7 @@ const SOURCE_LABELS = {
   youtube: 'YouTube',
   pubmed: 'PubMed',
   websearch: 'Web search',
+  literature: 'Research sweep',
 };
 
 const STATUSES = ['new', 'reviewed', 'used'];
@@ -1094,11 +1095,32 @@ async function loadResearch() {
         pubmed.details.example_term || 'Add PubMed keywords to build a query.';
     }
 
-    const data = await api('/items?source=pubmed&limit=50');
+    const sweep = sources.sources.find((s) => s.id === 'literature');
+    const status = $('#literature-status');
+    status.innerHTML = '';
+    if (sweep) {
+      status.append(
+        el('span', '', `every ${Math.round(sweep.effective_interval_minutes / 60)}h`)
+      );
+      status.append(
+        el('span', '', sweep.last_run_at ? `last ${relativeTime(sweep.last_run_at)}` : 'not run yet')
+      );
+      status.append(el('span', '', `${sweep.total_added} article(s) captured`));
+      if (sweep.details) {
+        const on = sweep.details.databases.filter((d) => d.enabled).length;
+        status.append(
+          el('span', '', `${on} of ${sweep.details.databases.length} databases`)
+        );
+        status.append(el('span', '', `last ${sweep.details.lookback_days} days`));
+      }
+      if (sweep.last_error) status.append(el('span', '', sweep.last_error));
+    }
+
+    const data = await api('/items?source=literature,pubmed&limit=50');
     renderItems(
       $('#research-list'),
       data.items,
-      'No articles yet. Add research keywords, then use "Pull now".'
+      'No articles yet. Add keywords at the top, then use "Sweep now".'
     );
   } catch (err) {
     toast(err.message, true);
@@ -1857,6 +1879,28 @@ function init() {
     });
     toast('Research settings saved');
   });
+  $('#literature-poll').addEventListener('click', async () => {
+    const button = $('#literature-poll');
+    button.disabled = true;
+    button.textContent = 'Sweeping…';
+    try {
+      const result = await api('/sources/literature/poll?force=true', { method: 'POST' });
+      toast(
+        result.ok
+          ? `Sweep: ${result.added || 0} new article(s)${result.notes ? ` — ${result.notes}` : ''}`
+          : `Sweep: ${result.error || result.message || result.skipped}`,
+        !result.ok
+      );
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Sweep now';
+      loadResearch();
+      refreshCounts();
+    }
+  });
+
   $('#pubmed-poll').addEventListener('click', async () => {
     const button = $('#pubmed-poll');
     button.disabled = true;

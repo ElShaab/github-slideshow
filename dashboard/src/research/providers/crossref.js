@@ -24,6 +24,11 @@ async function search(terms, options = {}) {
     rows: String(limit),
     select: SELECT,
   });
+  if (options.since) {
+    params.set('filter', `from-pub-date:${options.since.toISOString().slice(0, 10)}`);
+    params.set('sort', 'published');
+    params.set('order', 'desc');
+  }
   // Crossref's "polite pool" is faster and more reliable than the anonymous
   // one, and only asks for a contact address.
   const email = client.contactEmail();
@@ -49,6 +54,12 @@ async function search(terms, options = {}) {
       abstract: item.abstract ? client.stripMarkup(item.abstract) : null,
       venue: (item['container-title'] || [])[0] || null,
       year: Number.isFinite(year) ? year : null,
+      published_on:
+        item.issued && item.issued['date-parts'] && item.issued['date-parts'][0]
+          ? item.issued['date-parts'][0]
+              .map((part, index) => String(part).padStart(index ? 2 : 4, '0'))
+              .join('-')
+          : null,
       doi: item.DOI || null,
       url: item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : null),
       authors: authors.length

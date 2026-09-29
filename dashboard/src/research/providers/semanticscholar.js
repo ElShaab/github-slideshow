@@ -15,6 +15,7 @@ const FIELDS = [
   'influentialCitationCount',
   'externalIds',
   'publicationTypes',
+  'publicationDate',
   'isOpenAccess',
   'openAccessPdf',
   'url',
@@ -28,6 +29,10 @@ async function search(terms, options = {}) {
     limit: String(limit),
     fields: FIELDS,
   });
+  if (options.since) {
+    // Open-ended range: everything published on or after this date.
+    params.set('publicationDateOrYear', `${options.since.toISOString().slice(0, 10)}:`);
+  }
 
   const headers = {};
   if (config.semanticScholar.apiKey) {
@@ -51,6 +56,7 @@ async function search(terms, options = {}) {
       venue:
         (paper.publicationVenue && paper.publicationVenue.name) || paper.venue || null,
       year: paper.year || null,
+      published_on: paper.publicationDate || null,
       doi: ids.DOI || null,
       pmid: ids.PubMed || null,
       url: paper.url || (ids.DOI ? `https://doi.org/${ids.DOI}` : null),
