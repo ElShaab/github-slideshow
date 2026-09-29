@@ -261,6 +261,20 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
         />
       </SettingsGroup>
 
+      {/* Its own heading, and above Privacy rather than under About, because
+          this is the one row here that exists for our benefit rather than the
+          user's. Buried at the bottom of nine groups it would be found by
+          nobody, and the app only offers the sheet by itself once — after that
+          this row is the only way back to it. */}
+      <SettingsGroup title="Feedback">
+        <SettingsRow
+          label="Send feedback"
+          description="Tell us what to fix, add or remove. It goes straight to the people building GetFit."
+          onPress={() => setFeedbackOpen(true)}
+          last
+        />
+      </SettingsGroup>
+
       <SettingsGroup title="Privacy">
         <SettingsRow
           label="Your data and photos"
@@ -280,13 +294,6 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
       </SettingsGroup>
 
       <SettingsGroup title="About">
-        {/* The way back in. The app offers the sheet once on its own; without a
-            row here, anyone who dismissed it that time could never find it. */}
-        <SettingsRow
-          label="Send feedback"
-          description="Tell us what to fix or add."
-          onPress={() => setFeedbackOpen(true)}
-        />
         <SettingsRow
           label="Health disclaimer"
           description="GetFit gives estimates, not medical advice."
