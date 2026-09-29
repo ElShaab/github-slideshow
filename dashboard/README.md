@@ -63,12 +63,16 @@ survives restarts.
 3. **Ingest** matches text against the live keyword list, skips anything
    already in the `seen_items` ledger, and writes the rest into `items`.
 4. **The console** is one screen with three columns. The **Questions** feed on
-   the right lists everything captured, filterable by source, keyword, status
-   and free text, with a New / Reviewed / Used status per item. Clicking a
-   question loads it into the middle column, where the draft reply is written
-   and posted, and loads its **Matching research** into the left column, where
-   each paper can be ticked or unticked to decide what the draft may cite.
-   **Keywords** and **Sources** are the only other tabs.
+   the right lists what people asked — Reddit, X, YouTube and the web-search
+   source that covers Quora, Inspire and any other domain you add — filterable
+   by source, keyword, status and free text, with a New / Reviewed / Used
+   status per item. Literature never appears here. Clicking a question loads
+   it into the middle column, where the draft reply is written and posted, and
+   loads its research into the left column, where each paper can be ticked or
+   unticked to decide what the draft may cite. That left column has a second
+   view, **Latest research**, holding everything the daily sweep and the
+   PubMed pull have brought in. **Keywords** and **Sources** are the only
+   other tabs.
 
 ### Unified item shape
 
@@ -103,8 +107,9 @@ The keyword bar drives a scheduled sweep of the same six databases the
 per-question matcher uses. Once a day (`literature.interval_minutes`, default
 1440) each keyword is run against PubMed, Europe PMC, Crossref, Semantic
 Scholar, OpenAlex and ClinicalTrials.gov, restricted to work published in the
-last `literature.lookback_days` (default 30), and anything new is filed in the
-unified feed as a **Research sweep** item.
+last `literature.lookback_days` (default 30), and anything new is filed under
+**Latest research** in the console's research column — articles are not
+questions, so they stay out of the question feed.
 
 - **Date filtering is asked for and then checked.** Each provider gets its own
   documented filter — `reldate` + `datetype=edat` for PubMed, `FIRST_PDATE`
@@ -133,7 +138,7 @@ different source labels. Re-enable it in Sources if you want it back.
 ## Research matching
 
 Every captured question can be matched against six research databases at once,
-from the left-hand column of the console.
+from the **For this question** view of the console's left column.
 
 | Database | Credentials | What it adds |
 | -------- | ----------- | ------------ |

@@ -48,8 +48,15 @@
           <!-- LEFT: research matched to the selected question -->
           <div class="console-col col-research">
             <div class="col-head">
-              <h2>Matching research</h2>
-              <div class="row">
+              <div class="seg" id="research-views">
+                <button class="is-active" data-view="match" title="Databases searched for the selected question">
+                  For this question
+                </button>
+                <button data-view="sweep" title="Everything the daily keyword sweep brought in">
+                  Latest research
+                </button>
+              </div>
+              <div class="row" id="research-match-actions">
                 <button class="tiny" id="wb-match">Match research</button>
                 <button
                   class="tiny ghost"
@@ -59,13 +66,22 @@
                   Re-run
                 </button>
               </div>
+              <div class="row hidden" id="research-sweep-actions">
+                <button class="tiny" id="sweep-now">Sweep now</button>
+              </div>
             </div>
             <div class="col-body">
-              <div id="wb-terms" class="subtle"></div>
-              <div id="wb-providers" class="chips"></div>
-              <div id="wb-note"></div>
-              <div id="wb-picked" class="picked-note hidden"></div>
-              <div id="wb-results" class="list"></div>
+              <div id="research-match-view">
+                <div id="wb-terms" class="subtle"></div>
+                <div id="wb-providers" class="chips"></div>
+                <div id="wb-note"></div>
+                <div id="wb-picked" class="picked-note hidden"></div>
+                <div id="wb-results" class="list"></div>
+              </div>
+              <div id="research-sweep-view" class="hidden">
+                <div id="sweep-status" class="counts"></div>
+                <div id="sweep-list" class="list"></div>
+              </div>
             </div>
           </div>
 
@@ -114,13 +130,11 @@
                 <label>
                   Source
                   <select id="filter-source">
-                    <option value="">All sources</option>
+                    <option value="">All communities</option>
                     <option value="reddit">Reddit</option>
                     <option value="x">X (Twitter)</option>
                     <option value="youtube">YouTube</option>
-                    <option value="literature">Research sweep</option>
-                    <option value="pubmed">PubMed</option>
-                    <option value="websearch">Web search</option>
+                    <option value="websearch">Quora, Inspire &amp; web</option>
                   </select>
                 </label>
                 <label>

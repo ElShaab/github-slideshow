@@ -12,11 +12,20 @@ const SOURCE_LABELS = {
 
 const STATUSES = ['new', 'reviewed', 'used'];
 
+/** The feed column is a question list: people asking things, nowhere else. */
+const COMMUNITY_SOURCES = ['reddit', 'x', 'youtube', 'websearch'];
+/** Literature belongs to the research column, not the question list. */
+const LITERATURE_SOURCES = ['literature', 'pubmed'];
+
 const state = {
   tab: 'feed',
   keywords: [],
   settings: {},
   feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0, items: [] },
+  // Left column: matched research for the selected question, or the sweep.
+  researchView: 'match',
+  researchViewChosen: false,
+  health: null,
   editingKeyword: null,
   workbench: {
     itemId: null,
@@ -93,16 +102,18 @@ function relativeTime(iso) {
  * One question in the feed column. The whole card is a picker: clicking it
  * loads the question, its research and its draft into the other two columns.
  */
-function itemCard(item) {
-  const card = el('div', 'item is-pick');
+function itemCard(item, { pick = true } = {}) {
+  const card = el('div', pick ? 'item is-pick' : 'item');
   card.dataset.status = item.status;
   card.dataset.itemId = String(item.id);
-  if (item.id === state.workbench.itemId) card.classList.add('is-selected');
-  card.addEventListener('click', (event) => {
-    // Let the buttons and links inside the card do their own job.
-    if (event.target.closest('button, a, input, select')) return;
-    selectQuestion(item.id);
-  });
+  if (pick) {
+    if (item.id === state.workbench.itemId) card.classList.add('is-selected');
+    card.addEventListener('click', (event) => {
+      // Let the buttons and links inside the card do their own job.
+      if (event.target.closest('button, a, input, select')) return;
+      selectQuestion(item.id);
+    });
+  }
 
   const head = el('div', 'item-head');
   head.append(el('span', `badge source-${item.source}`, SOURCE_LABELS[item.source] || item.source));
@@ -115,9 +126,15 @@ function itemCard(item) {
   if (item.kind) head.append(el('span', 'badge', item.kind));
   card.append(head);
 
-  // The full text lives in the middle column once the card is picked.
-  const body = el('div', 'item-text tight', item.text);
-  body.title = 'Click to open this question';
+  // A picked question is shown in full in the middle column, so the card
+  // itself only needs a taste of it. An article has nowhere else to go.
+  const body = el('div', pick ? 'item-text tight' : 'item-text clamped', item.text);
+  if (pick) {
+    body.title = 'Click to open this question';
+  } else {
+    body.title = 'Click to expand';
+    body.addEventListener('click', () => body.classList.toggle('clamped'));
+  }
   card.append(body);
 
   const foot = el('div', 'item-foot');
@@ -182,19 +199,19 @@ function itemCard(item) {
   return card;
 }
 
-function renderItems(container, items, emptyMessage) {
+function renderItems(container, items, emptyMessage, options) {
   container.innerHTML = '';
   if (!items.length) {
     container.append(el('div', 'empty', emptyMessage));
     return;
   }
-  for (const item of items) container.append(itemCard(item));
+  for (const item of items) container.append(itemCard(item, options));
 }
 
 async function loadFeed() {
   const params = new URLSearchParams();
   const f = state.feed;
-  if (f.source) params.set('source', f.source);
+  params.set('source', f.source || COMMUNITY_SOURCES.join(','));
   if (f.keyword) params.set('keyword', f.keyword);
   if (f.status) params.set('status', f.status);
   if (f.q) params.set('q', f.q);
@@ -205,11 +222,7 @@ async function loadFeed() {
     const data = await api(`/items?${params}`);
     state.feed.total = data.total;
     state.feed.items = data.items;
-    renderItems(
-      $('#feed-list'),
-      data.items,
-      'Nothing here yet. Add keywords, then poll a source from the Sources tab.'
-    );
+    renderItems($('#feed-list'), data.items, emptyFeedMessage());
     const from = data.total === 0 ? 0 : f.offset + 1;
     const to = Math.min(f.offset + f.limit, data.total);
     $('#feed-range').textContent = `${from}-${to} of ${data.total}`;
@@ -222,6 +235,12 @@ async function loadFeed() {
       selectQuestion(data.items[0].id);
     } else {
       markSelectedCard();
+    }
+
+    // With no questions captured yet there is nothing to match, so show what
+    // the sweep has found instead - unless the view was chosen by hand.
+    if (!data.items.length && !state.researchViewChosen && state.researchView === 'match') {
+      showResearchView('sweep');
     }
   } catch (err) {
     toast(err.message, true);
@@ -237,13 +256,42 @@ function markSelectedCard() {
   }
 }
 
+/** Says why the question column is empty, naming what is not yet wired up. */
+function emptyFeedMessage() {
+  const health = state.health;
+  if (!health) return 'No questions captured yet.';
+
+  const community = health.sources.filter((s) => COMMUNITY_SOURCES.includes(s.id));
+  const live = community.filter((s) => s.enabled && s.configured).map((s) => SOURCE_LABELS[s.id]);
+  const missing = community.filter((s) => !s.configured).map((s) => SOURCE_LABELS[s.id]);
+
+  if (!live.length) {
+    return (
+      'No question source is set up yet. Reddit, X, YouTube and web search ' +
+      '(Quora, Inspire and any domain you add) feed this column — open the ' +
+      'Sources tab to add credentials and switch one on.'
+    );
+  }
+  return (
+    `Nothing captured yet from ${live.join(', ')}. Poll one from the Sources tab.` +
+    (missing.length ? ` Still needs credentials: ${missing.join(', ')}.` : '')
+  );
+}
+
 async function refreshCounts() {
   try {
     const summary = await api('/items/summary');
     const counts = $('#feed-counts');
     counts.innerHTML = '';
-    counts.append(el('span', '', `${summary.total} items`));
-    for (const [source, stats] of Object.entries(summary.bySource)) {
+
+    // Only the community sources are questions; literature is counted in the
+    // research column instead.
+    const community = Object.entries(summary.bySource).filter(([source]) =>
+      COMMUNITY_SOURCES.includes(source)
+    );
+    const total = community.reduce((sum, [, stats]) => sum + stats.total, 0);
+    counts.append(el('span', '', `${total} question${total === 1 ? '' : 's'}`));
+    for (const [source, stats] of community) {
       counts.append(
         el('span', '', `${SOURCE_LABELS[source] || source}: ${stats.total} (${stats.new || 0} new)`)
       );
@@ -1193,6 +1241,7 @@ function selectQuestion(itemId) {
   state.workbench.picked = new Set();
   markSelectedCard();
   showTab('feed');
+  if (state.researchView !== 'match') showResearchView('match');
   loadSelection();
 }
 
@@ -1711,6 +1760,54 @@ async function postReply(target) {
   }
 }
 
+/* --------------------------------------------- research column: the sweep */
+
+/** Flips the left column between the per-question match and the daily sweep. */
+function showResearchView(view) {
+  state.researchView = view;
+  $$('#research-views button').forEach((btn) =>
+    btn.classList.toggle('is-active', btn.dataset.view === view)
+  );
+  $('#research-match-view').classList.toggle('hidden', view !== 'match');
+  $('#research-sweep-view').classList.toggle('hidden', view !== 'sweep');
+  $('#research-match-actions').classList.toggle('hidden', view !== 'match');
+  $('#research-sweep-actions').classList.toggle('hidden', view !== 'sweep');
+  if (view === 'sweep') loadSweep();
+}
+
+/**
+ * Everything the daily keyword sweep and the PubMed pull have brought in,
+ * newest first. These are articles, not questions, so they live here rather
+ * than in the feed of things people asked.
+ */
+async function loadSweep() {
+  try {
+    const data = await api(`/items?source=${LITERATURE_SOURCES.join(',')}&limit=50`);
+    const status = $('#sweep-status');
+    status.innerHTML = '';
+    status.append(el('span', '', `${data.total} article${data.total === 1 ? '' : 's'}`));
+
+    const sweep = (state.health && state.health.sources.find((s) => s.id === 'literature')) || null;
+    if (sweep) {
+      status.append(
+        el('span', '', sweep.last_run_at ? `last swept ${relativeTime(sweep.last_run_at)}` : 'never swept')
+      );
+      if (sweep.last_status && sweep.last_status !== 'ok') {
+        status.append(el('span', '', `status: ${sweep.last_status}`));
+      }
+    }
+
+    renderItems(
+      $('#sweep-list'),
+      data.items,
+      'Nothing swept yet. The sweep runs the keywords above against six databases once a day — press "Sweep now" to run it immediately.',
+      { pick: false }
+    );
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
 /** Everything a match returns starts ticked; unticking narrows the draft. */
 function setMatch(match) {
   state.workbench.match = match;
@@ -1884,6 +1981,15 @@ function trackHeaderHeight() {
 
 /* ------------------------------------------------------------------- init */
 
+/** Per-source enabled/configured state, used to explain an empty column. */
+async function refreshHealth() {
+  try {
+    state.health = await api('/health');
+  } catch {
+    // Non-fatal: the empty states fall back to a generic message.
+  }
+}
+
 function debounce(fn, ms) {
   let timer;
   return (...args) => {
@@ -1933,6 +2039,33 @@ function init() {
     loadFeed();
   });
 
+  $$('#research-views button').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      state.researchViewChosen = true;
+      showResearchView(btn.dataset.view);
+    })
+  );
+  $('#sweep-now').addEventListener('click', async () => {
+    const button = $('#sweep-now');
+    button.disabled = true;
+    button.textContent = 'Sweeping…';
+    try {
+      const result = await api('/sources/literature/poll?force=true', { method: 'POST' });
+      toast(
+        result.ok
+          ? `Sweep: ${result.added || 0} new article(s)${result.notes ? ` — ${result.notes}` : ''}`
+          : `Sweep: ${result.error || result.message || result.skipped}`,
+        !result.ok
+      );
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Sweep now';
+      await refreshHealth();
+      loadSweep();
+    }
+  });
   $('#wb-match').addEventListener('click', () => runMatch(false));
   $('#wb-rematch').addEventListener('click', () => runMatch(true));
   $('#wb-generate').addEventListener('click', generateDraft);
@@ -1974,8 +2107,10 @@ function init() {
   trackHeaderHeight();
   loadKeywordBar();
   refreshDraftAvailability();
-  refreshCounts();
-  loadFeed();
+  refreshHealth().then(() => {
+    refreshCounts();
+    loadFeed();
+  });
 
   // Keep the feed reasonably live without hammering the API.
   setInterval(() => {
