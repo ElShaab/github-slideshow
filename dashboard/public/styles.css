@@ -217,6 +217,21 @@ main { max-width: 1720px; margin: 0 auto; padding: 1.25rem; }
 }
 .item-text.tight { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
+.draft-hint-row { align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.draft-hint-row p { margin: 0 0 0.5rem; flex: 1 1 14rem; }
+.snippets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  margin-bottom: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.snippets textarea { min-height: 4.5rem; }
+.snippets p { margin: 0; }
+
 .poll-report { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.8rem; font-size: 0.8rem; }
 .poll-line {
   padding: 0.4rem 0.55rem;

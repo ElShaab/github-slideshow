@@ -441,15 +441,20 @@ const DEFAULT_SETTINGS = {
   'research.provider_openalex': 'true',
   'research.provider_clinicaltrials': 'true',
 
-  // Draft reply generation (Anthropic API).
   // Replying. Nothing here posts on a schedule or in bulk: a reply is sent
   // only by an explicit, confirmed click on one draft.
   'reply.enabled': 'true',
   'reply.confirm_each': 'true',
 
-  'draft.model': 'claude-opus-5',
-  'draft.effort': 'high',
-  'draft.max_tokens': '16000',
+  // Reusable lines the composed draft wraps the reply body in. Both are
+  // edited in the UI; both may be blank.
+  'draft.opening':
+    'Here is what the research actually says on this, in plain language. ' +
+    'General information rather than advice about your own case.',
+  'draft.closing':
+    'If this is affecting you day to day, it is worth raising with your ' +
+    'prosthetist or care team — they can look at your situation in a way ' +
+    'nobody can from a thread.',
 
   // The daily literature sweep covers PubMed along with five other
   // databases, so the standalone poll is off by default; turn it on in

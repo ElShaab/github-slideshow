@@ -30,6 +30,7 @@ const state = {
   researchViewChosen: false,
   health: null,
   editingKeyword: null,
+  snippets: { opening: '', closing: '' },
   workbench: {
     itemId: null,
     match: null,
@@ -1673,7 +1674,7 @@ function renderPicked() {
   box.append(toggle);
 
   const generate = $('#wb-generate');
-  generate.textContent = picked ? `Generate from ${picked}` : 'Generate draft';
+  generate.textContent = picked ? `Build from ${picked}` : 'Build draft';
 }
 
 const SOURCE_DB_LABELS = {
@@ -1696,7 +1697,7 @@ function renderMatch(match) {
   results.innerHTML = '';
 
   $('#wb-picked').classList.add('hidden');
-  $('#wb-generate').textContent = 'Generate draft';
+  $('#wb-generate').textContent = 'Build draft';
 
   if (!state.workbench.itemId) {
     results.append(el('div', 'empty', 'Pick a question from the feed on the right.'));
@@ -1771,8 +1772,10 @@ function renderDraft() {
   text.value = draft.content;
   const usage = draft.usage || {};
   meta.textContent = [
-    draft.model,
-    usage.output_tokens ? `${usage.output_tokens} output tokens` : null,
+    usage.composed
+      ? `built from ${usage.papers} paper${usage.papers === 1 ? '' : 's'}` +
+        (usage.quoted ? `, ${usage.quoted} quoted` : '')
+      : draft.model,
     `saved ${relativeTime(draft.updated_at)}`,
     state.workbench.drafts.length > 1 ? `${state.workbench.drafts.length} versions` : null,
   ]
@@ -1821,17 +1824,60 @@ function renderDraft() {
 async function refreshDraftAvailability() {
   try {
     const status = await api('/drafts/status');
-    const button = $('#wb-generate');
-    button.disabled = !status.configured;
-    button.title = status.configured
-      ? `Generates with ${status.model}`
-      : 'ANTHROPIC_API_KEY is not set';
-    $('#wb-draft-hint').textContent = status.configured
-      ? 'Drafts are written from the papers ticked on the left, for your review only. Nothing is posted until you say so.'
-      : 'Set ANTHROPIC_API_KEY (a Replit secret or environment variable) and restart to enable draft generation. You can still write and save drafts by hand here.';
+    state.snippets = { opening: status.opening || '', closing: status.closing || '' };
+    $('#wb-generate').title =
+      'Builds the question, the ticked papers and their quoted conclusions into a draft';
+    $('#wb-draft-hint').textContent =
+      'The draft is built here from the ticked papers: each conclusion is quoted ' +
+      'from its stored abstract, word for word. The reply itself is yours to write.';
   } catch {
     // Non-fatal: the button stays enabled and any failure surfaces on click.
   }
+}
+
+/**
+ * The two reusable lines every draft is wrapped in, edited where they are
+ * used and stored in the database.
+ */
+function renderSnippetEditor() {
+  const box = $('#wb-snippets');
+  const open = box.classList.toggle('hidden');
+  if (open) return;
+
+  box.innerHTML = '';
+  const fields = [
+    ['draft.opening', 'Opening line', state.snippets.opening],
+    ['draft.closing', 'Closing line', state.snippets.closing],
+  ];
+  const inputs = {};
+  for (const [key, label, value] of fields) {
+    const wrap = el('label', '', label);
+    const area = el('textarea');
+    area.rows = 3;
+    area.value = value;
+    wrap.append(area);
+    box.append(wrap);
+    inputs[key] = area;
+  }
+
+  const row = el('div', 'row');
+  const save = el('button', 'tiny', 'Save snippets');
+  save.addEventListener('click', async () => {
+    const entries = {
+      'draft.opening': inputs['draft.opening'].value,
+      'draft.closing': inputs['draft.closing'].value,
+    };
+    await saveSettings(entries);
+    state.snippets = { opening: entries['draft.opening'], closing: entries['draft.closing'] };
+    toast('Snippets saved — they apply to the next draft you build');
+  });
+  const hide = el('button', 'tiny ghost', 'Close');
+  hide.addEventListener('click', () => box.classList.add('hidden'));
+  row.append(save, hide);
+  box.append(row);
+  box.append(
+    el('p', 'subtle', 'Either can be left empty. They are not applied to drafts already built.')
+  );
 }
 
 function renderReply() {
@@ -2194,7 +2240,7 @@ async function generateDraft() {
   const button = $('#wb-generate');
   const label = button.textContent;
   button.disabled = true;
-  button.textContent = 'Generating…';
+  button.textContent = 'Building…';
   try {
     const data = await api(`/items/${itemId}/drafts`, {
       method: 'POST',
@@ -2204,7 +2250,12 @@ async function generateDraft() {
     state.workbench.draft = data.draft;
     renderDraft();
     renderReply();
-    toast('Draft generated — review before using');
+    const built = data.draft.usage || {};
+    toast(
+      built.papers
+        ? `Draft built from ${built.papers} paper(s), ${built.quoted || 0} with a quoted conclusion`
+        : 'Draft built — no papers were ticked, so it cites nothing'
+    );
   } catch (err) {
     toast(err.message, true);
   } finally {
@@ -2218,7 +2269,7 @@ async function saveDraft() {
   const content = $('#wb-draft-text').value;
 
   // Nothing generated yet: save what was typed as a draft of its own, so the
-  // reply workflow does not depend on having an Anthropic key.
+  // reply workflow does not depend on building one first.
   if (!draft) {
     if (!content.trim() || !state.workbench.itemId) return;
     try {
@@ -2385,6 +2436,7 @@ function init() {
   $('#wb-match').addEventListener('click', () => runMatch(false));
   $('#wb-rematch').addEventListener('click', () => runMatch(true));
   $('#wb-generate').addEventListener('click', generateDraft);
+  $('#wb-snippets-toggle').addEventListener('click', renderSnippetEditor);
   $('#wb-draft-save').addEventListener('click', saveDraft);
   $('#wb-draft-copy').addEventListener('click', async () => {
     const text = $('#wb-draft-text').value;

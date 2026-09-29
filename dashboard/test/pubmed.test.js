@@ -107,3 +107,18 @@ test('pubmed abstract parsing keeps one record per article', () => {
   assert.equal(parsed.get('1'), 'One');
   assert.equal(parsed.get('2'), 'Two');
 });
+
+test('a structured abstract keeps its section labels', () => {
+  const parsed = pubmed.parseAbstracts(
+    '<PubmedArticle><PMID>3</PMID>' +
+      '<AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">Pain is common.</AbstractText>' +
+      '<AbstractText Label="CONCLUSIONS" NlmCategory="CONCLUSIONS">Mirror therapy helped.</AbstractText>' +
+      '<AbstractText Label="UNLABELLED">Trailing note.</AbstractText>' +
+      '</PubmedArticle>'
+  );
+  // The labels are what identify the conclusion when a draft quotes it.
+  assert.equal(
+    parsed.get('3'),
+    'BACKGROUND: Pain is common.\n\nCONCLUSIONS: Mirror therapy helped.\n\nTrailing note.'
+  );
+});

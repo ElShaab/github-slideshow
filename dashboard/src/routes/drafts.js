@@ -5,17 +5,19 @@ const drafts = require('../lib/drafts');
 const items = require('../lib/items');
 const store = require('../lib/researchStore');
 const research = require('../research');
-const generator = require('../drafts/generate');
+const composer = require('../drafts/compose');
 const settings = require('../lib/settings');
 
 const router = express.Router();
 
 router.get('/drafts/status', (req, res) => {
   res.json({
-    configured: generator.isConfigured(),
-    model: settings.get('draft.model'),
-    effort: settings.get('draft.effort'),
-    max_tokens: settings.getNumber('draft.max_tokens', 16000),
+    // Drafts are built here from the database. Nothing is sent anywhere and
+    // there is no key to configure, so this is always available.
+    mode: 'local',
+    configured: true,
+    opening: settings.get('draft.opening') || '',
+    closing: settings.get('draft.closing') || '',
     counts: drafts.summary(),
   });
 });
@@ -48,8 +50,8 @@ function selectResults(match, use) {
 }
 
 /**
- * Generate a draft for one question. Uses the cached research match, running
- * the match first when there is none, so the model always sees the same
+ * Build a draft for one question, in code, from the cached research match -
+ * running the match first when there is none, so the draft quotes the same
  * studies the physician is looking at.
  */
 router.post('/items/:id/drafts', async (req, res) => {
@@ -63,20 +65,18 @@ router.post('/items/:id/drafts', async (req, res) => {
   }
   match = selectResults(match, (req.body || {}).use);
 
-  try {
-    const generated = await generator.generateDraft({ item, match });
-    const saved = drafts.create({ item_id: item.id, ...generated });
-    res.status(201).json({ draft: saved, match_used: { terms: match.terms, count: match.results.length } });
-  } catch (err) {
-    const described = generator.describeError(err);
-    res.status(described.status).json({ error: described.message });
-  }
+  const composed = composer.composeDraft({ item, match });
+  const saved = drafts.create({ item_id: item.id, ...composed });
+  res.status(201).json({
+    draft: saved,
+    match_used: { terms: match.terms, count: (match.results || []).length },
+  });
 });
 
 /**
  * A draft written by hand, with no model involved. Without this the whole
- * reply workflow would depend on an Anthropic key: the physician could type
- * a reply but never save it, so the copy-and-post path never appeared.
+ * reply workflow would depend on building one first: the physician could
+ * type a reply but never save it, so the copy-and-post path never appeared.
  */
 router.post('/items/:id/drafts/manual', (req, res) => {
   const item = items.get(Number(req.params.id));

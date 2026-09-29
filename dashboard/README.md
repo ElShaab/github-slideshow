@@ -22,7 +22,7 @@ dashboard/
 │   ├── sources/           reddit.js, x.js, youtube.js, pubmed.js, websearch.js
 │   ├── research/          term extraction, evidence grading, merge, rank, and
 │   │                      one provider per literature API
-│   └── drafts/            Anthropic prompt and generation
+│   └── drafts/            draft composition and conclusion quoting
 ├── public/                index.html, app.js, styles.css
 ├── test/                  node:test suites (no network required)
 └── data/                  SQLite file (gitignored)
@@ -195,38 +195,69 @@ Each database is rate-limited independently with a shared politeness queue, and
 `Promise.allSettled` isolates failures - one database timing out or rate
 limiting is reported as a chip on that provider and the rest still merge.
 
-## Draft reply generation
+## Draft building
 
-**Generate draft**, above the middle column, sends the question plus the
-abstracts of the ticked papers to the Anthropic API and returns a draft for
-review. Nothing is posted anywhere without an explicit confirmed click.
+**Build draft**, above the middle column, assembles a draft from what is
+already in the database. No model, no network call, no API key: the whole
+thing is string handling over the cached research match.
 
-Every paper the match returned starts ticked. Unticking narrows what the model
-is given — the button reads *Generate from 3* when three are ticked, and only
-those three are sent, numbered in the order they appear on screen, so the
-citation numbers in the draft line up with the column beside it. Choosing a
-subset by hand is treated as your own relevance call, so the automatic "no
-strong match" framing is dropped; the rules below about being honest over
-weak evidence still apply.
+What it produces, in order:
 
-- Model `claude-opus-5` with adaptive thinking, streamed so a long generation
-  cannot hit an HTTP timeout, with the system prompt cached across drafts and
-  `fallbacks: "default"` so a policy decline re-runs on Anthropic's recommended
-  substitute rather than dead-ending.
-- The system prompt instructs the model to write for amputees and their
-  families rather than clinicians, to carry a citation number on every factual
-  claim and never cite a study outside the supplied list, to be explicit about
-  uncertainty and about evidence strength, never to give individualized medical
-  advice or suggest replacing the reader's care team, and to lead with the fact
-  when the supplied research does not answer the question.
-- Registered trials and preprints are labelled in the prompt so the draft can
-  say what they are.
-- Drafts are stored per question with status **Draft / Edited / Used**. Saving
-  edited text moves a draft from Draft to Edited automatically. The studies
-  handed to the model are stored with the draft, so the citation numbers in the
-  text stay resolvable.
-- Without `ANTHROPIC_API_KEY` the button is disabled and the rest of the
-  dashboard, including writing drafts by hand, still works.
+1. **The question**, restated in full and verbatim, with the source, the
+   thread it came from, the author and the date.
+2. **The evidence**: every ticked paper numbered `[1]`, `[2]`, … with its
+   title, journal, year, evidence level, open-access status and link — and
+   under each, **its conclusion quoted from the stored abstract, word for
+   word**.
+3. **The reply**, below a marked divider: your opening snippet, a clearly
+   marked blank section, and your closing snippet.
+
+The rule the whole thing rests on is that nothing about a study is written by
+the dashboard. Every word inside quotation marks is copied from that study's
+abstract as the database holds it, because a paraphrase produced by string
+handling would be a claim nobody checked. What the reply actually argues is
+left blank for you to write.
+
+### Finding the conclusion
+
+Three rules, tried in order, and the draft says which one fired:
+
+- **A labelled section.** Structured abstracts carry their section names
+  (`CONCLUSIONS:`, `INTERPRETATION:`, `CONCLUSIONS AND RELEVANCE:`), so the
+  text after the last such heading is taken, stopping at whatever section
+  follows — funding, registration, keywords. PubMed's `Label` attributes are
+  preserved for exactly this reason.
+- **A conclusion cue.** Failing that, a sentence opening with "In conclusion",
+  "We conclude", "These findings suggest" and similar, to the end.
+- **The last two sentences**, labelled in the draft as *"Last lines of the
+  abstract, quoted (no conclusion section was labelled)"* so a weaker
+  extraction is never passed off as the author's own conclusion.
+
+Sentence splitting protects abbreviations (`et al.`, `vs.`, `Fig.`, `0.5 mg.`),
+initials and decimals, and a quote is never cut mid-sentence to meet the length
+cap — a truncated quote is not a quote. Where the stored abstract is itself an
+extract, the note says so rather than letting a trailing ellipsis pass for the
+author's punctuation. A registered trial says it has no results to quote; a
+paper with no stored abstract says so and tells you to read it first.
+
+### Snippets
+
+The opening and closing lines are stored in SQLite (`draft.opening`,
+`draft.closing`) and edited from **Snippets** in the draft column. Either may
+be empty. They apply to the next draft you build, never retroactively.
+
+### Picking papers
+
+Every paper the match returned starts ticked. Unticking narrows what the draft
+quotes — the button reads *Build from 3* when three are ticked, and they are
+numbered in the order they appear on screen, so the citation numbers line up
+with the column beside them.
+
+Drafts are stored per question with status **Draft / Edited / Used**. Saving
+edited text moves a draft from Draft to Edited automatically. The papers a
+draft was built from are stored with it, so the citation numbers stay
+resolvable. A draft can also be written from scratch: type into the box and
+**Save** stores it like any other.
 
 ## Replying from the dashboard
 
@@ -385,9 +416,9 @@ replied** records it against that site — optionally with a link to your
 answer — and moves the draft and the question to Used. Research results, which
 nobody asked, get neither.
 
-Drafts do not need the Anthropic key either: type a reply into the box and
-**Save** stores it like any other draft, which is what makes the copy-and-post
-path available with no credentials set at all.
+Drafts need no credentials at all — they are built here — and one can also be
+typed from scratch and saved, which is what makes the copy-and-post path work
+with nothing configured.
 
 ### Feeds (RSS / Atom) — no credentials, no quota
 
@@ -519,7 +550,7 @@ staggered so every API is not called at once.
 | PUT    | `/api/drafts/:id` | Save edited text (Draft becomes Edited) |
 | PATCH  | `/api/drafts/:id` | `{status: "draft" \| "edited" \| "used"}` |
 | DELETE | `/api/drafts/:id` | Delete a draft |
-| GET    | `/api/drafts/status` | Whether the Anthropic key is present, and the model |
+| GET    | `/api/drafts/status` | Draft mode and the stored opening/closing snippets |
 | GET    | `/api/connections` | Linked accounts, redirect URIs, what still needs registering |
 | GET    | `/api/connections/:provider/start` | Begin linking (redirects to the platform) |
 | GET    | `/api/connections/:provider/callback` | OAuth return leg |

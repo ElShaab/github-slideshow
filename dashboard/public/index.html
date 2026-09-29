@@ -91,7 +91,7 @@
               <h2>Draft reply</h2>
               <div class="row">
                 <span class="subtle" id="wb-draft-meta"></span>
-                <button id="wb-generate" class="tiny">Generate draft</button>
+                <button id="wb-generate" class="tiny">Build draft</button>
               </div>
             </div>
             <div class="col-body">
@@ -100,10 +100,17 @@
               </div>
 
               <div class="card" id="wb-draft-card">
-                <p class="subtle" id="wb-draft-hint">
-                  Drafts are written from the papers ticked on the left, for
-                  your review only. Nothing is posted until you say so.
-                </p>
+                <div class="row draft-hint-row">
+                  <p class="subtle" id="wb-draft-hint">
+                    The draft is built here from the ticked papers, with each
+                    conclusion quoted from its stored abstract.
+                  </p>
+                  <button class="tiny ghost" id="wb-snippets-toggle"
+                    title="The opening and closing lines every draft is wrapped in">
+                    Snippets
+                  </button>
+                </div>
+                <div class="hidden snippets" id="wb-snippets"></div>
                 <textarea id="wb-draft-text" rows="12" spellcheck="true"
                   placeholder="No draft yet. Match the research on the left, tick the papers to use, then generate a draft you can edit here."></textarea>
                 <div class="row" id="wb-draft-controls">

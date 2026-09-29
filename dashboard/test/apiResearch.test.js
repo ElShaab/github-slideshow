@@ -5,7 +5,6 @@ const assert = require('node:assert');
 const { useTempDb, mockFetch } = require('./helpers');
 
 useTempDb('api-research');
-process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
 const { app } = require('../src/server');
 const keywords = require('../src/lib/keywords');
@@ -83,21 +82,6 @@ const RESEARCH_ROUTES = {
   'clinicaltrials.gov/api/v2': { body: { studies: [] } },
 };
 
-function sseStream(text) {
-  const events = [
-    ['message_start', { type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: 'claude-opus-5', content: [], stop_reason: null, usage: { input_tokens: 500, output_tokens: 1 } } }],
-    ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }],
-    ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } }],
-    ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-    ['message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 200 } }],
-    ['message_stop', { type: 'message_stop' }],
-  ];
-  return {
-    body: events.map(([n, d]) => `event: ${n}\ndata: ${JSON.stringify(d)}\n\n`).join(''),
-    headers: { 'content-type': 'text/event-stream' },
-  };
-}
-
 test('research is absent until it is run', async () => {
   const { status, data } = await call(`/api/items/${question.id}/research`);
   assert.equal(status, 200);
@@ -139,23 +123,32 @@ test('provider list reports which databases are enabled', async () => {
   assert.equal(data.cache.matched_items, 1);
 });
 
-test('draft status reports whether the API key is present', async () => {
+test('draft status reports the local mode and the stored snippets', async () => {
   const { data } = await call('/api/drafts/status');
-  assert.equal(data.configured, true);
-  assert.equal(data.model, 'claude-opus-5');
+  assert.equal(data.mode, 'local');
+  assert.equal(data.configured, true, 'there is nothing to configure');
+  assert.equal(typeof data.opening, 'string');
+  assert.equal(typeof data.closing, 'string');
 });
 
-test('generating a draft stores it against the question', async () => {
-  const mock = mockFetch({ 'api.anthropic.com': () => sseStream('Mirror therapy has decent evidence [1].') });
+test('building a draft stores it against the question, with no network call', async () => {
+  // Any outbound request at all would be a bug: the draft is built from the
+  // database alone.
+  const mock = mockFetch({});
   let created;
   try {
     created = await call(`/api/items/${question.id}/drafts`, { method: 'POST' });
   } finally {
     mock.restore();
   }
+  const outbound = mock.calls.filter((url) => !/127\.0\.0\.1|localhost/.test(url));
+  assert.deepEqual(outbound, [], 'nothing outside this process was fetched');
   assert.equal(created.status, 201);
   assert.equal(created.data.draft.status, 'draft');
-  assert.match(created.data.draft.content, /Mirror therapy/);
+  assert.equal(created.data.draft.model, null);
+  assert.equal(created.data.draft.usage.composed, true);
+  assert.match(created.data.draft.content, /QUESTION/);
+  assert.match(created.data.draft.content, /WRITE YOUR REPLY HERE/);
   assert.equal(created.data.draft.citations.length, 1);
   assert.equal(created.data.match_used.count, 1);
 
@@ -185,19 +178,15 @@ test('editing a draft saves the text and flips it to edited', async () => {
   assert.equal((await call(`/api/drafts/${draft.id}`, { method: 'DELETE' })).status, 404);
 });
 
-test('an Anthropic failure is reported without storing a draft', async () => {
-  const mock = mockFetch({
-    'api.anthropic.com': { status: 429, body: { type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } } },
+test('the snippets stored in settings are what a built draft carries', async () => {
+  await call('/api/settings', {
+    method: 'PUT',
+    body: { 'draft.opening': 'Opening from settings.', 'draft.closing': 'Closing from settings.' },
   });
-  let attempt;
-  try {
-    attempt = await call(`/api/items/${question.id}/drafts`, { method: 'POST' });
-  } finally {
-    mock.restore();
-  }
-  assert.equal(attempt.status, 429);
-  assert.match(attempt.data.error, /rate limit/i);
-  assert.equal((await call(`/api/items/${question.id}/drafts`)).data.drafts.length, 0);
+  const built = await call(`/api/items/${question.id}/drafts`, { method: 'POST' });
+  assert.match(built.data.draft.content, /Opening from settings\./);
+  assert.match(built.data.draft.content, /Closing from settings\./);
+  await call(`/api/drafts/${built.data.draft.id}`, { method: 'DELETE' });
 });
 
 test('only the ticked papers are handed to the model', async () => {
@@ -219,22 +208,10 @@ test('only the ticked papers are handed to the model', async () => {
     considered: 3,
   });
 
-  let sent;
-  const mock = mockFetch({
-    'api.anthropic.com': (url, options) => {
-      sent = JSON.parse(options.body);
-      return sseStream('Two papers looked at this [1][2].');
-    },
+  const created = await call(`/api/items/${question.id}/drafts`, {
+    method: 'POST',
+    body: { use: [0, 2] },
   });
-  let created;
-  try {
-    created = await call(`/api/items/${question.id}/drafts`, {
-      method: 'POST',
-      body: { use: [0, 2] },
-    });
-  } finally {
-    mock.restore();
-  }
 
   assert.equal(created.status, 201);
   assert.equal(created.data.match_used.count, 2);
@@ -243,13 +220,13 @@ test('only the ticked papers are handed to the model', async () => {
     ['Paper 1', 'Paper 3']
   );
 
-  const prompt = sent.messages[0].content;
-  assert.match(prompt, /\[1\] Paper 1/);
-  assert.match(prompt, /\[2\] Paper 3/);
-  assert.ok(!prompt.includes('Paper 2'), 'the unticked paper is not sent');
-  // Picking by hand is the physician's own relevance call.
-  assert.match(prompt, /physician read the retrieved research/);
-  assert.ok(!prompt.includes('no strong match'), 'the automatic verdict is dropped');
+  const draft = created.data.draft.content;
+  assert.match(draft, /\[1\] Paper 1/);
+  assert.match(draft, /\[2\] Paper 3/);
+  assert.ok(!draft.includes('Paper 2'), 'the unticked paper is left out');
+  // Each ticked paper's own conclusion, quoted.
+  assert.match(draft, /"Findings of paper 1\."/);
+  assert.match(draft, /"Findings of paper 3\."/);
 
   await call(`/api/items/${question.id}/drafts`).then(({ data }) =>
     Promise.all(
@@ -259,25 +236,13 @@ test('only the ticked papers are handed to the model', async () => {
 });
 
 test('ticking every paper is the same as ticking none', async () => {
-  let sent;
-  const mock = mockFetch({
-    'api.anthropic.com': (url, options) => {
-      sent = JSON.parse(options.body);
-      return sseStream('All three [1][2][3].');
-    },
+  const created = await call(`/api/items/${question.id}/drafts`, {
+    method: 'POST',
+    body: { use: [0, 1, 2] },
   });
-  let created;
-  try {
-    created = await call(`/api/items/${question.id}/drafts`, {
-      method: 'POST',
-      body: { use: [0, 1, 2] },
-    });
-  } finally {
-    mock.restore();
-  }
   assert.equal(created.data.match_used.count, 3);
-  // The whole set is not a hand-picked subset, so the honest verdict stands.
-  assert.match(sent.messages[0].content, /no strong match/);
+  assert.match(created.data.draft.content, /\[3\] Paper 3/);
+  await call(`/api/drafts/${created.data.draft.id}`, { method: 'DELETE' });
 });
 
 test('a draft can be written by hand with no model involved', async () => {

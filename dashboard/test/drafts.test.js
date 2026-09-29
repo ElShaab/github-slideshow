@@ -2,20 +2,17 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { useTempDb, mockFetch } = require('./helpers');
+const { useTempDb } = require('./helpers');
 
 useTempDb('drafts');
-process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
-const config = require('../src/config');
 const keywords = require('../src/lib/keywords');
 const items = require('../src/lib/items');
-const draftStore = require('../src/lib/drafts');
-const researchStore = require('../src/lib/researchStore');
+const settings = require('../src/lib/settings');
 const { ingest } = require('../src/lib/ingest');
 const { matcherFor } = require('../src/lib/matcher');
-const { generateDraft, describeError, Anthropic } = require('../src/drafts/generate');
-const { renderResearch, buildUserMessage, SYSTEM_PROMPT } = require('../src/drafts/prompt');
+const { composeDraft, BLANK_MARKER } = require('../src/drafts/compose');
+const { extractConclusion, sentences } = require('../src/drafts/conclusions');
 
 keywords.create({ term: 'phantom limb pain' });
 ingest(
@@ -35,234 +32,203 @@ ingest(
 );
 const item = items.query({ source: 'reddit' }).items[0];
 
-const MATCH = {
-  terms: ['phantom limb pain', 'mirror therapy'],
-  no_strong_matches: false,
-  note: null,
-  results: [
-    {
-      title: 'Mirror therapy for phantom limb pain: a systematic review',
-      venue: 'Pain Medicine',
-      year: 2024,
-      citations: 61,
-      url: 'https://doi.org/10.1000/mirror',
-      doi: '10.1000/mirror',
-      sources: ['pubmed', 'europepmc'],
-      evidence: { level: 1, label: 'Guideline / systematic review', preprint: false },
-      abstract: 'Pooled trials suggest mirror therapy reduces phantom limb pain.',
-    },
-    {
-      title: 'Mirror Therapy for Phantom Limb Pain After Amputation',
-      venue: 'ClinicalTrials.gov - Example University',
-      year: 2026,
-      url: 'https://clinicaltrials.gov/study/NCT09876543',
-      sources: ['clinicaltrials'],
-      registry: true,
-      status: 'RECRUITING',
-      evidence: { level: 2, label: 'Registered randomized trial', preprint: false },
-      abstract: 'A trial of mirror therapy for phantom limb pain.',
-    },
-  ],
+const REVIEW = {
+  title: 'Mirror therapy for phantom limb pain: a systematic review',
+  venue: 'Pain Medicine',
+  year: 2024,
+  doi: '10.1000/mirror',
+  url: 'https://doi.org/10.1000/mirror',
+  open_access: true,
+  evidence: { level: 1, label: 'Guideline / systematic review', preprint: false },
+  abstract:
+    'BACKGROUND: Phantom limb pain is common after amputation. ' +
+    'METHODS: We searched four databases for randomized trials. ' +
+    'RESULTS: Fourteen trials (n=732) met the criteria. ' +
+    'CONCLUSIONS: Mirror therapy reduced pain scores more than sham at 4 weeks. ' +
+    'The trials were small and at moderate risk of bias. ' +
+    'FUNDING: None.',
 };
 
-/** A minimal but valid Messages API SSE stream. */
-function sseStream(text, { stopReason = 'end_turn', model = 'claude-opus-5' } = {}) {
-  const events = [
-    ['message_start', {
-      type: 'message_start',
-      message: {
-        id: 'msg_test',
-        type: 'message',
-        role: 'assistant',
-        model,
-        content: [],
-        stop_reason: null,
-        stop_sequence: null,
-        usage: { input_tokens: 1200, output_tokens: 1, cache_read_input_tokens: 900 },
-      },
-    }],
-    ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }],
-    ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } }],
-    ['content_block_stop', { type: 'content_block_stop', index: 0 }],
-    ['message_delta', {
-      type: 'message_delta',
-      delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { output_tokens: 240 },
-    }],
-    ['message_stop', { type: 'message_stop' }],
-  ];
-  return {
-    body: events.map(([name, data]) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`).join(''),
-    headers: { 'content-type': 'text/event-stream' },
-  };
-}
+const TRIAL = {
+  title: 'Sensory Feedback in Bone-Anchored Prostheses',
+  venue: 'ClinicalTrials.gov',
+  year: 2026,
+  url: 'https://clinicaltrials.gov/study/NCT00000001',
+  registry: true,
+  status: 'RECRUITING',
+  evidence: { level: 2, label: 'Registered randomized trial', preprint: false },
+};
 
-const DRAFT_TEXT =
-  'Mirror therapy has reasonable evidence behind it for phantom limb pain [1]. ' +
-  'A newer trial is still recruiting, so it has no results yet [2]. ' +
-  'Your prosthetist or pain specialist is the right person to ask about your own situation.';
+const NO_ABSTRACT = {
+  title: 'Graded motor imagery versus mirror therapy',
+  venue: 'J Rehabil Med',
+  year: 2023,
+  url: 'https://doi.org/10.1000/rct',
+  evidence: { level: 2, label: 'Randomized controlled trial', preprint: false },
+  abstract: null,
+};
 
-/* ------------------------------------------------------------------ prompt */
+/* ----------------------------------------------------- conclusion quoting */
 
-test('the system prompt carries the audience, citation and safety rules', () => {
-  assert.match(SYSTEM_PROMPT, /not for clinicians/i);
-  assert.match(SYSTEM_PROMPT, /Never cite a study that is not in the list/i);
-  assert.match(SYSTEM_PROMPT, /Never give individualized medical advice/i);
-  assert.match(SYSTEM_PROMPT, /Never suggest replacing, bypassing/i);
-  assert.match(SYSTEM_PROMPT, /does not actually answer the question/i);
-  assert.match(SYSTEM_PROMPT, /honest about uncertainty/i);
+test('a labelled conclusion section is quoted, and only that section', () => {
+  const found = extractConclusion(REVIEW.abstract);
+  assert.equal(found.rule, 'labelled');
+  assert.equal(
+    found.text,
+    'Mirror therapy reduced pain scores more than sham at 4 weeks. ' +
+      'The trials were small and at moderate risk of bias.'
+  );
+  // Neither the methods before it nor the funding line after it.
+  assert.ok(!found.text.includes('four databases'));
+  assert.ok(!found.text.includes('FUNDING'));
+  // Verbatim: every sentence appears in the abstract exactly as quoted.
+  for (const sentence of sentences(found.text)) {
+    assert.ok(REVIEW.abstract.includes(sentence), `not verbatim: ${sentence}`);
+  }
 });
 
-test('studies are numbered, graded and flagged in the prompt', () => {
-  const rendered = renderResearch(MATCH.results);
-  assert.match(rendered, /\[1\] Mirror therapy for phantom limb pain/);
-  assert.match(rendered, /Evidence: Guideline \/ systematic review/);
-  assert.match(rendered, /\[2\] Mirror Therapy for Phantom Limb Pain/);
-  assert.match(rendered, /trial registration, status: RECRUITING - no published results/);
+test('an unstructured abstract falls back to the conclusion cue', () => {
+  const found = extractConclusion(
+    'We enrolled 180 adults within six weeks of amputation. ' +
+      'Gabapentin did not reduce average daily pain at 12 weeks (p = 0.42). ' +
+      'These findings suggest gabapentin should not be started routinely here.'
+  );
+  assert.equal(found.rule, 'cue');
+  assert.equal(
+    found.text,
+    'These findings suggest gabapentin should not be started routinely here.'
+  );
 });
 
-test('a study with no abstract warns the model not to infer from the title', () => {
-  const rendered = renderResearch([{ title: 'Something', evidence: { label: 'Unclassified study' } }]);
-  assert.match(rendered, /do not infer findings from the title alone/);
+test('with no cue at all the last lines are quoted, and labelled as such', () => {
+  const found = extractConclusion(
+    'Thirty-one cohorts were reviewed. Deep infection was uncommon. ' +
+      'Implant survival exceeded 90% at five years in most series.'
+  );
+  assert.equal(found.rule, 'tail');
+  assert.equal(
+    found.text,
+    'Deep infection was uncommon. Implant survival exceeded 90% at five years in most series.'
+  );
 });
 
-test('a no-match result tells the model to lead with that', () => {
-  const message = buildUserMessage({
+test('abbreviations, initials and decimals do not split a sentence', () => {
+  assert.deepEqual(sentences('Smith et al. reported a drop. It was 0.5 mg.'), [
+    'Smith et al. reported a drop.',
+    'It was 0.5 mg.',
+  ]);
+  assert.deepEqual(sentences('Pain fell (p = 0.001). No harms were seen.'), [
+    'Pain fell (p = 0.001).',
+    'No harms were seen.',
+  ]);
+  assert.equal(sentences('R. J. Smith led the trial.').length, 1);
+});
+
+test('a quote is never cut mid-sentence to meet the length cap', () => {
+  const long = `CONCLUSIONS: ${'This is a long conclusion sentence that runs on. '.repeat(20)}`;
+  const found = extractConclusion(long, { maxSentences: 3, softLimit: 40 });
+  assert.ok(found.text.endsWith('.'), 'ends on a sentence boundary');
+  assert.ok(long.includes(found.text), 'still verbatim');
+  assert.ok(found.truncated, 'and says it left some out');
+});
+
+test('an empty abstract yields nothing rather than an invented quote', () => {
+  assert.equal(extractConclusion(''), null);
+  assert.equal(extractConclusion(null), null);
+  assert.equal(extractConclusion('   '), null);
+});
+
+/* -------------------------------------------------------- draft composing */
+
+test('the draft restates the question, quotes each paper, and leaves the body blank', () => {
+  const { content, citations, usage, model } = composeDraft({
     item,
-    match: { terms: ['x'], results: [], no_strong_matches: true, note: 'No results matched.' },
+    match: { results: [REVIEW, TRIAL, NO_ABSTRACT] },
   });
-  assert.match(message, /found no strong match/);
-  assert.match(message, /No studies were found/);
+
+  assert.equal(model, null, 'no model was involved');
+  assert.equal(usage.composed, true);
+  assert.equal(usage.papers, 3);
+  assert.equal(usage.quoted, 1, 'only the paper with an abstract is quoted');
+
+  // The question, in full and verbatim.
+  assert.ok(content.includes('QUESTION'));
+  assert.ok(content.includes('Reddit · r/amputee · u/newamputee · 2026-09-01'));
+  assert.ok(content.includes(`"${item.text}"`));
+
+  // Each paper numbered, with journal, year and evidence level.
+  assert.ok(content.includes('[1] Mirror therapy for phantom limb pain: a systematic review'));
+  assert.ok(content.includes('Pain Medicine · 2024 · Guideline / systematic review · open access'));
+  assert.ok(content.includes('https://doi.org/10.1000/mirror'));
+  assert.ok(content.includes('[2] Sensory Feedback in Bone-Anchored Prostheses'));
+  assert.ok(content.includes('[3] Graded motor imagery versus mirror therapy'));
+
+  // The conclusion, quoted word for word.
+  assert.ok(
+    content.includes(
+      '"Mirror therapy reduced pain scores more than sham at 4 weeks. ' +
+        'The trials were small and at moderate risk of bias."'
+    )
+  );
+  // A registration and a missing abstract are stated, not papered over.
+  assert.ok(content.includes('Trial registration, status recruiting'));
+  assert.ok(content.includes('No abstract was stored for this paper'));
+
+  // And the reply body is left for the physician.
+  assert.ok(content.includes(BLANK_MARKER));
+  assert.equal(citations.length, 3);
+  assert.equal(citations[0].n, 1);
+  assert.equal(citations[1].registry, true);
 });
 
-/* -------------------------------------------------------------- generation */
+test('the opening and closing snippets come from settings and can be emptied', () => {
+  settings.setMany({
+    'draft.opening': 'Short answer first.',
+    'draft.closing': 'Ask your prosthetist.',
+  });
+  let content = composeDraft({ item, match: { results: [REVIEW] } }).content;
+  assert.ok(content.includes('Short answer first.'));
+  assert.ok(content.includes('Ask your prosthetist.'));
+  // The body marker sits between them, in that order.
+  const openAt = content.indexOf('Short answer first.');
+  const blankAt = content.indexOf(BLANK_MARKER);
+  const closeAt = content.indexOf('Ask your prosthetist.');
+  assert.ok(openAt < blankAt, 'the opening line comes before the blank body');
+  assert.ok(blankAt < closeAt, 'the closing line comes after it');
 
-test('generateDraft sends the documented request and returns the text', async () => {
-  let body;
-  let headers;
-  const mock = mockFetch({
-    'api.anthropic.com': (url, options) => {
-      body = JSON.parse(options.body);
-      headers = options.headers;
-      return sseStream(DRAFT_TEXT);
+  settings.setMany({ 'draft.opening': '', 'draft.closing': '' });
+  content = composeDraft({ item, match: { results: [REVIEW] } }).content;
+  assert.ok(!content.includes('Short answer first.'));
+  assert.ok(content.includes(BLANK_MARKER), 'the blank section is always there');
+});
+
+test('a question with no ticked papers still builds, citing nothing', () => {
+  const { content, citations, usage } = composeDraft({ item, match: { results: [] } });
+  assert.equal(citations.length, 0);
+  assert.equal(usage.papers, 0);
+  assert.ok(content.includes('No papers were ticked'));
+  assert.ok(content.includes(BLANK_MARKER));
+  assert.ok(content.includes(`"${item.text}"`));
+});
+
+test('nothing in a composed draft is invented: every quote is in an abstract', () => {
+  const { content } = composeDraft({ item, match: { results: [REVIEW] } });
+  const quotes = [...content.matchAll(/^ {4}"([\s\S]*?)"$/gm)].map((m) => m[1]);
+  assert.equal(quotes.length, 1);
+  for (const quote of quotes) {
+    assert.ok(REVIEW.abstract.includes(quote), `quote not found in the abstract: ${quote}`);
+  }
+});
+
+test('an abstract that is itself an extract is flagged, not passed off as whole', () => {
+  const { content } = composeDraft({
+    item,
+    match: {
+      results: [
+        { ...REVIEW, abstract: 'Mirror therapy reduced pain scores more than sham at 4 weeks…' },
+      ],
     },
   });
-
-  let generated;
-  try {
-    generated = await generateDraft({ item, match: MATCH });
-  } finally {
-    mock.restore();
-  }
-
-  assert.equal(body.model, 'claude-opus-5');
-  assert.deepEqual(body.thinking, { type: 'adaptive' });
-  assert.equal(body.output_config.effort, 'high');
-  assert.equal(body.stream, true);
-  assert.equal(body.fallbacks, 'default');
-  // The SDK sends betas as a header, not in the body.
-  assert.equal(headers.get('anthropic-beta'), 'server-side-fallback-2026-07-01');
-  assert.deepEqual(body.system[0].cache_control, { type: 'ephemeral' });
-  assert.match(body.system[0].text, /amputee or limb-loss community/);
-
-  const userContent = body.messages[0].content;
-  assert.match(userContent, /Does mirror therapy actually help phantom limb pain\?/);
-  assert.match(userContent, /\[1\] Mirror therapy for phantom limb pain/);
-  assert.match(userContent, /cite only from this list/);
-
-  assert.equal(generated.content, DRAFT_TEXT);
-  assert.equal(generated.model, 'claude-opus-5');
-  assert.equal(generated.usage.output_tokens, 240);
-  assert.equal(generated.usage.cache_read_input_tokens, 900);
-  assert.equal(generated.citations.length, 2);
-  assert.equal(generated.citations[0].n, 1);
-  assert.equal(generated.citations[1].registry, true);
-});
-
-test('a refusal is surfaced instead of being stored as a draft', async () => {
-  const mock = mockFetch({
-    'api.anthropic.com': () => sseStream('', { stopReason: 'refusal' }),
-  });
-  try {
-    await assert.rejects(() => generateDraft({ item, match: MATCH }), /declined to answer/);
-  } finally {
-    mock.restore();
-  }
-});
-
-test('hitting the token cap is reported rather than saved empty', async () => {
-  const mock = mockFetch({
-    'api.anthropic.com': () => sseStream('', { stopReason: 'max_tokens' }),
-  });
-  try {
-    await assert.rejects(() => generateDraft({ item, match: MATCH }), /token limit/);
-  } finally {
-    mock.restore();
-  }
-});
-
-test('a missing API key fails fast with a clear message', async () => {
-  const original = config.anthropic.apiKey;
-  config.anthropic.apiKey = '';
-  try {
-    await assert.rejects(() => generateDraft({ item, match: MATCH }), /ANTHROPIC_API_KEY is not set/);
-  } finally {
-    config.anthropic.apiKey = original;
-  }
-});
-
-test('SDK errors map onto useful statuses', () => {
-  const auth = new Anthropic.AuthenticationError(401, { type: 'error' }, 'bad key', new Headers());
-  assert.equal(describeError(auth).status, 401);
-  assert.match(describeError(auth).message, /API key/);
-
-  const limited = new Anthropic.RateLimitError(429, { type: 'error' }, 'slow down', new Headers());
-  assert.equal(describeError(limited).status, 429);
-
-  assert.equal(describeError(new Error('boom')).status, 500);
-});
-
-/* ------------------------------------------------------------------ storage */
-
-test('drafts are stored against the question and move through their statuses', () => {
-  const created = draftStore.create({
-    item_id: item.id,
-    content: DRAFT_TEXT,
-    model: 'claude-opus-5',
-    usage: { output_tokens: 240 },
-    citations: [{ n: 1, title: 'Mirror therapy' }],
-  });
-  assert.equal(created.status, 'draft');
-  assert.equal(created.citations[0].title, 'Mirror therapy');
-
-  // Saving edited text promotes draft -> edited automatically.
-  const edited = draftStore.update(created.id, { content: `${DRAFT_TEXT} Edited.` });
-  assert.equal(edited.status, 'edited');
-  assert.match(edited.content, /Edited\.$/);
-
-  const used = draftStore.setStatus(created.id, 'used');
-  assert.equal(used.status, 'used');
-
-  // An explicit save on a used draft does not silently demote it.
-  assert.equal(draftStore.update(created.id, { content: 'more' }).status, 'used');
-
-  assert.throws(() => draftStore.setStatus(created.id, 'published'), /Status must be one of/);
-  assert.equal(draftStore.latest(item.id).id, created.id);
-  assert.deepEqual(draftStore.summary(), { draft: 0, edited: 0, used: 1 });
-});
-
-test('several drafts can exist per question, newest first', () => {
-  draftStore.create({ item_id: item.id, content: 'second attempt' });
-  const all = draftStore.forItem(item.id);
-  assert.equal(all.length, 2);
-  assert.equal(all[0].content, 'second attempt');
-  assert.equal(draftStore.remove(all[0].id), true);
-  assert.equal(draftStore.forItem(item.id).length, 1);
-});
-
-test('deleting a question removes its drafts and cached research', () => {
-  researchStore.save(item.id, { terms: ['x'], results: [], providers: [] });
-  items.remove(item.id);
-  assert.equal(draftStore.forItem(item.id).length, 0);
-  assert.equal(researchStore.get(item.id), null);
+  assert.match(content, /the stored abstract is itself abridged/);
+  assert.match(content, /"Mirror therapy reduced pain scores more than sham at 4 weeks…"/);
 });
