@@ -57,11 +57,14 @@ function sleep(ms) {
 }
 
 /**
- * Small JSON fetch wrapper: timeout, a couple of retries for transient network
- * or 5xx failures, and structured errors so callers can back a source off
+ * Small fetch wrapper: timeout, a couple of retries for transient network or
+ * 5xx failures, and structured errors so callers can back a source off
  * without taking the other polls down with it.
+ *
+ * Returns the raw body as well as the parsed JSON, so a caller expecting XML
+ * or plain text shares the same retry and error handling.
  */
-async function fetchJson(url, options = {}) {
+async function fetchRaw(url, options = {}) {
   const {
     headers = {},
     timeoutMs = 20000,
@@ -69,6 +72,8 @@ async function fetchJson(url, options = {}) {
     retryDelayMs = 1000,
     method = 'GET',
     body,
+    accept = 'application/json',
+    parseJson = true,
   } = options;
 
   let lastError;
@@ -82,14 +87,14 @@ async function fetchJson(url, options = {}) {
         signal: controller.signal,
         headers: {
           'User-Agent': config.userAgent,
-          Accept: 'application/json',
+          Accept: accept,
           ...headers,
         },
       });
 
       const text = await res.text();
       let parsed = null;
-      if (text) {
+      if (text && parseJson) {
         try {
           parsed = JSON.parse(text);
         } catch {
@@ -108,13 +113,13 @@ async function fetchJson(url, options = {}) {
         lastError = err;
         if (res.status === 429) throw err;
       } else {
-        if (parsed === null && text) {
+        if (parseJson && parsed === null && text) {
           throw new HttpError('Response was not valid JSON', {
             status: res.status,
             body: text.slice(0, 200),
           });
         }
-        return { data: parsed, headers: res.headers, status: res.status };
+        return { data: parsed, text, headers: res.headers, status: res.status };
       }
     } catch (err) {
       if (err instanceof HttpError && (err.status === 429 || (err.status < 500 && err.status >= 400))) {
@@ -131,4 +136,18 @@ async function fetchJson(url, options = {}) {
   throw lastError || new HttpError('Request failed');
 }
 
-module.exports = { fetchJson, HttpError, sleep, looksLikeHtml, describeFailure };
+const fetchJson = (url, options = {}) => fetchRaw(url, options);
+
+/** Same wrapper for an endpoint that answers with XML or plain text. */
+const fetchText = (url, options = {}) =>
+  fetchRaw(url, { accept: 'text/xml, application/xml, text/plain', ...options, parseJson: false });
+
+module.exports = {
+  fetchJson,
+  fetchText,
+  fetchRaw,
+  HttpError,
+  sleep,
+  looksLikeHtml,
+  describeFailure,
+};

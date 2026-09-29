@@ -695,6 +695,10 @@ function literatureControls(source) {
 
 function redditControls(source) {
   const wrap = el('div');
+  // Which of the three read paths is in use, so a silent source is diagnosable.
+  if (source.details.reads_via) {
+    wrap.append(el('p', 'subtle', `Reading via ${source.details.reads_via}.`));
+  }
   wrap.append(el('h3', '', 'Subreddits'));
   wrap.append(
     chipList(source.details.subreddits, {

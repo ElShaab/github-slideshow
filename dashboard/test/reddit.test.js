@@ -167,6 +167,98 @@ test('a 403 block page becomes an actionable error, not a wall of CSS', async ()
   assert.equal(message.match(/datacenter IPs/g).length, 1);
 });
 
+/** An Atom feed shaped like the one Reddit publishes at /r/x/new/.rss. */
+function atomFeed(entries) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+${entries
+  .map(
+    (e) => `<entry>
+  <author><name>/u/${e.author}</name></author>
+  <id>${e.id}</id>
+  <link href="https://www.reddit.com${e.permalink}" />
+  <updated>2026-09-20T08:00:00+00:00</updated>
+  <title>${e.title}</title>
+  <content type="html">&lt;!-- SC_OFF --&gt;&lt;div class="md"&gt;&lt;p&gt;${e.body}&lt;/p&gt;&lt;/div&gt;</content>
+</entry>`
+  )
+  .join('\n')}
+</feed>`;
+}
+
+test('a refused JSON endpoint falls back to the public Atom feed', async () => {
+  reddit.forgetJsonBlock();
+  const mock = mockFetch({
+    '/new.json': { status: 403, body: '<body class=theme-beta></body>', headers: { 'content-type': 'text/html' } },
+    '/new/.rss': {
+      body: atomFeed([
+        {
+          id: 't3_rss1',
+          author: 'feedreader',
+          title: 'Phantom limb pain after a BKA',
+          permalink: '/r/amputee/comments/rss1/phantom/',
+          body: 'Worst at night &amp;amp; nothing helps yet.',
+        },
+      ]),
+      headers: { 'content-type': 'application/atom+xml' },
+    },
+    '/comments/.rss': {
+      body: atomFeed([
+        {
+          id: 't1_rss2',
+          author: 'someoneelse',
+          title: 'Re: sockets',
+          permalink: '/r/amputee/comments/rss1/phantom/c1/',
+          body: 'My prosthetic liner fixed it.',
+        },
+      ]),
+      headers: { 'content-type': 'application/atom+xml' },
+    },
+  });
+
+  let result;
+  try {
+    result = await reddit.poll();
+  } finally {
+    mock.restore();
+  }
+
+  assert.equal(result.added, 2);
+  const captured = items.query({ source: 'reddit' }).items;
+  const post = captured.find((i) => i.external_id === 't3_rss1');
+  assert.ok(post, 'the feed post was captured');
+  assert.equal(post.kind, 'post');
+  assert.equal(post.author, 'u/feedreader');
+  assert.equal(post.origin, 'r/amputee');
+  assert.equal(post.url, 'https://www.reddit.com/r/amputee/comments/rss1/phantom/');
+  // Title and body, with the escaped markup flattened to plain text.
+  assert.match(post.text, /^Phantom limb pain after a BKA\n\nWorst at night & nothing helps yet\.$/);
+
+  const comment = captured.find((i) => i.external_id === 't1_rss2');
+  assert.equal(comment.kind, 'comment');
+  // A comment's feed title restates the thread, so only its body is kept.
+  assert.equal(comment.text, 'My prosthetic liner fixed it.');
+});
+
+test('the refusal is remembered, so later polls skip straight to the feed', async () => {
+  const mock = mockFetch({
+    '/new.json': () => {
+      throw new Error('the JSON endpoint must not be called again');
+    },
+    '/new/.rss': { body: atomFeed([]), headers: { 'content-type': 'application/atom+xml' } },
+    '/comments/.rss': { body: atomFeed([]), headers: { 'content-type': 'application/atom+xml' } },
+  });
+  try {
+    const result = await reddit.poll();
+    assert.equal(result.added, 0);
+    assert.ok(!mock.calls.some((c) => c.includes('/new.json')), 'no further JSON request');
+    assert.ok(mock.calls.some((c) => c.includes('/new/.rss')), 'the feed was read');
+  } finally {
+    mock.restore();
+    reddit.forgetJsonBlock();
+  }
+});
+
 test('with client credentials, reads go through the OAuth API', async () => {
   const config = require('../src/config');
   config.reddit.clientId = 'cid';

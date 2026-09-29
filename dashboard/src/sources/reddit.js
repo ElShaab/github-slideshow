@@ -1,7 +1,8 @@
 'use strict';
 
 const config = require('../config');
-const { fetchJson, sleep } = require('../lib/http');
+const atom = require('../lib/atom');
+const { fetchJson, fetchText, sleep } = require('../lib/http');
 const { ingest } = require('../lib/ingest');
 const { matcherFor } = require('../lib/matcher');
 const settings = require('../lib/settings');
@@ -78,6 +79,73 @@ function forgetToken() {
   appToken = null;
 }
 
+/* ------------------------- public Atom feeds, the no-credential fallback -- */
+
+/**
+ * Reddit refuses the public JSON endpoints from a growing share of clients,
+ * but every subreddit also publishes an Atom feed at the same paths with
+ * `.rss`. It carries less metadata - no score, no comment count - but it is
+ * an official, public feed and it needs no app registration.
+ *
+ * Once the JSON endpoint has refused us, the rest of the poll goes straight
+ * to the feeds rather than collecting a 403 per subreddit; the block is
+ * re-tested after this window.
+ */
+const JSON_BLOCK_MEMORY_MS = 6 * 3600 * 1000;
+let jsonBlockedUntil = 0;
+
+function jsonLooksBlocked() {
+  return Date.now() < jsonBlockedUntil;
+}
+
+function rememberJsonBlocked() {
+  jsonBlockedUntil = Date.now() + JSON_BLOCK_MEMORY_MS;
+}
+
+/** `/r/x/new.json` -> `/r/x/new/.rss`, the feed for the same listing. */
+function feedUrl(path, limit) {
+  const listing = path.replace(/\.json$/, '');
+  return `${BASE}${listing}/.rss?limit=${limit}`;
+}
+
+function normalizeFeedEntry(entry, subreddit) {
+  const id = atom.tag(entry, 'id').trim();
+  const title = atom.tag(entry, 'title');
+  const body = atom.htmlToText(atom.tag(entry, 'content'));
+  const author = atom.tag(atom.tag(entry, 'author'), 'name').replace(/^\/u\//, '');
+  const url = atom.attr(entry, 'link', 'href');
+  const isComment = id.startsWith('t1_');
+
+  return {
+    external_id: id,
+    author: author ? `u/${author}` : null,
+    // A comment's feed title is a restatement of the thread, so only the post
+    // wants its title prepended to the body.
+    text: isComment ? body : [atom.htmlToText(title), body].filter(Boolean).join('\n\n'),
+    url: url || null,
+    timestamp: atom.tag(entry, 'updated') || atom.tag(entry, 'published'),
+    kind: isComment ? 'comment' : 'post',
+    origin: `r/${subreddit}`,
+    meta: {
+      title: isComment ? null : atom.htmlToText(title),
+      subreddit,
+      via: 'rss',
+    },
+  };
+}
+
+async function fetchFeed(path, limit, subreddit) {
+  const { text } = await fetchText(feedUrl(path, limit), {
+    timeoutMs: 20000,
+    retries: 1,
+    headers: {
+      'User-Agent': redditUserAgent(),
+      Accept: 'application/atom+xml, application/xml;q=0.9, */*;q=0.8',
+    },
+  });
+  return atom.entries(text).map((entry) => normalizeFeedEntry(entry, subreddit));
+}
+
 /** Public JSON listing -> normalized candidates. No credentials required. */
 function normalizePost(child, subreddit) {
   const d = child.data || {};
@@ -128,9 +196,15 @@ function normalizeComment(child, subreddit) {
  * included - which Reddit signals with a 403 and an HTML block page rather
  * than a JSON error, so that case is translated into something actionable.
  */
-async function fetchListing(path, limit) {
+async function fetchListing(path, limit, subreddit, normalize) {
   const headers = { 'User-Agent': redditUserAgent() };
   let url;
+
+  // The JSON endpoint refused us recently; do not collect another 403 per
+  // subreddit before falling back.
+  if (!usingOAuth() && jsonLooksBlocked()) {
+    return fetchFeed(path, limit, subreddit);
+  }
 
   if (usingOAuth()) {
     // /r/x/new.json -> /r/x/new on the OAuth host.
@@ -149,14 +223,20 @@ async function fetchListing(path, limit) {
       forgetToken();
     }
     if (err.status === 403 && !usingOAuth()) {
-      const blocked = new Error(
-        'Reddit refused the public JSON endpoint (HTTP 403). It blocks these ' +
-          'from datacenter IPs such as Replit\u2019s. Register a Reddit app and set ' +
-          'REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET to read through the OAuth API ' +
-          'instead, or run the dashboard from a home connection.'
-      );
-      blocked.status = 403;
-      throw blocked;
+      rememberJsonBlocked();
+      try {
+        return await fetchFeed(path, limit, subreddit);
+      } catch (feedErr) {
+        const blocked = new Error(
+          'Reddit refused both the public JSON endpoint and the public feed ' +
+            `(${err.status}, then ${feedErr.status || 'failed'}). It blocks these from ` +
+            'datacenter IPs such as Replit\u2019s. Register a Reddit app and set ' +
+            'REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET to read through the OAuth API ' +
+            'instead, or run the dashboard from a home connection.'
+        );
+        blocked.status = 403;
+        throw blocked;
+      }
     }
     throw err;
   }
@@ -164,7 +244,7 @@ async function fetchListing(path, limit) {
   const children = data && data.data && Array.isArray(data.data.children)
     ? data.data.children
     : [];
-  return children;
+  return children.map((child) => normalize(child, subreddit));
 }
 
 async function poll() {
@@ -190,15 +270,15 @@ async function poll() {
   for (const name of names) {
     const candidates = [];
     try {
-      for (const child of await fetchListing(`/r/${name}/new.json`, limit)) {
-        candidates.push(normalizePost(child, name));
-      }
+      candidates.push(
+        ...(await fetchListing(`/r/${name}/new.json`, limit, name, normalizePost))
+      );
       if (includeComments) {
         // Be polite to the public endpoint: one request at a time, spaced out.
         await sleep(1200);
-        for (const child of await fetchListing(`/r/${name}/comments.json`, limit)) {
-          candidates.push(normalizeComment(child, name));
-        }
+        candidates.push(
+          ...(await fetchListing(`/r/${name}/comments.json`, limit, name, normalizeComment))
+        );
       }
     } catch (err) {
       // A single bad/private/banned subreddit must not abort the whole poll,
@@ -241,7 +321,11 @@ module.exports = {
   isConfigured: () => true,
   describe: () => ({
     subreddits: subreddits.list(),
-    reads_via: usingOAuth() ? 'oauth.reddit.com (app credentials)' : 'public JSON endpoints',
+    reads_via: usingOAuth()
+      ? 'oauth.reddit.com (app credentials)'
+      : jsonLooksBlocked()
+        ? 'public Atom feeds (.rss) — the JSON endpoint refused us'
+        : 'public JSON endpoints, falling back to the Atom feeds if refused',
     user_agent: redditUserAgent(),
     include_comments: settings.getBool('reddit.include_comments', true),
     listing_limit: settings.getNumber('reddit.listing_limit', 50),
@@ -250,4 +334,9 @@ module.exports = {
   redditUserAgent,
   usingOAuth,
   forgetToken,
+  /** Re-probe the JSON endpoint on the next poll instead of waiting out the
+   *  remembered block. */
+  forgetJsonBlock: () => {
+    jsonBlockedUntil = 0;
+  },
 };

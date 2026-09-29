@@ -303,10 +303,18 @@ endpoints. One private or banned subreddit is reported as a note; if *every*
 subreddit fails, the whole poll is marked as an error, stating the shared
 cause once rather than repeating it per subreddit.
 
-**If every subreddit returns HTTP 403**, Reddit is refusing the public JSON
-endpoints for the host you are running on. It blocks these from datacenter IP
-ranges, Replit's included, and answers with an HTML block page rather than a
-JSON error. Two ways out:
+**If the public JSON endpoint returns HTTP 403**, Reddit is refusing it for
+the host you are running on — it blocks these from datacenter IP ranges,
+Replit's included, and answers with an HTML block page rather than a JSON
+error. The source then falls back on its own to the **public Atom feeds** the
+same listings publish at `/r/<sub>/new/.rss` and `/r/<sub>/comments/.rss`.
+These need no credentials and are an official, published interface, but they
+carry less: no score, no comment count, no flair, and a smaller page of
+results. Once refused, the rest of the poll goes straight to the feeds and the
+JSON endpoint is re-tried six hours later, so a block costs one 403 rather
+than one per subreddit. The Sources card says which path is in use.
+
+If the feeds are refused too, both ways out remain:
 
 1. **Read through the OAuth API** (recommended, and what the endpoints are
    for). Register an app at reddit.com/prefs/apps and set `REDDIT_CLIENT_ID`
