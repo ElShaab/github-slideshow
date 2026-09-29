@@ -36,3 +36,5 @@ export {
 } from '../utils/measurements';
 export type { MeasurementsDraft, MeasurementKey } from '../utils/measurements';
 export { LegalLinks, openExternal } from './LegalLinks';
+export { FeedbackModal } from './FeedbackModal';
+export type { FeedbackModalProps } from './FeedbackModal';

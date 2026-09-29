@@ -26,6 +26,11 @@ export const DOCUMENT_KEYS = {
   program: 'getfit.local.program',
   workouts: 'getfit.local.workouts',
   assessments: 'getfit.local.assessments',
+  // Not a fifth area of the app's data — an outbox. It is listed here so that
+  // clearing the device clears it too: feedback the user typed but that never
+  // reached the server is still their words, and sign-out and account deletion
+  // must not leave it behind on the phone.
+  feedback: 'getfit.local.feedback',
 } as const;
 
 export interface ProfileDocument {
@@ -63,6 +68,32 @@ export interface AssessmentsDocument {
   assessments: BodyAssessment[];
 }
 
+/** One message the user wrote, waiting for an account and a connection. */
+export interface PendingFeedback {
+  /** Minted on this device. Makes redelivery an upsert rather than a duplicate. */
+  id: string;
+  message: string;
+  appVersion: string | null;
+  platform: string | null;
+  writtenAt: string;
+}
+
+/**
+ * The feedback outbox.
+ *
+ * Feedback is written locally first and sent afterwards, for the same reason
+ * everything else here is: the device is the thing that works. Someone typing
+ * on a train should not lose what they wrote, and the account is deferrable, so
+ * "send it now" is not always available at the moment they press Send.
+ */
+export interface FeedbackDocument {
+  pending: PendingFeedback[];
+  /** When the app last opened the sheet by itself. Null until it has. */
+  promptedAt: string | null;
+  /** How many messages this device has delivered. Kept so it only asks once. */
+  sent: number;
+}
+
 export const emptyProfile = (userId: string, now: string): ProfileDocument => ({
   userId,
   createdAt: now,
@@ -77,3 +108,4 @@ export const emptyProfile = (userId: string, now: string): ProfileDocument => ({
 export const emptyProgram = (): ProgramDocument => ({ program: null, schedule: [] });
 export const emptyWorkouts = (): WorkoutsDocument => ({ completed: [], records: [] });
 export const emptyAssessments = (): AssessmentsDocument => ({ assessments: [] });
+export const emptyFeedback = (): FeedbackDocument => ({ pending: [], promptedAt: null, sent: 0 });

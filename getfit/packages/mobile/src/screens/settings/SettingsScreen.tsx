@@ -12,6 +12,7 @@ import {
 } from '@getfit/shared';
 import {
   ErrorState,
+  FeedbackModal,
   LegalLinks,
   LoadingScreen,
   Screen,
@@ -20,7 +21,7 @@ import {
   Text,
 } from '../../components';
 import { ApiError } from '../../api/client';
-import { authApi, settingsApi } from '../../api/endpoints';
+import { authApi, feedbackApi, settingsApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
 import { useUnits } from '../../state/UnitsProvider';
@@ -40,6 +41,7 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
   const { signOut, isGuest, email } = useSession();
   const settings = useAsync(() => settingsApi.load(), [], 'settingsApi.load');
   const [busy, setBusy] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -278,6 +280,13 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
       </SettingsGroup>
 
       <SettingsGroup title="About">
+        {/* The way back in. The app offers the sheet once on its own; without a
+            row here, anyone who dismissed it that time could never find it. */}
+        <SettingsRow
+          label="Send feedback"
+          description="Tell us what to fix or add."
+          onPress={() => setFeedbackOpen(true)}
+        />
         <SettingsRow
           label="Health disclaimer"
           description="GetFit gives estimates, not medical advice."
@@ -294,6 +303,12 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
       <Text variant="caption" color="muted" align="center">
         GetFit {appVersion()}
       </Text>
+
+      <FeedbackModal
+        visible={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onSubmit={(message) => feedbackApi.submit(message)}
+      />
     </Screen>
   );
 }

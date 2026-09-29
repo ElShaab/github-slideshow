@@ -41,7 +41,15 @@ import {
   verifyEmailCode,
   verifyPasswordResetCode,
 } from '../supabase/auth';
-import { deleteAccountEverywhere, signOutAndClearLocal, syncNow } from '../supabase/cloud';
+import {
+  deleteAccountEverywhere,
+  feedbackPromptDue,
+  noteFeedbackPrompted,
+  signOutAndClearLocal,
+  submitFeedback,
+  syncNow,
+} from '../supabase/cloud';
+import type { FeedbackDelivery } from '../state/feedback';
 import { createStoreProvider } from '../state/billing';
 import { clearLocalBilling, resolveEntitlement } from '../state/localEntitlement';
 
@@ -527,6 +535,32 @@ export const settingsApi = {
 
   updateApp(patch: Partial<AppSettings>): Promise<{ appSettings: AppSettings }> {
     return localApi.updateAppSettings(patch);
+  },
+};
+
+/* ---------------------------- feedback ---------------------------- */
+
+export const feedbackApi = {
+  /**
+   * Files what the user wrote.
+   *
+   * Resolves once the message is safely on the device, with a status saying
+   * whether it also reached the server. It does not reject: a message that
+   * could not be sent is kept and retried, and there is nothing useful for the
+   * person who wrote it to do about a failed request.
+   */
+  submit(message: string): Promise<FeedbackDelivery> {
+    return submitFeedback(message);
+  },
+
+  /** Whether the app should offer the sheet itself, given this much use. */
+  promptDue(completedWorkouts: number): Promise<boolean> {
+    return feedbackPromptDue(completedWorkouts);
+  },
+
+  /** Called when the sheet has been offered, so it is offered only once. */
+  notePrompted(): Promise<void> {
+    return noteFeedbackPrompted();
   },
 };
 

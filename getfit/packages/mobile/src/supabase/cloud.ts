@@ -1,6 +1,19 @@
+import { Platform } from 'react-native';
 import { localStore } from '../local/api';
+import { localId } from '../local/repository';
+import { DOCUMENT_KEYS, emptyFeedback, type FeedbackDocument } from '../local/documents';
+import { appVersion } from '../config/appInfo';
+import {
+  addPending,
+  markPrompted,
+  removeSent,
+  shouldPromptForFeedback,
+  toFeedbackRows,
+  type FeedbackDelivery,
+} from '../state/feedback';
 import { getSupabase } from './client';
 import { createSupabaseBackend } from './backend';
+import { createSupabaseFeedbackBackend } from './feedback';
 import { SYNC_KEY, SyncEngine, emptySyncMeta, type SyncMeta, type SyncResult } from './sync';
 import { accountsAvailable, currentAccount, onAuthChange, signOut } from './auth';
 
@@ -43,6 +56,14 @@ export function startCloudSync(): void {
 
   localStore.onChange((key) => {
     if (key === SYNC_KEY) return; // Recording a change is not itself a change.
+
+    // The outbox is not one of the synced documents — it travels one way and is
+    // never pulled back. Delivery is driven by flushFeedback, called where the
+    // message is written and again on sign-in; routing it through the sync
+    // engine here would only mark the account dirty and push data that has not
+    // changed.
+    if (key === DOCUMENT_KEYS.feedback) return;
+
     void getEngine()
       ?.noteLocalChange(key)
       .then(() => schedulePush());
@@ -50,7 +71,10 @@ export function startCloudSync(): void {
 
   unsubscribeAuth?.();
   unsubscribeAuth = onAuthChange((account) => {
-    if (account) void syncNow();
+    if (!account) return;
+    void syncNow();
+    // Feedback written before the account existed has somewhere to go now.
+    void flushFeedback();
   });
 }
 
@@ -97,6 +121,87 @@ export async function signOutAndClearLocal(): Promise<void> {
   await signOut();
   await localStore.clear();
   await localStore.update<SyncMeta>(SYNC_KEY, emptySyncMeta, () => emptySyncMeta());
+}
+
+/* -------------------------------- feedback ------------------------------ */
+
+const readFeedback = (): Promise<FeedbackDocument> =>
+  localStore.read<FeedbackDocument>(DOCUMENT_KEYS.feedback, emptyFeedback);
+
+/**
+ * Takes what the user wrote and tries to deliver it.
+ *
+ * Written to the device first, always, and sent second. Someone who has
+ * postponed creating their account, or who is typing with no signal, still
+ * pressed Send — losing their words because the network was not ready would be
+ * the one outcome the sheet must never produce. The returned status is what the
+ * sheet tells them, so it has to be the truth about where the message is.
+ */
+export async function submitFeedback(message: string): Promise<FeedbackDelivery> {
+  await localStore.update<FeedbackDocument>(DOCUMENT_KEYS.feedback, emptyFeedback, (current) =>
+    addPending(current, {
+      id: localId('feedback'),
+      message,
+      appVersion: appVersion(),
+      platform: Platform.OS,
+      writtenAt: new Date().toISOString(),
+    }),
+  );
+
+  return flushFeedback();
+}
+
+/**
+ * Delivers everything waiting in the outbox.
+ *
+ * Never throws. A failure here means the message stays on the device and is
+ * tried again on the next send or the next sign-in, which is the whole point of
+ * keeping it.
+ */
+export async function flushFeedback(): Promise<FeedbackDelivery> {
+  const document = await readFeedback();
+  // Another flush may already have taken it, which is a delivery, not a gap.
+  if (document.pending.length === 0) return 'sent';
+
+  const client = getSupabase();
+  const account = client ? await currentAccount() : null;
+  if (!client || !account) return 'queued-no-account';
+
+  const delivering = document.pending;
+
+  try {
+    await createSupabaseFeedbackBackend(client).submit(toFeedbackRows(delivering, account.id));
+  } catch (error) {
+    console.warn('GetFit: feedback is still waiting to be delivered:', error);
+    return 'queued-offline';
+  }
+
+  // Re-read through update rather than writing back the document from above:
+  // the user may have written a second message while the first was in flight,
+  // and only the ids that actually landed are removed.
+  await localStore.update<FeedbackDocument>(DOCUMENT_KEYS.feedback, emptyFeedback, (current) =>
+    removeSent(
+      current,
+      delivering.map((entry) => entry.id),
+    ),
+  );
+
+  return 'sent';
+}
+
+/** Whether the app should open the sheet on its own after this many workouts. */
+export async function feedbackPromptDue(completedWorkouts: number): Promise<boolean> {
+  // No project configured means nowhere for it to go, so asking would be a
+  // form that quietly discards what it collects.
+  if (!accountsAvailable()) return false;
+  return shouldPromptForFeedback(await readFeedback(), completedWorkouts);
+}
+
+/** Records that the app has asked, so it never asks by itself again. */
+export async function noteFeedbackPrompted(): Promise<void> {
+  await localStore.update<FeedbackDocument>(DOCUMENT_KEYS.feedback, emptyFeedback, (current) =>
+    markPrompted(current),
+  );
 }
 
 /**

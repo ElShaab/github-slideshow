@@ -1,6 +1,6 @@
 # GetFit Privacy Policy
 
-**Last updated: 25 September 2026**
+**Last updated: 29 September 2026**
 
 > **Before publishing:** host this at a public HTTPS URL and enter that URL in
 > App Store Connect and Play Console. This document describes what the software
@@ -91,6 +91,22 @@ Store on the device.
 Apple or Google, and GetFit checks your membership with the store directly from
 your phone.
 
+### Feedback you send us
+
+If you use **Send feedback** — from Settings, or from the sheet the app offers
+once after your first few workouts — we store exactly what you typed, together
+with your account id, the app version and whether you are on iOS or Android.
+Nothing else is attached, and the app does not read your training data or your
+photos into it.
+
+Feedback is entirely optional, and nothing in the app depends on it. Please do
+not type anything into it you would rather we did not keep: it is free text, so
+whatever you write is what we store. It is deleted with your account.
+
+If you have not created your account yet, or you are offline, the message waits
+on your phone and is sent when it can be. Signing out deletes anything still
+waiting, unsent.
+
 ### Technical data
 
 GetFit contains **no third-party analytics, advertising or tracking SDKs**, and
@@ -109,6 +125,7 @@ requests were made — as part of running the database.
 | Progress photos | On your phone | On your phone **only** — never uploaded |
 | Email address | Not collected | In your account |
 | Password | Not collected | Hashed by Supabase; never seen by us |
+| Feedback you send | Waits on your phone | Sent to us, and kept until you delete your account |
 | Payment details | Never collected | Never collected |
 
 The app keeps its own copy on the device at all times, which is why it works
@@ -126,6 +143,7 @@ database in the background.
 | Building and progressing your program | Body metrics, training history, goals | Contract |
 | Keeping your data across devices | Email, training data, assessments | Contract |
 | Keeping the service secure and working | Technical data | Legitimate interests |
+| Improving the app | Feedback you choose to send | Consent — you send it or you do not |
 
 ---
 
@@ -160,6 +178,8 @@ cross-context behavioural advertising.
   hold a copy.
 - **Assessments and training history:** until you delete your account.
 - **Account record:** until you delete your account.
+- **Feedback you sent:** until you delete your account, which deletes it with
+  everything else.
 - **Subscription records:** held by Apple or Google, not by us.
 - **Supabase service logs:** kept for Supabase's own retention period as part of
   running the database.
@@ -169,9 +189,10 @@ cross-context behavioural advertising.
 **Settings → Privacy & data → Delete account.**
 
 This is immediate and permanent. It erases your profile, every assessment, your
-whole training history and your goals — both from this phone and from our
-database — and signs you out. Your photos are deleted with the device data.
-Nothing is retained in a recoverable form, and there is no grace period.
+whole training history, your goals and any feedback you sent us — both from this
+phone and from our database — and signs you out. Your photos are deleted with
+the device data. Nothing is retained in a recoverable form, and there is no
+grace period.
 
 If the deletion cannot reach our database — for example because you are
 offline — the app tells you so and **does not** delete the local copy, so that

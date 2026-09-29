@@ -60,6 +60,12 @@ export const TextField = memo(function TextField({
       ? colors.fieldBorderFocused
       : colors.fieldBorder;
 
+  // A pill is the right shape for one line of text and the wrong one for a
+  // paragraph: the curve eats the first and last characters of every wrapped
+  // line. Handled here rather than by the caller so a multiline field still
+  // focuses, errors and glows like every other input in the app.
+  const multiline = rest.multiline === true;
+
   return (
     <View style={style}>
       <Text variant="micro" color="muted" uppercase>
@@ -77,10 +83,11 @@ export const TextField = memo(function TextField({
         onBlur={handleBlur}
         style={[
           styles.input,
+          multiline && styles.multiline,
           {
             marginTop: spacing.sm,
-            borderRadius: radius.pill,
-            paddingHorizontal: spacing.xl,
+            borderRadius: multiline ? radius.lg : radius.pill,
+            paddingHorizontal: multiline ? spacing.lg : spacing.xl,
             borderColor,
             backgroundColor: colors.field,
             color: colors.text,
@@ -112,5 +119,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 17,
     minHeight: 56,
+  },
+  multiline: {
+    minHeight: 132,
+    // iOS centres a multiline field's first line vertically without this, so
+    // an empty box shows its placeholder floating in the middle.
+    textAlignVertical: 'top',
   },
 });

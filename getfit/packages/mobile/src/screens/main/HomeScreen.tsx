@@ -1,10 +1,11 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { formatMass, formatPercent } from '@getfit/shared';
 import {
   ErrorState,
+  FeedbackModal,
   GlassCard,
   HologramViewer,
   LoadingScreen,
@@ -15,7 +16,7 @@ import {
   SectionHeader,
   Text,
 } from '../../components';
-import { homeApi } from '../../api/endpoints';
+import { feedbackApi, homeApi } from '../../api/endpoints';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
 import { useUnits } from '../../state/UnitsProvider';
@@ -43,6 +44,29 @@ export function HomeScreen(): React.ReactElement {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const completedWorkouts = home.data?.totals.workouts ?? null;
+
+  // The app asks for feedback once, here, after the user has trained enough to
+  // have a view worth hearing. Home is the right place because it is the screen
+  // they land on after a session rather than mid-workout.
+  useEffect(() => {
+    if (completedWorkouts === null) return undefined;
+
+    let cancelled = false;
+    void feedbackApi.promptDue(completedWorkouts).then((due) => {
+      if (cancelled || !due) return;
+      // Recorded when it opens rather than when it is answered: closing the
+      // sheet is an answer, and asking again next week would be nagging.
+      void feedbackApi.notePrompted();
+      setFeedbackOpen(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [completedWorkouts]);
 
   if (home.loading && !home.data) return <LoadingScreen message="Loading your dashboard…" />;
   if (!home.data) return <ErrorState message={home.error ?? undefined} onRetry={home.reload} />;
@@ -222,6 +246,12 @@ export function HomeScreen(): React.ReactElement {
           {profile.trainingLocation === 'home' ? 'Home' : 'Gym'}
         </Text>
       ) : null}
+
+      <FeedbackModal
+        visible={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onSubmit={(message) => feedbackApi.submit(message)}
+      />
     </Screen>
   );
 }

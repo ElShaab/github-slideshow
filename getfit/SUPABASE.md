@@ -19,7 +19,19 @@ device, and enables row-level security on every one of them with a single
 policy: a row belongs to one account, and only that account may read or write
 it. Anonymous callers are refused outright.
 
-To check it took, run this afterwards — every row must say `true`:
+Then run
+[`supabase/migrations/0002_feedback.sql`](supabase/migrations/0002_feedback.sql)
+the same way. It adds the one table behind **Send feedback**, and it is
+deliberately shaped differently from the nine above: there is an insert policy
+and **no select policy at all**, so the key shipped inside the app can add a
+row and can never read one back — not even the row it just wrote. Read feedback
+in **Table Editor → feedback**, newest first.
+
+Feedback from a signed-out device waits on the phone until there is an account
+behind it, so an empty table on day one means nobody has written yet, not that
+delivery is broken.
+
+To check both took, run this afterwards — every row must say `true`:
 
 ```sql
 select tablename, rowsecurity

@@ -171,6 +171,7 @@ Answer these to match what the app does:
 | Photos collected | **No** — a progress photo is optional, stays in the app's private directory on the device, and is never uploaded. Apple counts data as collected only when it leaves the device |
 | Contact info (email) | **Yes** — linked to identity, app functionality. Required to take out a membership, and verified by emailed code |
 | Purchases | **Yes** — linked to identity |
+| Other user content | **Yes** — linked to identity, app functionality. Only what someone types into **Send feedback**; nothing else the user writes leaves the phone |
 | Used for tracking | **No** |
 | Used for third-party advertising | **No** |
 | Data used to train models | **No** — nothing is sent to any model |
