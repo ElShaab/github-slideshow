@@ -13,6 +13,7 @@ const items = require('../src/lib/items');
 const { ingest } = require('../src/lib/ingest');
 const { matcherFor } = require('../src/lib/matcher');
 const research = require('../src/research');
+const researchStore = require('../src/lib/researchStore');
 
 keywords.create({ term: 'phantom limb pain' });
 ingest(
@@ -197,6 +198,86 @@ test('an Anthropic failure is reported without storing a draft', async () => {
   assert.equal(attempt.status, 429);
   assert.match(attempt.data.error, /rate limit/i);
   assert.equal((await call(`/api/items/${question.id}/drafts`)).data.drafts.length, 0);
+});
+
+test('only the ticked papers are handed to the model', async () => {
+  // Three cached papers; the console ticks the first and the third.
+  researchStore.save(question.id, {
+    terms: ['phantom limb pain'],
+    results: [1, 2, 3].map((n) => ({
+      title: `Paper ${n}`,
+      venue: 'Journal',
+      year: 2020 + n,
+      url: `https://doi.org/10.1000/p${n}`,
+      sources: ['pubmed'],
+      evidence: { level: 2, label: 'Randomized trial', preprint: false },
+      abstract: `Findings of paper ${n}.`,
+    })),
+    providers: [{ id: 'pubmed', status: 'ok', count: 3 }],
+    no_strong_matches: true,
+    note: 'nothing matched strongly',
+    considered: 3,
+  });
+
+  let sent;
+  const mock = mockFetch({
+    'api.anthropic.com': (url, options) => {
+      sent = JSON.parse(options.body);
+      return sseStream('Two papers looked at this [1][2].');
+    },
+  });
+  let created;
+  try {
+    created = await call(`/api/items/${question.id}/drafts`, {
+      method: 'POST',
+      body: { use: [0, 2] },
+    });
+  } finally {
+    mock.restore();
+  }
+
+  assert.equal(created.status, 201);
+  assert.equal(created.data.match_used.count, 2);
+  assert.deepEqual(
+    created.data.draft.citations.map((c) => c.title),
+    ['Paper 1', 'Paper 3']
+  );
+
+  const prompt = sent.messages[0].content;
+  assert.match(prompt, /\[1\] Paper 1/);
+  assert.match(prompt, /\[2\] Paper 3/);
+  assert.ok(!prompt.includes('Paper 2'), 'the unticked paper is not sent');
+  // Picking by hand is the physician's own relevance call.
+  assert.match(prompt, /physician read the retrieved research/);
+  assert.ok(!prompt.includes('no strong match'), 'the automatic verdict is dropped');
+
+  await call(`/api/items/${question.id}/drafts`).then(({ data }) =>
+    Promise.all(
+      data.drafts.map((d) => call(`/api/drafts/${d.id}`, { method: 'DELETE' }))
+    )
+  );
+});
+
+test('ticking every paper is the same as ticking none', async () => {
+  let sent;
+  const mock = mockFetch({
+    'api.anthropic.com': (url, options) => {
+      sent = JSON.parse(options.body);
+      return sseStream('All three [1][2][3].');
+    },
+  });
+  let created;
+  try {
+    created = await call(`/api/items/${question.id}/drafts`, {
+      method: 'POST',
+      body: { use: [0, 1, 2] },
+    });
+  } finally {
+    mock.restore();
+  }
+  assert.equal(created.data.match_used.count, 3);
+  // The whole set is not a hand-picked subset, so the honest verdict stands.
+  assert.match(sent.messages[0].content, /no strong match/);
 });
 
 test('existing feed and keyword endpoints still work', async () => {

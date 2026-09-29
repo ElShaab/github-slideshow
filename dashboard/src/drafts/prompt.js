@@ -81,6 +81,12 @@ function buildUserMessage({ item, match }) {
     parts.push(`The research below was retrieved for: ${match.terms.join(', ')}.`);
   }
 
+  if (match && match.selected_by_hand) {
+    parts.push(
+      'A physician read the retrieved research and chose the studies below as the relevant ones. Work from these only.'
+    );
+  }
+
   if (match && match.no_strong_matches) {
     parts.push(
       'IMPORTANT: the research matching step found no strong match for this question' +

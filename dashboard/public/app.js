@@ -16,9 +16,18 @@ const state = {
   tab: 'feed',
   keywords: [],
   settings: {},
-  feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0 },
+  feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0, items: [] },
   editingKeyword: null,
-  workbench: { itemId: null, items: [], match: null, draft: null, drafts: [], replyTarget: null },
+  workbench: {
+    itemId: null,
+    match: null,
+    draft: null,
+    drafts: [],
+    replyTarget: null,
+    // Indexes into match.results that the draft may cite. Everything the
+    // match returned starts ticked; unticking narrows what the model sees.
+    picked: new Set(),
+  },
 };
 
 /* ------------------------------------------------------------------ utils */
@@ -80,9 +89,20 @@ function relativeTime(iso) {
 
 /* ------------------------------------------------------------------- feed */
 
+/**
+ * One question in the feed column. The whole card is a picker: clicking it
+ * loads the question, its research and its draft into the other two columns.
+ */
 function itemCard(item) {
-  const card = el('div', 'item');
+  const card = el('div', 'item is-pick');
   card.dataset.status = item.status;
+  card.dataset.itemId = String(item.id);
+  if (item.id === state.workbench.itemId) card.classList.add('is-selected');
+  card.addEventListener('click', (event) => {
+    // Let the buttons and links inside the card do their own job.
+    if (event.target.closest('button, a, input, select')) return;
+    selectQuestion(item.id);
+  });
 
   const head = el('div', 'item-head');
   head.append(el('span', `badge source-${item.source}`, SOURCE_LABELS[item.source] || item.source));
@@ -95,9 +115,9 @@ function itemCard(item) {
   if (item.kind) head.append(el('span', 'badge', item.kind));
   card.append(head);
 
-  const body = el('div', 'item-text clamped', item.text);
-  body.title = 'Click to expand';
-  body.addEventListener('click', () => body.classList.toggle('clamped'));
+  // The full text lives in the middle column once the card is picked.
+  const body = el('div', 'item-text tight', item.text);
+  body.title = 'Click to open this question';
   card.append(body);
 
   const foot = el('div', 'item-foot');
@@ -145,11 +165,6 @@ function itemCard(item) {
     foot.append(link);
   }
 
-  const research = el('button', 'tiny ghost', 'Research →');
-  research.title = 'Match this question against the research databases';
-  research.addEventListener('click', () => openInWorkbench(item.id));
-  foot.append(research);
-
   const del = el('button', 'tiny danger', 'Dismiss');
   del.title = 'Remove from the feed. It will not come back on the next poll.';
   del.addEventListener('click', async () => {
@@ -189,6 +204,7 @@ async function loadFeed() {
   try {
     const data = await api(`/items?${params}`);
     state.feed.total = data.total;
+    state.feed.items = data.items;
     renderItems(
       $('#feed-list'),
       data.items,
@@ -199,8 +215,25 @@ async function loadFeed() {
     $('#feed-range').textContent = `${from}-${to} of ${data.total}`;
     $('#feed-prev').disabled = f.offset === 0;
     $('#feed-next').disabled = f.offset + f.limit >= data.total;
+
+    // Open the first question by default so the console is never three
+    // empty columns, and re-open the selected one after a refresh.
+    if (!state.workbench.itemId && data.items.length) {
+      selectQuestion(data.items[0].id);
+    } else {
+      markSelectedCard();
+    }
   } catch (err) {
     toast(err.message, true);
+  }
+}
+
+function markSelectedCard() {
+  for (const card of $$('#feed-list .item')) {
+    card.classList.toggle(
+      'is-selected',
+      Number(card.dataset.itemId) === state.workbench.itemId
+    );
   }
 }
 
@@ -271,7 +304,9 @@ function renderKeywordBar() {
       state.feed.keyword = keyword.term.toLowerCase();
       state.feed.offset = 0;
       $('#filter-keyword').value = keyword.term.toLowerCase();
-      showTab('feed');
+      // showTab only reloads on a change of tab, so refilter in place.
+      if (state.tab === 'feed') loadFeed();
+      else showTab('feed');
     });
 
     const drop = el('button', 'drop', '×');
@@ -517,7 +552,6 @@ function sourceCard(source) {
       loadSources();
       refreshCounts();
       if (state.tab === 'feed') loadFeed();
-      if (state.tab === 'research') loadResearch();
     }
   });
   actions.append(toggle, pollNow);
@@ -582,8 +616,33 @@ function sourceCard(source) {
   if (source.id === 'x') card.append(xControls(source));
   if (source.id === 'youtube') card.append(youtubeControls(source));
   if (source.id === 'websearch') card.append(websearchControls(source));
+  if (source.id === 'pubmed' || source.id === 'literature') {
+    card.append(literatureControls(source));
+  }
 
   return card;
+}
+
+/** Shows what the keywords at the top of the screen actually search for. */
+function literatureControls(source) {
+  const wrap = el('div');
+  const details = source.details || {};
+  if (details.databases) {
+    const on = details.databases.filter((d) => d.enabled).map((d) => d.label || d.id);
+    wrap.append(
+      el(
+        'p',
+        'subtle',
+        `${on.length} of ${details.databases.length} databases: ${on.join(', ')}. ` +
+          `Keeps anything published in the last ${details.lookback_days} days.`
+      )
+    );
+  }
+  if (details.example_term) {
+    wrap.append(el('h3', '', 'Example query'));
+    wrap.append(el('pre', 'query', details.example_term));
+  }
+  return wrap;
 }
 
 function redditControls(source) {
@@ -859,7 +918,7 @@ function connectionsCard(info) {
     el(
       'p',
       'subtle',
-      'Replies post as the account you link here. Nothing is ever sent automatically: you confirm each reply from the Workbench.'
+      'Replies post as the account you link here. Nothing is ever sent automatically: you confirm each reply from the console.'
     )
   );
 
@@ -1004,7 +1063,7 @@ function researchCard(info) {
     el(
       'p',
       'subtle',
-      'Queried per question from the Workbench tab, not on a schedule. Results are merged, deduplicated and ranked by evidence quality.'
+      'Queried per question from the console, and once a day by the research sweep. Results are merged, deduplicated and ranked by evidence quality.'
     )
   );
 
@@ -1036,7 +1095,41 @@ function researchCard(info) {
   });
   emailLabel.append(email);
   card.append(emailLabel);
+
+  card.append(el('h3', '', 'Daily sweep'));
+  card.append(
+    el(
+      'p',
+      'subtle',
+      'How far back the scheduled sweep and the PubMed pull look, and how much each one brings back. Run either from its own card above.'
+    )
+  );
+  const grid = el('div', 'grid-2');
+  grid.append(
+    numberSetting('Look back (days)', 'pubmed.reldate_days', { min: 1, max: 365 })
+  );
+  grid.append(
+    numberSetting('Max articles per pull', 'pubmed.max_results', { min: 1, max: 100 })
+  );
+  card.append(grid);
+
   return card;
+}
+
+/** A number input bound straight to one stored setting. */
+function numberSetting(label, key, { min, max }) {
+  const wrap = el('label', '', label);
+  const input = el('input');
+  input.type = 'number';
+  input.min = String(min);
+  input.max = String(max);
+  input.value = state.settings[key];
+  input.addEventListener('change', async () => {
+    await saveSettings({ [key]: input.value });
+    toast('Saved');
+  });
+  wrap.append(input);
+  return wrap;
 }
 
 async function loadSources() {
@@ -1080,56 +1173,6 @@ async function saveSettings(entries) {
   }
 }
 
-/* --------------------------------------------------------------- research */
-
-async function loadResearch() {
-  try {
-    state.settings = await api('/settings');
-    $('#pubmed-reldate').value = state.settings['pubmed.reldate_days'];
-    $('#pubmed-max').value = state.settings['pubmed.max_results'];
-
-    const sources = await api('/sources');
-    const pubmed = sources.sources.find((s) => s.id === 'pubmed');
-    if (pubmed) {
-      $('#pubmed-status').textContent = pubmed.last_run_at
-        ? `Last pull ${relativeTime(pubmed.last_run_at)} (${pubmed.last_status})`
-        : 'Not pulled yet';
-      $('#pubmed-query').textContent =
-        pubmed.details.example_term || 'Add PubMed keywords to build a query.';
-    }
-
-    const sweep = sources.sources.find((s) => s.id === 'literature');
-    const status = $('#literature-status');
-    status.innerHTML = '';
-    if (sweep) {
-      status.append(
-        el('span', '', `every ${Math.round(sweep.effective_interval_minutes / 60)}h`)
-      );
-      status.append(
-        el('span', '', sweep.last_run_at ? `last ${relativeTime(sweep.last_run_at)}` : 'not run yet')
-      );
-      status.append(el('span', '', `${sweep.total_added} article(s) captured`));
-      if (sweep.details) {
-        const on = sweep.details.databases.filter((d) => d.enabled).length;
-        status.append(
-          el('span', '', `${on} of ${sweep.details.databases.length} databases`)
-        );
-        status.append(el('span', '', `last ${sweep.details.lookback_days} days`));
-      }
-      if (sweep.last_error) status.append(el('span', '', sweep.last_error));
-    }
-
-    const data = await api('/items?source=literature,pubmed&limit=50');
-    renderItems(
-      $('#research-list'),
-      data.items,
-      'No articles yet. Add keywords at the top, then use "Sweep now".'
-    );
-  } catch (err) {
-    toast(err.message, true);
-  }
-}
-
 /* -------------------------------------------------------------- workbench */
 
 const EVIDENCE_HINT = {
@@ -1140,62 +1183,34 @@ const EVIDENCE_HINT = {
   5: 'Weakest: single case, opinion, or not peer reviewed',
 };
 
-function openInWorkbench(itemId) {
+/**
+ * Open one question in the console: the middle column shows it, the left
+ * column its matched research, and the feed card is highlighted.
+ */
+function selectQuestion(itemId) {
+  if (!itemId) return;
   state.workbench.itemId = itemId;
-  showTab('workbench');
+  state.workbench.picked = new Set();
+  markSelectedCard();
+  showTab('feed');
+  loadSelection();
 }
 
-async function loadWorkbenchQuestions() {
-  const scope = $('#wb-scope').value;
-  const params = new URLSearchParams({ limit: '100' });
-  if (scope) params.set('status', scope);
-  const data = await api(`/items?${params}`);
-  state.workbench.items = data.items;
-
-  // A question opened from the feed stays selected even when the status
-  // filter would hide it - the click was explicit.
-  const wanted = state.workbench.itemId;
-  if (wanted && !data.items.some((i) => i.id === wanted)) {
-    try {
-      const pinned = await api(`/items/${wanted}`);
-      state.workbench.items = [pinned, ...data.items];
-    } catch {
-      // The item is gone; fall through to the filtered list.
-    }
-  }
-
-  const select = $('#wb-question');
-  select.innerHTML = '';
-  if (!state.workbench.items.length) {
-    const option = el('option', '', 'No questions match this filter');
-    option.value = '';
-    select.append(option);
-  }
-  for (const item of state.workbench.items) {
-    const option = el(
-      'option',
-      '',
-      `${SOURCE_LABELS[item.source] || item.source} · ${item.text.slice(0, 80).replace(/\s+/g, ' ')}`
-    );
-    option.value = String(item.id);
-    select.append(option);
-  }
-  if (
-    !state.workbench.itemId ||
-    !state.workbench.items.some((i) => i.id === state.workbench.itemId)
-  ) {
-    state.workbench.itemId = state.workbench.items.length
-      ? state.workbench.items[0].id
-      : null;
-  }
-  select.value = state.workbench.itemId ? String(state.workbench.itemId) : '';
+/** Steps to the next or previous question in the feed column. */
+function stepQuestion(delta) {
+  const list = state.feed.items;
+  if (!list.length) return;
+  const index = list.findIndex((i) => i.id === state.workbench.itemId);
+  const next = list[Math.min(Math.max(index + delta, 0), list.length - 1)];
+  if (!next || next.id === state.workbench.itemId) return;
+  selectQuestion(next.id);
 }
 
 function renderQuestion(item) {
   const card = $('#wb-question-card');
   card.innerHTML = '';
   if (!item) {
-    card.append(el('div', 'empty', 'Pick a question to get started.'));
+    card.append(el('div', 'empty', 'Pick a question from the feed on the right.'));
     return;
   }
 
@@ -1205,6 +1220,16 @@ function renderQuestion(item) {
   if (item.author) head.append(el('span', '', item.author));
   head.append(el('span', '', relativeTime(item.timestamp)));
   card.append(head);
+
+  const step = el('div', 'row');
+  const prev = el('button', 'tiny ghost', '↑ Previous');
+  prev.title = 'Previous question in the feed';
+  prev.addEventListener('click', () => stepQuestion(-1));
+  const next = el('button', 'tiny ghost', 'Next ↓');
+  next.title = 'Next question in the feed';
+  next.addEventListener('click', () => stepQuestion(1));
+  step.append(prev, next);
+  head.append(step);
 
   card.append(el('p', 'question-text', item.text));
 
@@ -1239,7 +1264,7 @@ function renderQuestion(item) {
   card.append(foot);
 }
 
-function resultCard(result) {
+function resultCard(result, index) {
   const card = el('div', 'result');
   card.dataset.level = String(result.evidence ? result.evidence.level : 4);
 
@@ -1293,7 +1318,44 @@ function resultCard(result) {
       el('p', 'subtle', 'Trial registration — study is planned or under way, no published results.')
     );
   }
+
+  // Ticking decides which papers the draft is allowed to cite.
+  const pick = el('label', 'pick-line');
+  const box = el('input');
+  box.type = 'checkbox';
+  box.checked = state.workbench.picked.has(index);
+  box.addEventListener('change', () => {
+    if (box.checked) state.workbench.picked.add(index);
+    else state.workbench.picked.delete(index);
+    renderPicked();
+  });
+  pick.append(box, document.createTextNode(' Use this paper in the draft'));
+  card.append(pick);
   return card;
+}
+
+/** The running count of ticked papers, with a select-all/none shortcut. */
+function renderPicked() {
+  const box = $('#wb-picked');
+  const total = (state.workbench.match && state.workbench.match.results) || [];
+  box.innerHTML = '';
+  box.classList.toggle('hidden', !total.length);
+  if (!total.length) return;
+
+  const picked = state.workbench.picked.size;
+  box.append(
+    el('span', '', `Drafting from ${picked} of ${total.length} paper${total.length === 1 ? '' : 's'}`)
+  );
+  const toggle = el('button', 'tiny ghost', picked === total.length ? 'Untick all' : 'Tick all');
+  toggle.addEventListener('click', () => {
+    state.workbench.picked =
+      picked === total.length ? new Set() : new Set(total.map((_, i) => i));
+    renderMatch(state.workbench.match);
+  });
+  box.append(toggle);
+
+  const generate = $('#wb-generate');
+  generate.textContent = picked ? `Generate from ${picked}` : 'Generate draft';
 }
 
 const SOURCE_DB_LABELS = {
@@ -1314,6 +1376,14 @@ function renderMatch(match) {
   providers.innerHTML = '';
   note.innerHTML = '';
   results.innerHTML = '';
+
+  $('#wb-picked').classList.add('hidden');
+  $('#wb-generate').textContent = 'Generate draft';
+
+  if (!state.workbench.itemId) {
+    results.append(el('div', 'empty', 'Pick a question from the feed on the right.'));
+    return;
+  }
 
   if (!match || !match.exists) {
     results.append(
@@ -1357,7 +1427,8 @@ function renderMatch(match) {
     );
     return;
   }
-  for (const result of match.results) results.append(resultCard(result));
+  match.results.forEach((result, index) => results.append(resultCard(result, index)));
+  renderPicked();
 }
 
 function renderDraft() {
@@ -1438,7 +1509,7 @@ async function refreshDraftAvailability() {
       ? `Generates with ${status.model}`
       : 'ANTHROPIC_API_KEY is not set';
     $('#wb-draft-hint').textContent = status.configured
-      ? 'Drafts are written from the matched research on the right, for your review only. Nothing is posted anywhere.'
+      ? 'Drafts are written from the papers ticked on the left, for your review only. Nothing is posted until you say so.'
       : 'Set ANTHROPIC_API_KEY (a Replit secret or environment variable) and restart to enable draft generation. You can still write and save drafts by hand here.';
   } catch {
     // Non-fatal: the button stays enabled and any failure surfaces on click.
@@ -1550,7 +1621,7 @@ function markRepliedButton(target) {
         body: { url: url || undefined },
       });
       toast(result.account ? `Recorded as ${result.account}` : 'Recorded');
-      await loadWorkbench();
+      await loadSelection();
       refreshCounts();
     } catch (err) {
       toast(err.message, true);
@@ -1632,27 +1703,38 @@ async function postReply(target) {
       body: { confirm: true },
     });
     toast(`Posted as ${result.account}`);
-    await loadWorkbench();
+    await loadSelection();
     refreshCounts();
   } catch (err) {
     toast(err.message, true);
-    await loadWorkbench();
+    await loadSelection();
   }
 }
 
-async function loadWorkbench() {
-  try {
-    await Promise.all([loadWorkbenchQuestions(), refreshDraftAvailability()]);
-    const itemId = state.workbench.itemId;
-    if (!itemId) {
-      renderQuestion(null);
-      renderMatch(null);
-      state.workbench.draft = null;
-      state.workbench.drafts = [];
-      renderDraft();
-      return;
-    }
+/** Everything a match returns starts ticked; unticking narrows the draft. */
+function setMatch(match) {
+  state.workbench.match = match;
+  state.workbench.picked = new Set(
+    ((match && match.results) || []).map((_, index) => index)
+  );
+}
 
+/** Loads the selected question into the middle and left columns. */
+async function loadSelection() {
+  const itemId = state.workbench.itemId;
+  if (!itemId) {
+    renderQuestion(null);
+    setMatch(null);
+    renderMatch(null);
+    state.workbench.draft = null;
+    state.workbench.drafts = [];
+    state.workbench.replyTarget = null;
+    renderDraft();
+    renderReply();
+    return;
+  }
+
+  try {
     const [item, match, draftData, replyTarget] = await Promise.all([
       api(`/items/${itemId}`),
       api(`/items/${itemId}/research`),
@@ -1660,7 +1742,11 @@ async function loadWorkbench() {
       api(`/items/${itemId}/reply-target`),
     ]);
 
-    state.workbench.match = match;
+    // A slower request for a question the physician has already clicked past
+    // must not overwrite the one now on screen.
+    if (state.workbench.itemId !== itemId) return;
+
+    setMatch(match);
     state.workbench.drafts = draftData.drafts;
     state.workbench.draft = draftData.drafts[0] || null;
     state.workbench.replyTarget = replyTarget;
@@ -1687,7 +1773,7 @@ async function runMatch(refresh) {
       `/items/${itemId}/research${refresh ? '?refresh=true' : ''}`,
       { method: 'POST' }
     );
-    state.workbench.match = match;
+    setMatch(match);
     renderMatch(match);
     toast(
       match.no_strong_matches
@@ -1709,11 +1795,23 @@ async function runMatch(refresh) {
 async function generateDraft() {
   const itemId = state.workbench.itemId;
   if (!itemId) return;
+
+  const results = (state.workbench.match && state.workbench.match.results) || [];
+  const use = [...state.workbench.picked].sort((a, b) => a - b);
+  if (results.length && !use.length) {
+    toast('Tick at least one paper on the left, or re-run the match', true);
+    return;
+  }
+
   const button = $('#wb-generate');
+  const label = button.textContent;
   button.disabled = true;
   button.textContent = 'Generating…';
   try {
-    const data = await api(`/items/${itemId}/drafts`, { method: 'POST' });
+    const data = await api(`/items/${itemId}/drafts`, {
+      method: 'POST',
+      body: { use },
+    });
     state.workbench.drafts = [data.draft, ...state.workbench.drafts];
     state.workbench.draft = data.draft;
     renderDraft();
@@ -1723,7 +1821,7 @@ async function generateDraft() {
     toast(err.message, true);
   } finally {
     button.disabled = false;
-    button.textContent = 'Generate draft';
+    button.textContent = label;
   }
 }
 
@@ -1749,32 +1847,39 @@ async function saveDraft() {
   }
 }
 
-function stepQuestion(delta) {
-  const list = state.workbench.items;
-  if (!list.length) return;
-  const index = list.findIndex((i) => i.id === state.workbench.itemId);
-  const next = list[Math.min(Math.max(index + delta, 0), list.length - 1)];
-  if (!next || next.id === state.workbench.itemId) return;
-  state.workbench.itemId = next.id;
-  loadWorkbench();
-}
-
 /* ------------------------------------------------------------------- tabs */
 
 function showTab(tab) {
+  const changed = state.tab !== tab;
   state.tab = tab;
   $$('#tabs .tab').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.tab === tab));
-  for (const name of ['feed', 'workbench', 'research', 'keywords', 'sources']) {
+  for (const name of ['feed', 'keywords', 'sources']) {
     $(`#panel-${name}`).classList.toggle('hidden', name !== tab);
   }
+  if (!changed) return;
   if (tab === 'feed') {
     refreshCounts();
     loadFeed();
   }
-  if (tab === 'workbench') loadWorkbench();
   if (tab === 'keywords') loadKeywords();
   if (tab === 'sources') loadSources();
-  if (tab === 'research') loadResearch();
+}
+
+/**
+ * The console is a full-height three-column layout, so it needs to know how
+ * much room the sticky header above it takes.
+ */
+function trackHeaderHeight() {
+  const stack = $('.topstack');
+  const apply = () => {
+    document.documentElement.style.setProperty(
+      '--topstack-h',
+      `${Math.round(stack.getBoundingClientRect().height)}px`
+    );
+  };
+  apply();
+  if (window.ResizeObserver) new ResizeObserver(apply).observe(stack);
+  window.addEventListener('resize', apply);
 }
 
 /* ------------------------------------------------------------------- init */
@@ -1828,16 +1933,6 @@ function init() {
     loadFeed();
   });
 
-  $('#wb-question').addEventListener('change', (e) => {
-    state.workbench.itemId = Number(e.target.value) || null;
-    loadWorkbench();
-  });
-  $('#wb-scope').addEventListener('change', () => {
-    state.workbench.itemId = null;
-    loadWorkbench();
-  });
-  $('#wb-prev').addEventListener('click', () => stepQuestion(-1));
-  $('#wb-next').addEventListener('click', () => stepQuestion(1));
   $('#wb-match').addEventListener('click', () => runMatch(false));
   $('#wb-rematch').addEventListener('click', () => runMatch(true));
   $('#wb-generate').addEventListener('click', generateDraft);
@@ -1875,63 +1970,16 @@ function init() {
     input.addEventListener('change', syncScopeVisibility)
   );
 
-  $('#pubmed-save').addEventListener('click', async () => {
-    await saveSettings({
-      'pubmed.reldate_days': $('#pubmed-reldate').value,
-      'pubmed.max_results': $('#pubmed-max').value,
-    });
-    toast('Research settings saved');
-  });
-  $('#literature-poll').addEventListener('click', async () => {
-    const button = $('#literature-poll');
-    button.disabled = true;
-    button.textContent = 'Sweeping…';
-    try {
-      const result = await api('/sources/literature/poll?force=true', { method: 'POST' });
-      toast(
-        result.ok
-          ? `Sweep: ${result.added || 0} new article(s)${result.notes ? ` — ${result.notes}` : ''}`
-          : `Sweep: ${result.error || result.message || result.skipped}`,
-        !result.ok
-      );
-    } catch (err) {
-      toast(err.message, true);
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Sweep now';
-      loadResearch();
-      refreshCounts();
-    }
-  });
-
-  $('#pubmed-poll').addEventListener('click', async () => {
-    const button = $('#pubmed-poll');
-    button.disabled = true;
-    button.textContent = 'Pulling…';
-    try {
-      const result = await api('/sources/pubmed/poll?force=true', { method: 'POST' });
-      toast(
-        result.ok
-          ? `PubMed: ${result.added || 0} new article(s)`
-          : `PubMed: ${result.error || result.message || result.skipped}`,
-        !result.ok
-      );
-    } catch (err) {
-      toast(err.message, true);
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Pull now';
-      loadResearch();
-    }
-  });
-
   syncScopeVisibility();
+  trackHeaderHeight();
   loadKeywordBar();
-  showTab('feed');
+  refreshDraftAvailability();
+  refreshCounts();
+  loadFeed();
 
   // Keep the feed reasonably live without hammering the API.
   setInterval(() => {
-    if (state.tab === 'feed') {
+    if (state.tab === 'feed' && !(document.activeElement || document.body).closest('.col-draft')) {
       refreshCounts();
       loadFeed();
     } else if (state.tab === 'sources') {

@@ -62,9 +62,13 @@ survives restarts.
    and hand them to the ingest pipeline.
 3. **Ingest** matches text against the live keyword list, skips anything
    already in the `seen_items` ledger, and writes the rest into `items`.
-4. **The feed** shows everything in one chronological list, filterable by
-   source, keyword, status and free text, with a New / Reviewed / Used status
-   per item.
+4. **The console** is one screen with three columns. The **Questions** feed on
+   the right lists everything captured, filterable by source, keyword, status
+   and free text, with a New / Reviewed / Used status per item. Clicking a
+   question loads it into the middle column, where the draft reply is written
+   and posted, and loads its **Matching research** into the left column, where
+   each paper can be ticked or unticked to decide what the draft may cite.
+   **Keywords** and **Sources** are the only other tabs.
 
 ### Unified item shape
 
@@ -129,8 +133,7 @@ different source labels. Re-enable it in Sources if you want it back.
 ## Research matching
 
 Every captured question can be matched against six research databases at once,
-from the **Workbench** tab: the question sits on the left, the matched research
-on the right.
+from the left-hand column of the console.
 
 | Database | Credentials | What it adds |
 | -------- | ----------- | ------------ |
@@ -188,9 +191,17 @@ limiting is reported as a chip on that provider and the rest still merge.
 
 ## Draft reply generation
 
-The Workbench's **Generate draft** button sends the question plus the matched
-abstracts to the Anthropic API and returns a draft for review. Nothing is
-posted anywhere by this application.
+**Generate draft**, above the middle column, sends the question plus the
+abstracts of the ticked papers to the Anthropic API and returns a draft for
+review. Nothing is posted anywhere without an explicit confirmed click.
+
+Every paper the match returned starts ticked. Unticking narrows what the model
+is given — the button reads *Generate from 3* when three are ticked, and only
+those three are sent, numbered in the order they appear on screen, so the
+citation numbers in the draft line up with the column beside it. Choosing a
+subset by hand is treated as your own relevance call, so the automatic "no
+strong match" framing is dropped; the rules below about being honest over
+weak evidence still apply.
 
 - Model `claude-opus-5` with adaptive thinking, streamed so a long generation
   cannot hit an HTTP timeout, with the system prompt cached across drafts and
@@ -229,7 +240,7 @@ APIs, and it is not always available — a new Reddit account with an unverified
 email cannot create one, for instance. **Add account by hand** on the same card
 records which account you post from without any OAuth:
 
-- The Workbench names it: "You post as u/yourname to a post in r/amputee."
+- The console names it: "You post as u/yourname to a post in r/amputee."
 - **Copy draft & open thread** copies the reply and opens the thread, so you
   paste and post it yourself.
 - **Mark as replied** records it against that account, optionally with a link
@@ -252,7 +263,7 @@ automatically when they expire.
 
 Replies go out only on an explicit, confirmed click on one draft:
 
-- The Workbench names the account and the exact thread before you send, and
+- The console names the account and the exact thread before you send, and
   shows the text you are about to post in the confirmation.
 - A thread you have already replied to says so, with a link to that reply.
 - Drafts too long for the platform (X's 280 characters) are caught before
@@ -356,8 +367,8 @@ Uses NCBI E-utilities: `esearch` over `[Title/Abstract]` for every keyword
 scoped to `all` or to `pubmed`, then `esummary` for metadata and `efetch` for
 abstracts. Requests are paced for the 3 req/s unauthenticated limit (10/s if
 you set `PUBMED_API_KEY`). To keep clinical searches separate from community
-chatter, add keywords scoped to PubMed only — the Research tab shows the
-resulting query and the articles it returned.
+chatter, add keywords scoped to PubMed only — the PubMed card in Sources shows
+the resulting query, and the articles land in the feed under **PubMed**.
 
 ### Web search — `BRAVE_SEARCH_API_KEY` *or* `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX`
 
@@ -429,7 +440,7 @@ staggered so every API is not called at once.
 | DELETE | `/api/items/:id/research` | Drop the cached match |
 | GET    | `/api/research/providers` | Databases, enabled state, cache summary |
 | GET    | `/api/items/:id/drafts` | Drafts for a question, newest first |
-| POST   | `/api/items/:id/drafts` | Generate a draft from the matched research |
+| POST   | `/api/items/:id/drafts` | Generate a draft; optional `{use: [0, 2]}` limits it to those matched papers |
 | PUT    | `/api/drafts/:id` | Save edited text (Draft becomes Edited) |
 | PATCH  | `/api/drafts/:id` | `{status: "draft" \| "edited" \| "used"}` |
 | DELETE | `/api/drafts/:id` | Delete a draft |

@@ -27,6 +27,27 @@ router.get('/items/:id/drafts', (req, res) => {
 });
 
 /**
+ * Narrows the matched research to the papers ticked in the console.
+ *
+ * `use` holds indexes into the cached result list, in the order they are
+ * shown. Picking by hand is the physician's own relevance call, so the
+ * "nothing matched strongly" framing is dropped - the system prompt still
+ * requires honesty about how strong each study is.
+ */
+function selectResults(match, use) {
+  const all = (match && match.results) || [];
+  if (!Array.isArray(use) || !use.length || !all.length) return match;
+
+  const picked = [...new Set(use.map(Number))]
+    .filter((n) => Number.isInteger(n) && n >= 0 && n < all.length)
+    .sort((a, b) => a - b)
+    .map((n) => all[n]);
+  if (!picked.length || picked.length === all.length) return match;
+
+  return { ...match, results: picked, no_strong_matches: false, selected_by_hand: true };
+}
+
+/**
  * Generate a draft for one question. Uses the cached research match, running
  * the match first when there is none, so the model always sees the same
  * studies the physician is looking at.
@@ -40,6 +61,7 @@ router.post('/items/:id/drafts', async (req, res) => {
     const fresh = await research.matchItem(item.id);
     match = { ...fresh };
   }
+  match = selectResults(match, (req.body || {}).use);
 
   try {
     const generated = await generator.generateDraft({ item, match });

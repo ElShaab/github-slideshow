@@ -18,9 +18,7 @@
         <p class="subtle" id="brand-sub">Community signal &amp; literature tracking</p>
       </div>
       <nav class="tabs" id="tabs">
-        <button class="tab is-active" data-tab="feed">Feed</button>
-        <button class="tab" data-tab="workbench">Workbench</button>
-        <button class="tab" data-tab="research">Research</button>
+        <button class="tab is-active" data-tab="feed">Console</button>
         <button class="tab" data-tab="keywords">Keywords</button>
         <button class="tab" data-tab="sources">Sources</button>
       </nav>
@@ -44,162 +42,121 @@
     </div>
 
     <main>
-      <!-- FEED -->
+      <!-- CONSOLE: research (left) · reply (middle) · questions (right) -->
       <section class="panel" id="panel-feed">
-        <div class="toolbar">
-          <div class="filters" id="feed-filters">
-            <label>
-              Source
-              <select id="filter-source">
-                <option value="">All sources</option>
-                <option value="reddit">Reddit</option>
-                <option value="x">X (Twitter)</option>
-                <option value="youtube">YouTube</option>
-                <option value="literature">Research sweep</option>
-                <option value="pubmed">PubMed</option>
-                <option value="websearch">Web search</option>
-              </select>
-            </label>
-            <label>
-              Keyword
-              <select id="filter-keyword">
-                <option value="">All keywords</option>
-              </select>
-            </label>
-            <label>
-              Status
-              <select id="filter-status">
-                <option value="">All statuses</option>
-                <option value="new">New</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="used">Used</option>
-              </select>
-            </label>
-            <label class="grow">
-              Search
-              <input id="filter-q" type="search" placeholder="Text, author or origin" />
-            </label>
-            <button class="ghost" id="feed-refresh">Refresh</button>
-          </div>
-          <div class="counts" id="feed-counts"></div>
-        </div>
-        <div id="feed-list" class="list"></div>
-        <div class="pager">
-          <button class="ghost" id="feed-prev">Previous</button>
-          <span id="feed-range" class="subtle"></span>
-          <button class="ghost" id="feed-next">Next</button>
-        </div>
-      </section>
-
-      <!-- WORKBENCH: question on the left, matched research on the right -->
-      <section class="panel hidden" id="panel-workbench">
-        <div class="filters">
-          <label class="grow">
-            Question
-            <select id="wb-question"></select>
-          </label>
-          <label>
-            Show
-            <select id="wb-scope">
-              <option value="new">New only</option>
-              <option value="">Any status</option>
-              <option value="reviewed">Reviewed</option>
-              <option value="used">Used</option>
-            </select>
-          </label>
-          <button class="ghost" id="wb-prev">Previous</button>
-          <button class="ghost" id="wb-next">Next</button>
-        </div>
-
-        <div class="split">
-          <div class="split-col">
-            <div class="card" id="wb-question-card">
-              <div class="empty">Pick a question to get started.</div>
+        <div class="console">
+          <!-- LEFT: research matched to the selected question -->
+          <div class="console-col col-research">
+            <div class="col-head">
+              <h2>Matching research</h2>
+              <div class="row">
+                <button class="tiny" id="wb-match">Match research</button>
+                <button
+                  class="tiny ghost"
+                  id="wb-rematch"
+                  title="Ignore the cache and query every database again"
+                >
+                  Re-run
+                </button>
+              </div>
             </div>
-
-            <div class="card" id="wb-draft-card">
-              <div class="card-head">
-                <h2>Draft reply</h2>
-                <div class="row">
-                  <span class="subtle" id="wb-draft-meta"></span>
-                  <button id="wb-generate">Generate draft</button>
-                </div>
-              </div>
-              <p class="subtle" id="wb-draft-hint">
-                Drafts are written from the matched research on the right, for
-                your review only. Nothing is posted anywhere.
-              </p>
-              <textarea id="wb-draft-text" rows="14" spellcheck="true"
-                placeholder="No draft yet. Match the research first, then generate a draft you can edit here."></textarea>
-              <div class="row" id="wb-draft-controls">
-                <div class="status-group" id="wb-draft-status"></div>
-                <button class="ghost" id="wb-draft-save">Save</button>
-                <button class="ghost" id="wb-draft-copy">Copy</button>
-                <button class="tiny danger" id="wb-draft-delete">Delete</button>
-                <span class="subtle" id="wb-draft-saved"></span>
-              </div>
-              <div class="reply-bar" id="wb-reply"></div>
-              <div id="wb-draft-citations" class="citations"></div>
-            </div>
-          </div>
-
-          <div class="split-col">
-            <div class="card">
-              <div class="card-head">
-                <h2>Matched research</h2>
-                <div class="row">
-                  <button id="wb-match">Match research</button>
-                  <button class="ghost" id="wb-rematch" title="Ignore the cache and query every database again">Re-run</button>
-                </div>
-              </div>
+            <div class="col-body">
               <div id="wb-terms" class="subtle"></div>
               <div id="wb-providers" class="chips"></div>
               <div id="wb-note"></div>
+              <div id="wb-picked" class="picked-note hidden"></div>
+              <div id="wb-results" class="list"></div>
             </div>
-            <div id="wb-results" class="list"></div>
           </div>
-        </div>
-      </section>
 
-      <!-- RESEARCH -->
-      <section class="panel hidden" id="panel-research">
-        <div class="card">
-          <div class="card-head">
-            <h2>Daily research sweep</h2>
-            <div class="row">
-              <button class="ghost" id="literature-poll">Sweep now</button>
-              <button class="ghost" id="pubmed-poll">PubMed only</button>
+          <!-- MIDDLE: the question and the draft written from the ticked papers -->
+          <div class="console-col col-draft">
+            <div class="col-head">
+              <h2>Draft reply</h2>
+              <div class="row">
+                <span class="subtle" id="wb-draft-meta"></span>
+                <button id="wb-generate" class="tiny">Generate draft</button>
+              </div>
+            </div>
+            <div class="col-body">
+              <div class="card" id="wb-question-card">
+                <div class="empty">Pick a question from the feed on the right.</div>
+              </div>
+
+              <div class="card" id="wb-draft-card">
+                <p class="subtle" id="wb-draft-hint">
+                  Drafts are written from the papers ticked on the left, for
+                  your review only. Nothing is posted until you say so.
+                </p>
+                <textarea id="wb-draft-text" rows="12" spellcheck="true"
+                  placeholder="No draft yet. Match the research on the left, tick the papers to use, then generate a draft you can edit here."></textarea>
+                <div class="row" id="wb-draft-controls">
+                  <div class="status-group" id="wb-draft-status"></div>
+                  <button class="ghost tiny" id="wb-draft-save">Save</button>
+                  <button class="ghost tiny" id="wb-draft-copy">Copy</button>
+                  <button class="tiny danger" id="wb-draft-delete">Delete</button>
+                  <span class="subtle" id="wb-draft-saved"></span>
+                </div>
+                <div class="reply-bar" id="wb-reply"></div>
+                <div id="wb-draft-citations" class="citations"></div>
+              </div>
             </div>
           </div>
-          <p class="subtle">
-            Runs the keywords at the top of the screen against PubMed, Europe
-            PMC, Crossref, Semantic Scholar, OpenAlex and ClinicalTrials.gov
-            once a day, keeps what was published recently, and files anything
-            new in the feed. Scope a keyword to <code>literature</code> only to
-            search it here and nowhere else.
-          </p>
-          <div id="literature-status" class="counts"></div>
-          <div class="grid-2">
-            <label>
-              Look back (days)
-              <input type="number" min="1" max="365" id="pubmed-reldate" />
-            </label>
-            <label>
-              Max articles per pull
-              <input type="number" min="1" max="100" id="pubmed-max" />
-            </label>
+
+          <!-- RIGHT: the feed of questions -->
+          <div class="console-col col-feed">
+            <div class="col-head">
+              <h2>Questions</h2>
+              <button class="ghost tiny" id="feed-refresh">Refresh</button>
+            </div>
+            <div class="col-body">
+              <div class="filters" id="feed-filters">
+                <label>
+                  Source
+                  <select id="filter-source">
+                    <option value="">All sources</option>
+                    <option value="reddit">Reddit</option>
+                    <option value="x">X (Twitter)</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="literature">Research sweep</option>
+                    <option value="pubmed">PubMed</option>
+                    <option value="websearch">Web search</option>
+                  </select>
+                </label>
+                <label>
+                  Keyword
+                  <select id="filter-keyword">
+                    <option value="">All keywords</option>
+                  </select>
+                </label>
+                <label>
+                  Status
+                  <select id="filter-status">
+                    <option value="">All statuses</option>
+                    <option value="new">New</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="used">Used</option>
+                  </select>
+                </label>
+                <label class="grow">
+                  Search
+                  <input id="filter-q" type="search" placeholder="Text, author or origin" />
+                </label>
+              </div>
+              <div class="counts" id="feed-counts"></div>
+              <div id="feed-list" class="list"></div>
+              <div class="pager">
+                <button class="ghost tiny" id="feed-prev">Previous</button>
+                <span id="feed-range" class="subtle"></span>
+                <button class="ghost tiny" id="feed-next">Next</button>
+              </div>
+            </div>
           </div>
-          <div class="row">
-            <button id="pubmed-save">Save research settings</button>
-            <span class="subtle" id="pubmed-status"></span>
-          </div>
-          <pre class="query" id="pubmed-query"></pre>
         </div>
-        <div id="research-list" class="list"></div>
       </section>
 
       <!-- KEYWORDS -->
-      <section class="panel hidden" id="panel-keywords">
+      <section class="panel narrow hidden" id="panel-keywords">
         <div class="card">
           <h2 id="keyword-form-title">Add a keyword</h2>
           <form id="keyword-form" class="keyword-form">
@@ -254,7 +211,7 @@
       </section>
 
       <!-- SOURCES -->
-      <section class="panel hidden" id="panel-sources">
+      <section class="panel narrow hidden" id="panel-sources">
         <div id="source-cards"></div>
         <div class="card">
           <h2>Recent poll activity</h2>
