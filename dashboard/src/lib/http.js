@@ -30,6 +30,28 @@ function parseRetryAfter(headers) {
   return null;
 }
 
+function looksLikeHtml(text) {
+  return /^\s*(<!doctype html|<html|<body|<head|<\?xml[^>]*>\s*<!doctype html)/i.test(
+    String(text || '')
+  );
+}
+
+/**
+ * A readable one-line reason. An API's own JSON error is worth quoting; a page
+ * of markup is not - a block or login page dumped into the log buries the
+ * actual problem under a stylesheet.
+ */
+function describeFailure(parsed, text) {
+  if (parsed && parsed.error) return `: ${JSON.stringify(parsed.error).slice(0, 200)}`;
+  if (parsed && parsed.detail) return `: ${String(parsed.detail).slice(0, 200)}`;
+  if (parsed && parsed.message) return `: ${String(parsed.message).slice(0, 200)}`;
+  if (looksLikeHtml(text)) {
+    return ': the server returned a web page instead of JSON (a block, login or error page)';
+  }
+  if (text) return `: ${text.replace(/\s+/g, ' ').trim().slice(0, 200)}`;
+  return '';
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -78,16 +100,8 @@ async function fetchJson(url, options = {}) {
       if (!res.ok) {
         const retryAfter = parseRetryAfter(res.headers);
         const err = new HttpError(
-          `HTTP ${res.status} from ${new URL(url).host}${
-            parsed && parsed.error
-              ? `: ${JSON.stringify(parsed.error).slice(0, 200)}`
-              : parsed && parsed.detail
-                ? `: ${String(parsed.detail).slice(0, 200)}`
-                : text
-                  ? `: ${text.slice(0, 200)}`
-                  : ''
-          }`,
-          { status: res.status, retryAfter, body: parsed }
+          `HTTP ${res.status} from ${new URL(url).host}${describeFailure(parsed, text)}`,
+          { status: res.status, retryAfter, body: parsed, html: looksLikeHtml(text) }
         );
         // 4xx other than 429 will not get better by retrying.
         if (res.status < 500 && res.status !== 429) throw err;
@@ -117,4 +131,4 @@ async function fetchJson(url, options = {}) {
   throw lastError || new HttpError('Request failed');
 }
 
-module.exports = { fetchJson, HttpError, sleep };
+module.exports = { fetchJson, HttpError, sleep, looksLikeHtml, describeFailure };

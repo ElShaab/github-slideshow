@@ -141,3 +141,99 @@ test('one failing subreddit does not abort the rest of the poll', async () => {
   }
   db.prepare("DELETE FROM subreddits WHERE name = 'prosthetics'").run();
 });
+
+/* ------------------------------------------------- blocked public endpoints */
+
+test('a 403 block page becomes an actionable error, not a wall of CSS', async () => {
+  const blockPage =
+    '<body class=theme-beta><div><style>.theme-light,:root{--rem360:22.5rem;--rem320:20rem;' +
+    '--rem192:12rem;--rem144:9rem}</style></div></body>';
+  const mock = mockFetch({
+    'www.reddit.com': { status: 403, body: blockPage, headers: { 'content-type': 'text/html' } },
+  });
+  let message = '';
+  try {
+    await reddit.poll();
+  } catch (err) {
+    message = err.message;
+  } finally {
+    mock.restore();
+  }
+
+  assert.match(message, /datacenter IPs/);
+  assert.match(message, /REDDIT_CLIENT_ID/);
+  assert.ok(!message.includes('--rem360'), 'the block page markup must not reach the log');
+  // One cause, stated once, rather than repeated per subreddit.
+  assert.equal(message.match(/datacenter IPs/g).length, 1);
+});
+
+test('with client credentials, reads go through the OAuth API', async () => {
+  const config = require('../src/config');
+  config.reddit.clientId = 'cid';
+  config.reddit.clientSecret = 'csecret';
+  reddit.forgetToken();
+
+  const seen = [];
+  const headers = {};
+  const mock = mockFetch({
+    'www.reddit.com/api/v1/access_token': (url, options) => {
+      seen.push(url);
+      return { body: { access_token: 'app-token', expires_in: 3600 } };
+    },
+    'oauth.reddit.com': (url, options) => {
+      seen.push(url);
+      headers[url] = options.headers;
+      return { body: { data: { children: [] } } };
+    },
+  });
+  try {
+    await reddit.poll();
+  } finally {
+    mock.restore();
+  }
+
+  assert.ok(seen.some((u) => u.includes('/api/v1/access_token')), 'an app token is fetched');
+  const listing = seen.find((u) => u.includes('oauth.reddit.com'));
+  assert.ok(listing, 'listings come from the OAuth host');
+  assert.ok(!listing.includes('.json'), 'the OAuth host has no .json suffix');
+  assert.equal(headers[listing].Authorization, 'Bearer app-token');
+  assert.match(headers[listing]['User-Agent'], /^nodejs:amputee-research-dashboard:/);
+
+  config.reddit.clientId = '';
+  config.reddit.clientSecret = '';
+  reddit.forgetToken();
+});
+
+test('an app without a secret uses the installed-client grant', async () => {
+  const config = require('../src/config');
+  config.reddit.clientId = 'cid-only';
+  config.reddit.clientSecret = '';
+  reddit.forgetToken();
+
+  let tokenBody = '';
+  const mock = mockFetch({
+    'www.reddit.com/api/v1/access_token': (url, options) => {
+      tokenBody = options.body;
+      return { body: { access_token: 'installed-token', expires_in: 3600 } };
+    },
+    'oauth.reddit.com': { body: { data: { children: [] } } },
+  });
+  try {
+    await reddit.poll();
+  } finally {
+    mock.restore();
+  }
+  assert.match(tokenBody, /installed_client/);
+  assert.match(tokenBody, /device_id=DO_NOT_TRACK_THIS_DEVICE/);
+
+  config.reddit.clientId = '';
+  reddit.forgetToken();
+});
+
+test('the user agent names the account the dashboard knows about', () => {
+  const manualAccounts = require('../src/lib/manualAccounts');
+  assert.match(reddit.redditUserAgent(), /^nodejs:amputee-research-dashboard:[\d.]+$/);
+  manualAccounts.save('reddit', { handle: 'u/someone', profile_url: null });
+  assert.match(reddit.redditUserAgent(), /\(by \/u\/someone\)$/);
+  manualAccounts.remove('reddit');
+});

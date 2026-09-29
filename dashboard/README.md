@@ -277,15 +277,35 @@ linked and no password is set, the server says so at boot.
 
 ## Sources
 
-### Reddit — no credentials
+### Reddit — no credentials, but see the note on blocked IPs
 
-Reads the public JSON endpoints, `/r/<sub>/new.json` for posts and
-`/r/<sub>/comments.json` for new comments. Subreddits are managed in the
+Reads `/r/<sub>/new` for posts and `/r/<sub>/comments` for new comments. Subreddits are managed in the
 Sources tab (seeded with `amputee`, `amputees`, `prosthetics`, `Prosthetist`,
 `limbloss`, `disability`, `AskDocs`). Requests are spaced ~1.2s apart and sent
 with a descriptive `USER_AGENT`, which is what Reddit asks for on these
 endpoints. One private or banned subreddit is reported as a note; if *every*
-subreddit fails, the whole poll is marked as an error.
+subreddit fails, the whole poll is marked as an error, stating the shared
+cause once rather than repeating it per subreddit.
+
+**If every subreddit returns HTTP 403**, Reddit is refusing the public JSON
+endpoints for the host you are running on. It blocks these from datacenter IP
+ranges, Replit's included, and answers with an HTML block page rather than a
+JSON error. Two ways out:
+
+1. **Read through the OAuth API** (recommended, and what the endpoints are
+   for). Register an app at reddit.com/prefs/apps and set `REDDIT_CLIENT_ID`
+   and `REDDIT_CLIENT_SECRET`; the source then fetches an app-only token and
+   reads from `oauth.reddit.com`, which is not IP-blocked. An app with no
+   secret (the "installed app" type) works too, via the installed-client
+   grant. These are the same credentials used for posting, so setting them up
+   once covers both.
+2. **Run the dashboard from a home connection**, where the public endpoints
+   generally still answer.
+
+The `User-Agent` follows Reddit's documented
+`<platform>:<app id>:<version> (by /u/<username>)` form, taking the username
+from whichever Reddit account the dashboard knows about — the linked one, or
+the one declared by hand.
 
 ### X (Twitter) — `X_BEARER_TOKEN`
 
