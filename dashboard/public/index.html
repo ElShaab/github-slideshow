@@ -11,6 +11,7 @@
     />
   </head>
   <body>
+    <div class="topstack">
     <header class="topbar">
       <div class="brand">
         <h1>Amputee Research Dashboard</h1>
@@ -24,6 +25,23 @@
         <button class="tab" data-tab="sources">Sources</button>
       </nav>
     </header>
+
+    <div class="keyword-bar" id="keyword-bar">
+      <span class="keyword-bar-label">Tracking</span>
+      <div class="keyword-chips" id="keyword-bar-chips"></div>
+      <form class="keyword-bar-add" id="keyword-bar-form">
+        <input
+          id="keyword-bar-input"
+          type="text"
+          placeholder="Add a keyword"
+          autocomplete="off"
+          aria-label="Add a keyword"
+        />
+        <button type="submit" class="tiny">Add</button>
+        <button type="button" class="tiny ghost" id="keyword-bar-manage">Manage</button>
+      </form>
+    </div>
+    </div>
 
     <main>
       <!-- FEED -->

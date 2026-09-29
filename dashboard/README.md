@@ -51,7 +51,10 @@ survives restarts.
 ## How it fits together
 
 1. **Keywords** live in SQLite and are read fresh from the database at the
-   start of every poll — nothing is hardcoded. Each keyword applies to *all
+   start of every poll — nothing is hardcoded. The list sits in a bar across
+   the top of every tab: type to add one (applied to all sources), press the
+   × to stop tracking one, or click a term to filter the feed by it. The
+   **Keywords** tab is where scoping, notes and enable/disable live. Each keyword applies to *all
    sources* or to a specific subset (Reddit, X, YouTube, PubMed). Terms are
    trimmed, internal whitespace is collapsed, and duplicates are rejected
    case-insensitively.

@@ -229,6 +229,89 @@ async function refreshCounts() {
   }
 }
 
+/* ----------------------------------------------------- keyword bar (global) */
+
+/**
+ * The keyword list every poll job reads, kept in view on every tab so adding
+ * or dropping a term never means going hunting for it.
+ */
+async function loadKeywordBar() {
+  try {
+    const data = await api('/keywords');
+    state.keywords = data.keywords;
+    renderKeywordBar();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderKeywordBar() {
+  const box = $('#keyword-bar-chips');
+  box.innerHTML = '';
+
+  if (!state.keywords.length) {
+    box.append(
+      el('span', 'empty-note', 'No keywords yet — nothing will be captured until you add one.')
+    );
+    return;
+  }
+
+  for (const keyword of state.keywords) {
+    const chip = el('span', `keyword-chip${keyword.enabled ? '' : ' off'}`);
+
+    const term = el('button', 'term', keyword.term);
+    term.type = 'button';
+    term.title = keyword.enabled
+      ? `Show only ${keyword.term} in the feed${
+          keyword.scope === 'specific' ? ` · ${keyword.sources.join(', ')} only` : ''
+        }`
+      : `${keyword.term} is disabled — enable it in the Keywords tab`;
+    term.addEventListener('click', () => {
+      state.feed.keyword = keyword.term.toLowerCase();
+      state.feed.offset = 0;
+      $('#filter-keyword').value = keyword.term.toLowerCase();
+      showTab('feed');
+    });
+
+    const drop = el('button', 'drop', '×');
+    drop.type = 'button';
+    drop.title = `Stop tracking ${keyword.term}`;
+    drop.addEventListener('click', async () => {
+      if (!confirm(`Stop tracking "${keyword.term}"? Items already captured stay in the feed.`)) {
+        return;
+      }
+      try {
+        await api(`/keywords/${keyword.id}`, { method: 'DELETE' });
+        toast(`No longer tracking "${keyword.term}"`);
+        await loadKeywordBar();
+        if (state.tab === 'keywords') loadKeywords();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+
+    chip.append(term, drop);
+    box.append(chip);
+  }
+}
+
+async function addKeywordFromBar(event) {
+  event.preventDefault();
+  const input = $('#keyword-bar-input');
+  const term = input.value.trim();
+  if (!term) return;
+  try {
+    // New terms apply everywhere by default; the Keywords tab narrows them.
+    const created = await api('/keywords', { method: 'POST', body: { term, scope: 'all' } });
+    input.value = '';
+    toast(`Now tracking "${created.term}"`);
+    await loadKeywordBar();
+    if (state.tab === 'keywords') loadKeywords();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
 /* --------------------------------------------------------------- keywords */
 
 function keywordRow(keyword) {
@@ -285,6 +368,7 @@ async function loadKeywords() {
   try {
     const data = await api('/keywords');
     state.keywords = data.keywords;
+    renderKeywordBar();
     const list = $('#keyword-list');
     list.innerHTML = '';
     if (!data.keywords.length) {
@@ -370,6 +454,7 @@ async function submitKeyword(event) {
     }
     resetKeywordForm();
     loadKeywords();
+    loadKeywordBar();
   } catch (err) {
     $('#keyword-error').textContent = err.message;
   }
@@ -1756,6 +1841,9 @@ function init() {
     }
   });
 
+  $('#keyword-bar-form').addEventListener('submit', addKeywordFromBar);
+  $('#keyword-bar-manage').addEventListener('click', () => showTab('keywords'));
+
   $('#keyword-form').addEventListener('submit', submitKeyword);
   $('#keyword-cancel').addEventListener('click', resetKeywordForm);
   $$('input[name="scope"]').forEach((input) =>
@@ -1791,6 +1879,7 @@ function init() {
   });
 
   syncScopeVisibility();
+  loadKeywordBar();
   showTab('feed');
 
   // Keep the feed reasonably live without hammering the API.

@@ -45,10 +45,13 @@ h2 { font-size: 1rem; margin: 0 0 0.6rem; }
 h3 { font-size: 0.95rem; margin: 0 0 0.4rem; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
 
-.topbar {
+.topstack {
   position: sticky;
   top: 0;
   z-index: 5;
+}
+
+.topbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -75,6 +78,70 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 }
 .tab:hover { background: var(--surface-2); color: var(--text); }
 .tab.is-active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+.keyword-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 1.25rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.keyword-bar-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding-top: 0.28rem;
+  flex: none;
+}
+.keyword-chips {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  flex: 1 1 260px;
+  min-width: 0;
+  /* Enough room for a long list without pushing the feed off screen. */
+  max-height: 5.2rem;
+  overflow-y: auto;
+}
+.keyword-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  padding: 0 0.15rem 0 0.15rem;
+}
+.keyword-chip.off { background: var(--surface); color: var(--text-dim); border-color: var(--border); }
+.keyword-chip button {
+  font: inherit;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.12rem 0.4rem;
+  border-radius: 99px;
+}
+.keyword-chip .term:hover { text-decoration: underline; }
+.keyword-chip .drop { opacity: 0.6; font-size: 0.9rem; line-height: 1; padding: 0.12rem 0.35rem; }
+.keyword-chip .drop:hover { opacity: 1; color: var(--err); }
+.keyword-bar-add { display: flex; gap: 0.35rem; align-items: center; flex: none; }
+.keyword-bar-add input { min-width: 150px; font-size: 0.82rem; padding: 0.25rem 0.5rem; }
+.keyword-bar .empty-note { font-size: 0.8rem; color: var(--text-dim); padding-top: 0.28rem; }
+
+@media (max-width: 640px) {
+  /* On a phone a pinned header plus a wrapped keyword list would eat the
+     screen, so the stack scrolls away instead. */
+  .topstack { position: static; }
+  .keyword-bar { padding: 0.5rem 0.8rem; }
+  .keyword-bar-add input { min-width: 0; flex: 1; }
+  .keyword-bar-add { flex: 1 1 100%; }
+}
 
 main { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
 
