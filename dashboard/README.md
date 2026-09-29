@@ -229,7 +229,7 @@ APIs, and it is not always available — a new Reddit account with an unverified
 email cannot create one, for instance. **Add account by hand** on the same card
 records which account you post from without any OAuth:
 
-- The Workbench names it: "You post as u/AmputeeAssit to a post in r/amputee."
+- The Workbench names it: "You post as u/yourname to a post in r/amputee."
 - **Copy draft & open thread** copies the reply and opens the thread, so you
   paste and post it yourself.
 - **Mark as replied** records it against that account, optionally with a link

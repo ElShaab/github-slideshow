@@ -66,7 +66,7 @@ module.exports = {
   },
 
   /** Reddit fullnames are what the feed already stores: t3_ posts, t1_ comments. */
-  /** Accepts "AmputeeAssit", "u/AmputeeAssit" or a profile URL. */
+  /** Accepts "yourname", "u/yourname" or a profile URL. */
   normalizeHandle(raw) {
     const name = String(raw || '')
       .trim()

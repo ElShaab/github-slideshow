@@ -954,7 +954,7 @@ function connectionsCard(info) {
 
 async function setManualAccount(provider) {
   const examples = {
-    reddit: 'AmputeeAssit, u/AmputeeAssit or a profile link',
+    reddit: 'yourname, u/yourname or a profile link',
     x: 'drsmith, @drsmith or a profile link',
     youtube: '@YourChannel, a channel link, or the channel name',
   };
