@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GetFit — {{ page.title }}</title>
+    <meta name="description" content="{{ page.description }}" />
+    <style>
+      /* Matches the app's palette, so the page a reviewer opens from the
+         paywall does not look like it belongs to somebody else. */
+      :root {
+        --bg: #062a66;
+        --bg-deep: #041d49;
+        --card: rgba(255, 255, 255, 0.06);
+        --edge: rgba(216, 241, 255, 0.22);
+        --text: #eaf4ff;
+        --muted: rgba(234, 244, 255, 0.76);
+        --accent: #22e3f2;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 0 16px 96px;
+        background: linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+        background-attachment: fixed;
+        color: var(--text);
+        font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      main { max-width: 46rem; margin: 0 auto; }
+      header { padding: 56px 0 8px; }
+      header p { color: var(--muted); margin: 4px 0 0; }
+      h1 { font-size: 2rem; line-height: 1.2; margin: 0; letter-spacing: -0.01em; }
+      h2 {
+        font-size: 1.3rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--edge);
+      }
+      h3 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; color: var(--accent); }
+      a { color: var(--accent); }
+      hr { display: none; }
+      strong { color: #fff; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        display: block;
+        overflow-x: auto;
+      }
+      th, td {
+        border: 1px solid var(--edge);
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: var(--card); }
+      blockquote {
+        margin: 1.5rem 0;
+        padding: 0.75rem 1rem;
+        border-left: 3px solid var(--accent);
+        background: var(--card);
+        color: var(--muted);
+      }
+      code {
+        background: var(--card);
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      footer {
+        margin-top: 4rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--edge);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>GetFit</h1>
+        <p>{{ page.title }}</p>
+      </header>
+      {{ content }}
+      <footer>
+        <!-- Relative, because this is a project site served under
+             /github-slideshow/ — an absolute path would miss that prefix. -->
+        <a href="privacy.html">Privacy Policy</a> · <a href="support.html">Support</a>
+      </footer>
+    </main>
+  </body>
+</html>

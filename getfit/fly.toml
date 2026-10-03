@@ -1,0 +1,53 @@
+# GetFit API on Fly.io.
+#
+# Rename the app before the first deploy; `fly launch --no-deploy` will do it
+# for you and attach a Postgres cluster. Secrets are never stored here — set
+# them with `fly secrets set` (see RELEASE.md, "Deploy the API").
+#
+# There is no AI service to configure: body composition is computed in-process
+# from the user's tape measurements, so this machine is the whole analyser.
+
+app = "getfit-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  # A Fly Postgres cluster is reached over the private 6PN network, which is
+  # already encrypted, and presents a self-signed certificate that would fail
+  # verification. Set this to "true" and supply DATABASE_CA_CERT instead when
+  # the database is reached across the public internet.
+  DATABASE_SSL = "false"
+  STORAGE_DRIVER = "s3"
+  LOG_LEVEL = "info"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # Kept warm: a cold start in front of an App Store reviewer reads as a broken
+  # app, and the first request after a deploy also runs the migrations.
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+# Liveness only — the endpoint is unauthenticated and reports nothing about
+# configuration.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
