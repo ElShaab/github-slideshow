@@ -154,14 +154,21 @@ const feedbackProbe = await call('/rest/v1/feedback', {
 const feedbackMissing =
   feedbackProbe.status === 404 || feedbackProbe.body?.code === 'PGRST205';
 
-if (feedbackMissing) fail('the feedback table exists', 'run supabase/migrations/0002_feedback.sql');
-else pass('the feedback table exists');
-
 if (missing.length === 0) pass(`all ${TABLES.length} tables exist`);
 else fail(`all ${TABLES.length} tables exist`, `missing: ${missing.join(', ')} — run supabase/migrations/0001_user_data.sql`);
 
 if (readableByAnon.length === 0) pass('a signed-out caller can read nothing');
 else fail('a signed-out caller can read nothing', `readable without signing in: ${readableByAnon.join(', ')}`);
+
+if (feedbackMissing) {
+  fail(
+    'the feedback table exists',
+    'run supabase/migrations/0002_feedback.sql — or, if you already did, PostgREST is ' +
+      "still serving its old schema cache: run  notify pgrst, 'reload schema';",
+  );
+} else {
+  pass('the feedback table exists');
+}
 
 if (missing.length > 0) {
   console.log(`\n${failures} check(s) failed. Run the migration first.\n`);
