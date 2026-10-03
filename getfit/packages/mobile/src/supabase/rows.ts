@@ -50,6 +50,7 @@ import type {
 export interface ProfileRow {
   user_id: string;
   local_user_id: string | null;
+  display_name: string | null;
   age: number | null;
   sex: Sex | null;
   height_cm: number | null;
@@ -215,6 +216,7 @@ export function profileDocToRows(userId: string, doc: ProfileDocument): ProfileR
     profile: {
       user_id: userId,
       local_user_id: doc.userId,
+      display_name: doc.displayName ?? null,
       age: profile?.age ?? null,
       sex: profile?.sex ?? null,
       height_cm: profile?.heightCm ?? null,
@@ -289,6 +291,7 @@ export function rowsToProfileDoc(rows: ProfileRows): ProfileDocument {
   return {
     userId: localUserId,
     createdAt: row.profile_created_at ?? new Date(0).toISOString(),
+    displayName: row.display_name,
     profile,
     goals: rows.goals.map(
       (goal): UserGoal => ({

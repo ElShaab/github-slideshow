@@ -9,6 +9,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
+  greetingName,
+  displayNameError,
+  MAX_DISPLAY_NAME,
   ACCOUNT_REMINDER_HOURS,
   CODE_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -113,8 +116,17 @@ describe('moving through the steps', () => {
     assert.equal(verified.email, 'someone@example.com');
   });
 
-  test('setting the password finishes it', () => {
-    const done = nextStep({ step: 'password', email: 'a@b.com' }, { type: 'password-set' });
+  test('setting the password leads to the name, not the end', () => {
+    // The account is complete here — password set, data pushed. The name is
+    // asked for after precisely so that closing the app on it leaves a working
+    // account rather than a half-made one.
+    const named = nextStep({ step: 'password', email: 'a@b.com' }, { type: 'password-set' });
+    assert.equal(named.step, 'name');
+    assert.equal(named.email, 'a@b.com');
+  });
+
+  test('and the name finishes it', () => {
+    const done = nextStep({ step: 'name', email: 'a@b.com' }, { type: 'name-set' });
     assert.equal(done.step, 'done');
   });
 
@@ -228,5 +240,61 @@ describe('when to ask for an account', () => {
       shouldAskForAccount({ signedIn: false, passwordSet: false, deferredAt: hoursAgo(-50) }, NOW),
       true,
     );
+  });
+});
+
+describe('displayNameError', () => {
+  test('asks for something rather than accepting nothing', () => {
+    assert.equal(displayNameError(''), 'Tell us what to call you.');
+    assert.equal(displayNameError('   '), 'Tell us what to call you.');
+  });
+
+  test('accepts whatever somebody calls themselves', () => {
+    // No shape rules on purpose: a validator that knows better turns people
+    // away over an apostrophe or a script it did not expect.
+    for (const name of ["Mo", "O'Brien", 'Иван', '李雷', 'Anne-Marie', 'Dr. Smith']) {
+      assert.equal(displayNameError(name), null, name);
+    }
+  });
+
+  test('refuses what the column would refuse, and says by how much', () => {
+    assert.equal(displayNameError('x'.repeat(MAX_DISPLAY_NAME)), null);
+    assert.equal(
+      displayNameError('x'.repeat(MAX_DISPLAY_NAME + 4)),
+      'That is 4 characters too long.',
+    );
+  });
+});
+
+describe('greetingName', () => {
+  test('uses the first word, so the greeting stays a greeting', () => {
+    assert.equal(greetingName('Mohamed Hussein Mahmoud'), 'Mohamed');
+  });
+
+  test('keeps a single name whole', () => {
+    assert.equal(greetingName('Mo'), 'Mo');
+  });
+
+  test('is null when there is nothing to use', () => {
+    // Home falls back to a bare "Good morning" rather than "Good morning, ".
+    assert.equal(greetingName(null), null);
+    assert.equal(greetingName(undefined), null);
+    assert.equal(greetingName('   '), null);
+  });
+});
+
+describe('the step after the password', () => {
+  test('asks for a name', () => {
+    assert.equal(nextStep({ step: 'password', email: 'a@b.co' }, { type: 'password-set' }).step, 'name');
+  });
+
+  test('and finishes after it', () => {
+    assert.equal(nextStep({ step: 'name', email: 'a@b.co' }, { type: 'name-set' }).step, 'done');
+  });
+
+  test('but someone returning with a password already set is done', () => {
+    // The account is complete once the password is set. Resuming into the name
+    // step would trap anyone who chose to skip it.
+    assert.equal(resumeStep({ signedIn: true, passwordSet: true }), 'done');
   });
 });

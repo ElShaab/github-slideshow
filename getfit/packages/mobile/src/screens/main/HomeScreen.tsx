@@ -17,6 +17,7 @@ import {
   Text,
 } from '../../components';
 import { feedbackApi, homeApi } from '../../api/endpoints';
+import { greetingName } from '../../state/accountSetup';
 import { useAsync } from '../../state/useAsync';
 import { useTheme } from '../../theme';
 import { useUnits } from '../../state/UnitsProvider';
@@ -71,7 +72,8 @@ export function HomeScreen(): React.ReactElement {
   if (home.loading && !home.data) return <LoadingScreen message="Loading your dashboard…" />;
   if (!home.data) return <ErrorState message={home.error ?? undefined} onRetry={home.reload} />;
 
-  const { assessment, assessmentAvailability, today, profile, totals } = home.data;
+  const { assessment, assessmentAvailability, today, profile, totals, displayName } = home.data;
+  const name = greetingName(displayName);
 
   return (
     <Screen onRefresh={home.reload} refreshing={home.refreshing}>
@@ -81,7 +83,7 @@ export function HomeScreen(): React.ReactElement {
             GetFit
           </Text>
           <Text variant="title" accessibilityRole="header">
-            {greeting()}
+            {name ? `${greeting()}, ${name}` : greeting()}
           </Text>
         </View>
 
@@ -112,7 +114,17 @@ export function HomeScreen(): React.ReactElement {
       {assessment ? (
         <GlassCard padded={false} contentStyle={{ padding: spacing.lg }}>
           <View style={styles.bodyRow}>
-            <HologramViewer data={assessment.hologramData} size={190} rotate />
+            {/* volumetric={false} on purpose. A GL surface this small costs a
+                second render context for depth nobody can see at 120pt wide,
+                and it is the path that was drawing the figure outside its own
+                box. The flat renderer lofts from the same widths, so this is
+                the same body, drawn reliably. */}
+            <HologramViewer
+              data={assessment.hologramData}
+              size={240}
+              rotate
+              volumetric={false}
+            />
             <View style={[styles.bodyStats, { gap: spacing.sm }]}>
               <MetricCard label="Weight" value={formatMass(assessment.weightKg, units)} />
               <MetricCard label="Body fat" value={formatPercent(assessment.bodyFatPercent)} />

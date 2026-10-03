@@ -27,6 +27,12 @@ and **no select policy at all**, so the key shipped inside the app can add a
 row and can never read one back — not even the row it just wrote. Read feedback
 in **Table Editor → feedback**, newest first.
 
+Then run
+[`supabase/migrations/0003_display_name.sql`](supabase/migrations/0003_display_name.sql),
+which adds the one column behind the name the app asks for after the password.
+It is nullable and stays nullable: accounts made before it existed have no
+name, and somebody who skips the step still has a working app.
+
 Feedback from a signed-out device waits on the phone until there is an account
 behind it, so an empty table on day one means nobody has written yet, not that
 delivery is broken.

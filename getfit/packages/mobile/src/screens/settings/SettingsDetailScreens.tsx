@@ -34,6 +34,7 @@ import {
   Screen,
   SecondaryButton,
   Text,
+  TextField,
   WEIGHT_BOUNDS_KG,
   openExternal,
 } from '../../components';
@@ -42,6 +43,7 @@ import { legal } from '../../config/legal';
 import { createStoreProvider } from '../../state/billing';
 import { useStorePrices } from '../../state/useStorePrices';
 import { settingsApi, subscriptionApi } from '../../api/endpoints';
+import { MAX_DISPLAY_NAME } from '../../state/accountSetup';
 import { useAsync } from '../../state/useAsync';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
@@ -75,8 +77,15 @@ export function SettingsProfileScreen({
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [sex, setSex] = useState<'male' | 'female' | null>(null);
+  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The name is set during account setup, before onboarding builds a
+  // profile, so it loads on its own rather than with the fields below.
+  useEffect(() => {
+    if (settings.data) setName(settings.data.displayName ?? '');
+  }, [settings.data]);
 
   useEffect(() => {
     const profile = settings.data?.profile;
@@ -91,6 +100,7 @@ export function SettingsProfileScreen({
     setBusy(true);
     setError(null);
     try {
+      await settingsApi.setDisplayName(name);
       await settingsApi.updateProfile({
         age: Number.parseInt(age, 10),
         // Typed in the user's units; stored, as always, in metric.
@@ -103,7 +113,7 @@ export function SettingsProfileScreen({
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
       setBusy(false);
     }
-  }, [age, height, navigation, sex, units, weight]);
+  }, [age, height, name, navigation, sex, units, weight]);
 
   if (settings.loading && !settings.data) return <LoadingScreen />;
   if (!settings.data) return <ErrorState
@@ -130,6 +140,17 @@ export function SettingsProfileScreen({
       </Text>
 
       <View style={{ marginTop: spacing.xxl, gap: spacing.xl }}>
+        <TextField
+          label="Name"
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+          autoComplete="name"
+          textContentType="givenName"
+          placeholder="What should we call you?"
+          maxLength={MAX_DISPLAY_NAME}
+          hint="Shown on your home screen. Leave it blank for no name."
+        />
         <NumberField label="Age" value={age} onChange={setAge} unit="years" min={13} max={100} />
         <HeightField value={height} onChange={setHeight} units={units} />
         <NumberField

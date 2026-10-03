@@ -51,6 +51,16 @@ export interface ProfileDocument {
    * the app asks again later rather than blocking someone with no signal.
    */
   accountDeferredAt?: string;
+  /**
+   * What to call the user.
+   *
+   * On the document rather than inside `profile`, because it is asked for
+   * during account setup — straight after the password — and `profile` stays
+   * null until onboarding has produced every field the programme generator
+   * needs. Putting it there would mean collecting a name and immediately
+   * dropping it.
+   */
+  displayName?: string | null;
   settings: AppSettings;
 }
 
@@ -102,6 +112,7 @@ export const emptyProfile = (userId: string, now: string): ProfileDocument => ({
   equipment: [],
   preferences: [],
   preferencesChosen: false,
+  displayName: null,
   settings: { themeMode: 'dark', reducedMotion: false, units: 'metric' },
 });
 

@@ -135,6 +135,11 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
 
       <SettingsGroup title="Personal information">
         <SettingsRow
+          label="Name"
+          value={settings.data.displayName ?? 'Not set'}
+          onPress={() => navigation.navigate('SettingsProfile')}
+        />
+        <SettingsRow
           label="Age"
           value={profile ? `${profile.age}` : '—'}
           onPress={() => navigation.navigate('SettingsProfile')}

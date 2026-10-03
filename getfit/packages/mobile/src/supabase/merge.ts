@@ -101,8 +101,22 @@ export function mergeProfile(
   const localComplete = local.profile?.onboardingCompleted ?? false;
   const remoteComplete = remote.profile?.onboardingCompleted ?? false;
 
-  if (localComplete !== remoteComplete) return localComplete ? local : remote;
-  return winner === 'remote' ? remote : local;
+  const chosen =
+    localComplete !== remoteComplete
+      ? localComplete
+        ? local
+        : remote
+      : winner === 'remote'
+        ? remote
+        : local;
+
+  // The name is asked for during account setup, which can happen before
+  // onboarding finishes — so the side that wins on completeness may be the one
+  // that never saw it. Carried across rather than resolved, because a name is
+  // not in conflict with anything: one side has it and the other does not.
+  const other = chosen === local ? remote : local;
+  if (chosen.displayName || !other.displayName) return chosen;
+  return { ...chosen, displayName: other.displayName };
 }
 
 /**

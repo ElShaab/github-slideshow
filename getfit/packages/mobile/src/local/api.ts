@@ -323,6 +323,7 @@ export const localApi = {
 
     return {
       entitlement,
+      displayName: doc.displayName ?? null,
       totals: {
         workouts: workouts.completed.length,
         sets: workouts.completed.reduce((n, workout) => n + workout.totalSets, 0),
@@ -355,6 +356,7 @@ export const localApi = {
   async settings() {
     const doc = await repo.profileDoc();
     return {
+      displayName: doc.displayName ?? null,
       profile: doc.profile,
       goals: doc.goals,
       equipment: doc.equipment,
@@ -362,6 +364,23 @@ export const localApi = {
       appSettings: doc.settings,
       entitlement: await currentEntitlement(),
     };
+  },
+
+  /**
+   * Sets what to call the user.
+   *
+   * Separate from updateProfile because it is written during account setup,
+   * before onboarding has built a profile for updateProfile to patch. Blank
+   * clears it rather than storing an empty string, so Home can simply ask
+   * whether there is a name.
+   */
+  async setDisplayName(name: string) {
+    const trimmed = name.trim();
+    const doc = await repo.updateProfileDoc((current) => ({
+      ...current,
+      displayName: trimmed === '' ? null : trimmed,
+    }));
+    return { displayName: doc.displayName ?? null };
   },
 
   async updateProfile(patch: Record<string, unknown>) {

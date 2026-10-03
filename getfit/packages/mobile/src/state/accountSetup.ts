@@ -1,14 +1,21 @@
 /**
  * The rules behind creating an account after payment.
  *
- * Three steps: give an email, prove you own it with the code that arrives, then
- * choose a password. Each one is a separate screen, and this is the part that
+ * Four steps: give an email, prove you own it with the code that arrives,
+ * choose a password, then say what to call you. Each one is a separate screen,
+ * and this is the part that
  * decides which screen comes next and what counts as valid — kept out of the
  * component so it can be tested without a device, because the failure modes
  * here strand a customer who has already been charged.
  */
 
-export type AccountStep = 'email' | 'code' | 'password' | 'done';
+export type AccountStep = 'email' | 'code' | 'password' | 'name' | 'done';
+
+/**
+ * Long enough for a full name, short enough to sit beside "Good morning,".
+ * Matches the check constraint on profiles.display_name.
+ */
+export const MAX_DISPLAY_NAME = 60;
 
 /** The length Supabase's `{{ .Token }}` email code is generated at. */
 export const CODE_LENGTH = 6;
@@ -68,6 +75,7 @@ export type AccountSetupEvent =
   | { type: 'code-sent'; email: string }
   | { type: 'code-verified' }
   | { type: 'password-set' }
+  | { type: 'name-set' }
   | { type: 'change-email' };
 
 /**
@@ -86,7 +94,12 @@ export function nextStep(
       return { step: 'code', email: event.email.trim() };
     case 'code-verified':
       return { ...state, step: 'password' };
+    // The account is complete at this point — the password is set and the
+    // data is pushed. The name is asked for after, so abandoning the app on
+    // that screen leaves a working account rather than a half-made one.
     case 'password-set':
+      return { ...state, step: 'name' };
+    case 'name-set':
       return { ...state, step: 'done' };
     // Mistyped addresses are the common case, and the way back has to exist
     // or the only escape is deleting the app.
@@ -163,4 +176,30 @@ export function shouldAskForAccount(prompt: AccountPrompt, now = new Date()): bo
   if (elapsed < 0) return true;
 
   return elapsed >= ACCOUNT_REMINDER_HOURS * 3_600_000;
+}
+
+/**
+ * Why this name cannot be used, or null when it can.
+ *
+ * Nothing is rejected for shape. A name is whatever somebody says it is, and a
+ * validator that knows better is a validator that turns people away over an
+ * apostrophe or a script it was not expecting. Only length is checked, because
+ * only length is something the screen and the database actually disagree about.
+ */
+export function displayNameError(name: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return 'Tell us what to call you.';
+  if (trimmed.length > MAX_DISPLAY_NAME) {
+    return `That is ${trimmed.length - MAX_DISPLAY_NAME} characters too long.`;
+  }
+  return null;
+}
+
+/** What to greet somebody with, given what they told us. */
+export function greetingName(displayName: string | null | undefined): string | null {
+  const trimmed = (displayName ?? '').trim();
+  if (trimmed.length === 0) return null;
+  // Just the first word: "Good morning, Mohamed Hussein Mahmoud" reads like a
+  // summons. Falls back to the whole thing when there is no space to split on.
+  return trimmed.split(/\s+/)[0] ?? null;
 }

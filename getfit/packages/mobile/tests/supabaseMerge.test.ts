@@ -227,6 +227,25 @@ describe('merging the profile', () => {
     const empty = emptyProfile('user_new', '2026-06-01T00:00:00Z');
     assert.equal(mergeProfile(stored, empty, 'remote').profile?.weightKg, 85);
   });
+
+  test('the name survives a side that wins on being onboarded', () => {
+    // The name is given during account setup, before onboarding finishes, so
+    // the side holding it is exactly the side that loses the completeness
+    // test. Losing it there would mean typing a name and watching it vanish.
+    const named = { ...emptyProfile('user_new', '2026-06-01T00:00:00Z'), displayName: 'Mo' };
+    const onboarded = complete('user_1', 85);
+
+    assert.equal(mergeProfile(named, onboarded, 'local').displayName, 'Mo');
+    assert.equal(mergeProfile(onboarded, named, 'remote').displayName, 'Mo');
+  });
+
+  test('but a name already on the winning side is not replaced', () => {
+    const mine = { ...complete('user_1', 80), displayName: 'Mohamed' };
+    const theirs = { ...complete('user_1', 85), displayName: 'Old' };
+
+    assert.equal(mergeProfile(mine, theirs, 'local').displayName, 'Mohamed');
+    assert.equal(mergeProfile(mine, theirs, 'remote').displayName, 'Old');
+  });
 });
 
 describe('merging the programme', () => {

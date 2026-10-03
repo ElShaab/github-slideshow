@@ -4,10 +4,12 @@ import { useNavigation } from '@react-navigation/native';
 import { GlassButton, PrimaryButton, Screen, Text, TextField } from '../../components';
 import { ApiError } from '../../api/client';
 import { AuthError, currentAccount } from '../../supabase/auth';
-import { authApi } from '../../api/endpoints';
+import { authApi, settingsApi } from '../../api/endpoints';
 import {
   CODE_LENGTH,
+  MAX_DISPLAY_NAME,
   cleanCode,
+  displayNameError,
   isValidCode,
   isValidEmail,
   nextStep,
@@ -21,7 +23,9 @@ import { useTheme } from '../../theme';
 /**
  * Setting up the account, after payment.
  *
- * Three steps: the address, the code that proves it, then a password. It can be
+ * Four steps: the address, the code that proves it, a password, and what to
+ * call you. The account is complete after the password — the name comes last
+ * precisely so that abandoning it leaves a working account. It can be
  * postponed, and deliberately so: every step needs the network, and a customer
  * who has just paid and has no signal must not be held on a screen they cannot
  * complete. The membership does not depend on this — entitlement comes from the
@@ -55,6 +59,7 @@ export function CreateAccountScreen(): React.ReactElement {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -146,13 +151,37 @@ export function CreateAccountScreen(): React.ReactElement {
       // Sets the password, records that setup finished, and pushes everything
       // already on this phone up to the new account.
       await authApi.completeAccount(password);
+      // Not leave(): the account is made, and the last thing to ask is what to
+      // call them. Refresh anyway so the stage behind this screen has already
+      // moved on if they close the app here.
+      await refresh();
+      setState((current) => nextStep(current, { type: 'password-set' }));
+    } catch (caught) {
+      show(caught);
+    } finally {
+      setBusy(false);
+    }
+  }, [password, refresh, show]);
+
+  const chooseName = useCallback(async () => {
+    const problem = displayNameError(name);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setCause(null);
+    try {
+      await settingsApi.setDisplayName(name);
       await leave();
     } catch (caught) {
       show(caught);
     } finally {
       setBusy(false);
     }
-  }, [leave, password, show]);
+  }, [leave, name, show]);
 
   const { title, subtitle, body, action, canSubmit } = useMemo(() => {
     if (state.step === 'code') {
@@ -206,6 +235,31 @@ export function CreateAccountScreen(): React.ReactElement {
       };
     }
 
+    if (state.step === 'name') {
+      return {
+        title: 'What should we call you?',
+        subtitle: 'It goes on your home screen. Nothing else, and nobody else sees it.',
+        canSubmit: displayNameError(name) === null,
+        action: { label: 'Done', onPress: chooseName },
+        body: (
+          <TextField
+            label="Your name"
+            value={name}
+            onChangeText={(value) => {
+              setName(value);
+              if (error) setError(null);
+            }}
+            autoCapitalize="words"
+            autoComplete="name"
+            textContentType="givenName"
+            placeholder="Mo"
+            maxLength={MAX_DISPLAY_NAME}
+            hint="You can change this later in Settings."
+          />
+        ),
+      };
+    }
+
     return {
       title: 'Save your progress',
       subtitle:
@@ -226,7 +280,19 @@ export function CreateAccountScreen(): React.ReactElement {
         />
       ),
     };
-  }, [choosePassword, code, email, password, sendCode, state.email, state.step, verifyCode]);
+  }, [
+    choosePassword,
+    chooseName,
+    code,
+    email,
+    error,
+    name,
+    password,
+    sendCode,
+    state.email,
+    state.step,
+    verifyCode,
+  ]);
 
   return (
     <Screen

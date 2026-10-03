@@ -473,6 +473,8 @@ export const progressApi = {
 
 export interface HomeData {
   entitlement: Entitlement;
+  /** What to call the user, or null if they have not said. */
+  displayName: string | null;
   profile: UserProfile | null;
   assessment: BodyAssessment | null;
   assessmentAvailability: AssessmentAvailability;
@@ -504,6 +506,7 @@ export const homeApi = {
 /* ---------------------------- settings ---------------------------- */
 
 export interface SettingsData {
+  displayName: string | null;
   profile: UserProfile | null;
   goals: UserGoal[];
   equipment: EquipmentId[];
@@ -515,6 +518,11 @@ export interface SettingsData {
 export const settingsApi = {
   load(): Promise<SettingsData> {
     return localApi.settings();
+  },
+
+  /** Works before onboarding has built a profile, unlike updateProfile. */
+  setDisplayName(name: string): Promise<{ displayName: string | null }> {
+    return localApi.setDisplayName(name);
   },
 
   updateProfile(

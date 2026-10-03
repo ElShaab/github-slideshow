@@ -7,7 +7,7 @@ permalink: /privacy
 
 <!-- Generated from the markdown in getfit/ by `npm run legal`. Do not edit. -->
 
-**Last updated: 29 September 2026**
+**Last updated: 3 October 2026**
 
 GetFit is operated by **Mohamed Hussein** ("we", "us"), who can be reached at
 **getfit.app.support@gmail.com** about anything in this policy. It
@@ -83,6 +83,14 @@ cannot reach is an account you could be locked out of.
 
 Before you subscribe, no account exists and nothing is transmitted.
 
+### Your name
+
+What you type when the app asks what to call you, straight after you set your
+password. It is shown on your home screen and nowhere else, it is never used to
+identify or match you, and you can change or clear it at any time in
+**Settings → Personal information → Name**. Leaving it blank is fine; the app
+simply greets you without one.
+
 ### Subscription data
 
 Which plan you bought and when the period ends, read from the App Store or Play
@@ -125,6 +133,7 @@ requests were made — as part of running the database.
 | Program and training history | On your phone | On your phone **and** in your account |
 | Progress photos | On your phone | On your phone **only** — never uploaded |
 | Email address | Not collected | In your account |
+| Your name | Not collected | In your account, if you give one |
 | Password | Not collected | Hashed by Supabase; never seen by us |
 | Feedback you send | Waits on your phone | Sent to us, and kept until you delete your account |
 | Payment details | Never collected | Never collected |
