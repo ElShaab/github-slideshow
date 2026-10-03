@@ -225,6 +225,23 @@ const wrote = await call('/rest/v1/profiles', {
 if (wrote.ok) pass('a signed-in user can store their profile');
 else fail('a signed-in user can store their profile', `HTTP ${wrote.status} ${JSON.stringify(wrote.body)}`);
 
+// 0003, checked on its own rather than folded into the write above: a missing
+// column would otherwise fail the whole profile insert and report it as
+// something else entirely. PGRST204 is "no such column in the schema cache".
+const named = await call(`/rest/v1/profiles?user_id=eq.${alice.id}`, {
+  token: alice.token,
+  method: 'PATCH',
+  prefer: 'return=representation',
+  body: { display_name: 'Check Script' },
+});
+if (named.ok && Array.isArray(named.body) && named.body[0]?.display_name === 'Check Script') {
+  pass('and the name they asked to be called');
+} else if (named.body?.code === 'PGRST204' || named.status === 404) {
+  fail('and the name they asked to be called', 'run supabase/migrations/0003_display_name.sql');
+} else {
+  fail('and the name they asked to be called', `HTTP ${named.status} ${JSON.stringify(named.body)}`);
+}
+
 const assessment = await call('/rest/v1/assessments', {
   token: alice.token,
   method: 'POST',
