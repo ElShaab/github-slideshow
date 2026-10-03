@@ -31,6 +31,25 @@ Feedback from a signed-out device waits on the phone until there is an account
 behind it, so an empty table on day one means nobody has written yet, not that
 delivery is broken.
 
+**If you are writing a migration of your own, revoke before you grant.** A
+Supabase project ships with
+
+```sql
+alter default privileges in schema public grant all on tables to anon, authenticated;
+```
+
+so a table arrives with select, insert, update and delete already granted to
+both roles. Granting the one privilege you want adds nothing and removes
+nothing. `0002` revokes from both roles first, and `npm run supabase:check`
+catches the mistake if it creeps back: a read that returns an empty array
+instead of being refused means the privilege is still there and only row level
+security is filtering — which looks identical to a locked-down table right up
+until somebody adds a select policy.
+
+A local Postgres will not reproduce this unless you set that default-privileges
+line yourself first. It is the difference between a migration that passes
+locally and one that is wrong in production.
+
 To check both took, run this afterwards — every row must say `true`:
 
 ```sql

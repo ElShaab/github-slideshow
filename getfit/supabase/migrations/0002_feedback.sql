@@ -53,8 +53,20 @@ create policy "insert own feedback" on public.feedback
   for insert to authenticated
   with check (user_id = (select auth.uid()));
 
+-- Revoked from BOTH roles before anything is granted back, and the order is
+-- the whole point. A Supabase project ships with
+--
+--   alter default privileges in schema public grant all on tables to anon, authenticated;
+--
+-- so this table arrives with select, insert, update and delete already granted
+-- to both. `grant insert` on top of that adds nothing and takes nothing away:
+-- authenticated keeps select, and a read then returns an empty array — row
+-- level security filtering rather than the privilege system refusing — which
+-- looks identical to "it is locked down" until somebody adds a select policy
+-- and discovers it was never the privilege that was stopping them.
+--
 -- Same stance as every table in 0001: the publishable key identifies the
 -- project and is not a credential. Feedback from a signed-out device waits on
 -- the device until there is an account behind it.
-revoke all on public.feedback from anon;
+revoke all on public.feedback from anon, authenticated;
 grant insert on public.feedback to authenticated;

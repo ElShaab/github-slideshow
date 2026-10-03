@@ -330,8 +330,20 @@ if (!feedbackMissing) {
   // The point of the table's shape: insert and nothing else. A client that
   // could read this back could read everyone's.
   const readsItBack = await call('/rest/v1/feedback?select=*', { token: alice.token });
-  if (!readsItBack.ok) pass('and cannot read any of it back, not even their own');
-  else fail('and cannot read any of it back, not even their own', JSON.stringify(readsItBack.body));
+  if (!readsItBack.ok) {
+    pass('and cannot read any of it back, not even their own');
+  } else {
+    // An empty array means the select privilege is still there and only row
+    // level security is filtering. Supabase grants it by default on every new
+    // table in public, so 0002 revokes it; an older copy of 0002 did not.
+    fail(
+      'and cannot read any of it back, not even their own',
+      Array.isArray(readsItBack.body) && readsItBack.body.length === 0
+        ? 'the read was allowed and returned nothing, rather than refused — re-run ' +
+          'supabase/migrations/0002_feedback.sql, which revokes select from authenticated'
+        : JSON.stringify(readsItBack.body),
+    );
+  }
 
   const forgedFeedback = await call('/rest/v1/feedback', {
     token: bob.token,
@@ -346,12 +358,14 @@ if (!feedbackMissing) {
   if (!forgedFeedback.ok) pass('and cannot file it under another account');
   else fail('and cannot file it under another account', 'the forged row was accepted');
 
-  // The device keeps a message until it is sure it landed, so this is the
-  // normal path after a dropped response, not an edge case.
+  // The device keeps a message until it is sure it landed, so redelivery is
+  // the normal path after a dropped response, not an edge case. A plain
+  // insert, exactly as the app sends it: the duplicate key IS the success
+  // signal, and the app reads 23505 as "already delivered". An upsert would
+  // need a way to update the conflicting row, which this table does not grant.
   const redelivered = await call('/rest/v1/feedback', {
     token: alice.token,
     method: 'POST',
-    prefer: 'resolution=ignore-duplicates',
     body: {
       user_id: alice.id,
       id: feedbackId,
@@ -359,8 +373,16 @@ if (!feedbackMissing) {
       written_at: new Date().toISOString(),
     },
   });
-  if (redelivered.ok) pass('and redelivering the same message is accepted, not duplicated');
-  else fail('and redelivering the same message is accepted, not duplicated', `HTTP ${redelivered.status} ${JSON.stringify(redelivered.body)}`);
+  if (redelivered.body?.code === '23505') {
+    pass('and redelivering it is refused as a duplicate, which the app reads as delivered');
+  } else if (redelivered.ok) {
+    fail('and redelivering it is refused as a duplicate', 'it was stored a second time');
+  } else {
+    fail(
+      'and redelivering it is refused as a duplicate',
+      `HTTP ${redelivered.status} ${JSON.stringify(redelivered.body)}`,
+    );
+  }
 }
 
 /* -------------------------------- cleanup ------------------------------- */
