@@ -144,6 +144,19 @@ for (const table of TABLES) {
   else if (result.ok) readableByAnon.push(table);
 }
 
+// public.feedback (0002) is probed separately because it is shaped differently:
+// nobody has select on it, so a denied read cannot tell "no such table" from
+// "no permission". An insert can — PGRST205 only comes back when it is absent.
+const feedbackProbe = await call('/rest/v1/feedback', {
+  method: 'POST',
+  body: { user_id: '00000000-0000-0000-0000-000000000000', id: 'probe', message: 'probe', written_at: new Date().toISOString() },
+});
+const feedbackMissing =
+  feedbackProbe.status === 404 || feedbackProbe.body?.code === 'PGRST205';
+
+if (feedbackMissing) fail('the feedback table exists', 'run supabase/migrations/0002_feedback.sql');
+else pass('the feedback table exists');
+
 if (missing.length === 0) pass(`all ${TABLES.length} tables exist`);
 else fail(`all ${TABLES.length} tables exist`, `missing: ${missing.join(', ')} — run supabase/migrations/0001_user_data.sql`);
 
@@ -273,6 +286,76 @@ const forged = await call('/rest/v1/assessments', {
 if (!forged.ok) pass('and cannot write into it either');
 else fail('and cannot write into it either', 'the forged row was accepted');
 
+/* -------------------------------- feedback ------------------------------ */
+
+if (!feedbackMissing) {
+  const feedbackId = `check_${rand()}`;
+  const filed = await call('/rest/v1/feedback', {
+    token: alice.token,
+    method: 'POST',
+    body: {
+      user_id: alice.id,
+      id: feedbackId,
+      message: 'Written by npm run supabase:check — safe to delete.',
+      app_version: 'check-script',
+      platform: 'ios',
+      written_at: new Date().toISOString(),
+    },
+  });
+  if (filed.ok) pass('a signed-in user can file feedback');
+  else fail('a signed-in user can file feedback', `HTTP ${filed.status} ${JSON.stringify(filed.body)}`);
+
+  // Aimed at a real account, so that a refusal is the policy refusing and not
+  // the foreign key rejecting an id that was never going to exist. The earlier
+  // probe only had to tell "no such table" from "no permission".
+  const anonFiles = await call('/rest/v1/feedback', {
+    method: 'POST',
+    body: {
+      user_id: alice.id,
+      id: `anon_${rand()}`,
+      message: 'Filed by nobody',
+      written_at: new Date().toISOString(),
+    },
+  });
+  if (!anonFiles.ok) pass('a signed-out caller cannot file feedback at all');
+  else fail('a signed-out caller cannot file feedback at all', 'the anonymous insert was accepted');
+
+  // The point of the table's shape: insert and nothing else. A client that
+  // could read this back could read everyone's.
+  const readsItBack = await call('/rest/v1/feedback?select=*', { token: alice.token });
+  if (!readsItBack.ok) pass('and cannot read any of it back, not even their own');
+  else fail('and cannot read any of it back, not even their own', JSON.stringify(readsItBack.body));
+
+  const forgedFeedback = await call('/rest/v1/feedback', {
+    token: bob.token,
+    method: 'POST',
+    body: {
+      user_id: alice.id,
+      id: `forged_${rand()}`,
+      message: 'Filed under somebody else',
+      written_at: new Date().toISOString(),
+    },
+  });
+  if (!forgedFeedback.ok) pass('and cannot file it under another account');
+  else fail('and cannot file it under another account', 'the forged row was accepted');
+
+  // The device keeps a message until it is sure it landed, so this is the
+  // normal path after a dropped response, not an edge case.
+  const redelivered = await call('/rest/v1/feedback', {
+    token: alice.token,
+    method: 'POST',
+    prefer: 'resolution=ignore-duplicates',
+    body: {
+      user_id: alice.id,
+      id: feedbackId,
+      message: 'Written by npm run supabase:check — safe to delete.',
+      written_at: new Date().toISOString(),
+    },
+  });
+  if (redelivered.ok) pass('and redelivering the same message is accepted, not duplicated');
+  else fail('and redelivering the same message is accepted, not duplicated', `HTTP ${redelivered.status} ${JSON.stringify(redelivered.body)}`);
+}
+
 /* -------------------------------- cleanup ------------------------------- */
 
 const deleted = await call('/rest/v1/rpc/delete_own_account', { token: alice.token, method: 'POST', body: {} });
@@ -290,7 +373,7 @@ await call('/rest/v1/rpc/delete_own_account', { token: bob.token, method: 'POST'
 
 console.log(
   failures === 0
-    ? '\nAll checks passed. Supabase is connected, storing data, and private per account.\n'
+    ? '\nAll checks passed. Supabase is connected, storing data, and private per account.\n  Feedback filed by this script is removed with its test account.\n'
     : `\n${failures} check(s) failed.\n`,
 );
 process.exit(failures === 0 ? 0 : 1);
