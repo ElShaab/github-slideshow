@@ -51,7 +51,7 @@ async function verifyPlay(purchase: Record<string, unknown>) {
   return new GoogleBillingProvider().verify({
     platform: 'google',
     receipt: 'purchase-token',
-    productId: 'getfit_monthly_members',
+    productId: 'getfit_monthly_membership',
     packageName: 'com.getfit.app',
   });
 }

@@ -417,7 +417,7 @@ production build; see RELEASE.md.
 
 1. In **App Store Connect → Your App → Subscriptions**, create one subscription
    group containing both auto-renewable subscriptions:
-   - `getfit_monthly_members` at **$4.99/month**
+   - `getfit_monthly_membership` at **$4.99/month**
    - `getfit_membership_yearly` at **$19.99/year**
 
    These are the prices the app shows (`SUBSCRIPTION_PRICE_USD` and the yearly
@@ -429,8 +429,16 @@ production build; see RELEASE.md.
    for character, and Apple does not allow a product id to be changed after it
    is created. Build 9 was rejected because the app asked for
    `getfit_membership_monthly` while App Store Connect held
-   `getfit_monthly_members`: `getSubscriptions` returned nothing, and the
+   `getfit_monthly_membership`: `getSubscriptions` returned nothing, and the
    monthly plan could not be bought at all.
+
+   **Read the identifier off the subscription's own page, never off the
+   Subscriptions list.** The list truncates, and it truncates without an
+   ellipsis wide enough to notice: `getfit_monthly_membership` appears there as
+   `getfit_monthly_members`, which is itself a plausible identifier. Build 10
+   was fixed to that truncation and failed the same way for the same reason.
+   The paywall now prints what it asked for and what the store offered
+   underneath the error, so this costs one screenshot instead of one build.
 
    Put them in the same group so members can move between them, and give the
    **yearly** plan the *lower* subscription level. Level 1 is the top of a
@@ -465,7 +473,7 @@ response. The client's claim about its own subscription is never trusted.
 
 1. In the **Google Play Console → Monetise → Subscriptions**, create two
    subscriptions:
-   - `getfit_monthly_members` with a monthly base plan at the $5 price point
+   - `getfit_monthly_membership` with a monthly base plan at the $5 price point
    - `getfit_membership_yearly` with a yearly base plan at the $20 price point
 2. Do **not** add a free trial offer.
 3. In Google Cloud, enable the **Google Play Android Developer API** and create

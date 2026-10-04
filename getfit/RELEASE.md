@@ -75,7 +75,7 @@ Product IDs must match `SUBSCRIPTION_PLANS` in
 
 | Product ID | US price | Duration |
 | --- | --- | --- |
-| `getfit_monthly_members` | **$4.99** | 1 month |
+| `getfit_monthly_membership` | **$4.99** | 1 month |
 | `getfit_membership_yearly` | **$19.99** | 1 year |
 
 **Whatever price point you pick, `priceUsd` in `SUBSCRIPTION_PLANS` has to

@@ -101,8 +101,8 @@ describe('what the screen does with it', () => {
 describe('saying which identifiers were involved', () => {
   test('names the one asked for and the ones the store answered with', () => {
     assert.equal(
-      requestedVersusOffered('getfit_monthly_members', ['getfit_membership_yearly']),
-      'Asked for getfit_monthly_members \u00b7 the store offered getfit_membership_yearly',
+      requestedVersusOffered('getfit_monthly_membership', ['getfit_membership_yearly']),
+      'Asked for getfit_monthly_membership \u00b7 the store offered getfit_membership_yearly',
     );
   });
 
@@ -110,13 +110,13 @@ describe('saying which identifiers were involved', () => {
     // Nothing offered means the whole catalogue is missing — a different
     // problem from one product being misnamed, and worth telling apart.
     assert.equal(
-      requestedVersusOffered('getfit_monthly_members', []),
-      'Asked for getfit_monthly_members \u00b7 the store offered nothing',
+      requestedVersusOffered('getfit_monthly_membership', []),
+      'Asked for getfit_monthly_membership \u00b7 the store offered nothing',
     );
   });
 
   test('lists several in a stable order, so two screenshots can be compared', () => {
-    const line = requestedVersusOffered('getfit_monthly_members', [
+    const line = requestedVersusOffered('getfit_monthly_membership', [
       'getfit_membership_yearly',
       'getfit_extra',
     ]);
@@ -133,7 +133,7 @@ describe('saying which identifiers were involved', () => {
   test('carries no price, account or receipt — only identifiers', () => {
     // It is shown on a customer's screen. Product ids are already public in
     // the App Store listing; nothing else here may be.
-    const line = requestedVersusOffered('getfit_monthly_members', ['getfit_membership_yearly']);
+    const line = requestedVersusOffered('getfit_monthly_membership', ['getfit_membership_yearly']);
     assert.ok(!/\d+\.\d\d/.test(line), 'a price leaked into the diagnostic');
     assert.ok(!/@/.test(line), 'an address leaked into the diagnostic');
   });

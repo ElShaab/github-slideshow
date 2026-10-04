@@ -32,7 +32,7 @@
               "locale": "en_US"
             }
           ],
-          "productID": "getfit_monthly_members",
+          "productID": "getfit_monthly_membership",
           "recurringSubscriptionPeriod": "P1M",
           "referenceName": "GetFit Membership Monthly",
           "subscriptionGroupID": "21437654",

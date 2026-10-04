@@ -84,7 +84,7 @@ describe('the group is configured the way App Store Connect is', () => {
     // in build 9 and 10 — somebody on the monthly plan who chose yearly got no
     // transaction at all until their month ran out, and the app waited two
     // minutes for one before giving up with GF-12.
-    const monthly = byId.get('getfit_monthly_members');
+    const monthly = byId.get('getfit_monthly_membership');
     const yearly = byId.get('getfit_membership_yearly');
     assert.ok(monthly && yearly);
     assert.ok(

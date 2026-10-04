@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { NativeStoreProvider, type IapModule } from '../src/state/storeAdapter';
 
-const MONTHLY = 'getfit_monthly_members';
+const MONTHLY = 'getfit_monthly_membership';
 
 /** Exactly what transactionSk2ToPurchaseMap produces: no receipt, real id. */
 const sk2Transaction = (id = 'tx-2000000123') => ({

@@ -19,7 +19,7 @@ import {
   type IapModule,
 } from '../src/state/storeAdapter';
 
-const MONTHLY = 'getfit_monthly_members';
+const MONTHLY = 'getfit_monthly_membership';
 
 type Listener = (value: never) => void;
 

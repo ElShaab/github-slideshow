@@ -21,7 +21,7 @@ export const MAX_WARMUP_SETS = 2;
  * number shown has to be the number charged, or Guideline 3.1.2 applies.
  */
 export const SUBSCRIPTION_PRICE_USD = 4.99;
-export const SUBSCRIPTION_PRODUCT_ID = 'getfit_monthly_members';
+export const SUBSCRIPTION_PRODUCT_ID = 'getfit_monthly_membership';
 export const YEARLY_PRODUCT_ID = 'getfit_membership_yearly';
 
 /**
