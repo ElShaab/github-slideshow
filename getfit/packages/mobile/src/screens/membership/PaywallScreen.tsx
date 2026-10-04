@@ -178,7 +178,23 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
       await refresh();
     } catch (caught) {
       if (caught instanceof StorePurchaseCancelled) {
-        setError('Purchase cancelled.');
+        // StoreKit reports "cancelled" both when somebody taps Cancel and when
+        // the sheet never really opened because the product is not purchasable
+        // on this device — wrong storefront, an agreement not in effect, a
+        // product still missing its metadata. Telling the second group their
+        // purchase was cancelled blames them for a configuration they cannot
+        // see, and tells a reviewer nothing at all.
+        //
+        // The prices are the tell. The paywall falls back to the bundled
+        // figures when the store answers with nothing, so a plan showing a
+        // price is not evidence the store offered it — but a plan the store
+        // DID price is evidence it exists and can be bought.
+        const offered = Boolean(prices[selected?.productId ?? SUBSCRIPTION_PRODUCT_ID]);
+        setError(
+          offered
+            ? 'Purchase cancelled.'
+            : 'Nothing was charged. The App Store did not offer this membership on this device — check your connection and try again.',
+        );
       } else if (caught instanceof StorePurchaseDeferred) {
         // The customer has done everything asked of them; someone else has to
         // approve it. Telling them the purchase failed would be wrong.
@@ -193,7 +209,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     } finally {
       setBusy(false);
     }
-  }, [logPurchase, refresh, selected?.productId, store]);
+  }, [logPurchase, prices, refresh, selected?.productId, store]);
 
   const restore = useCallback(async () => {
     setBusy(true);
