@@ -29,6 +29,11 @@ import {
 import { recordDevGrant, recordPurchase } from '../../state/localEntitlement';
 import { useAsync } from '../../state/useAsync';
 import { useStorePrices } from '../../state/useStorePrices';
+import {
+  STORE_FAILURE,
+  failureCodeOf,
+  withFailureCode,
+} from '../../state/storeFailures';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 
@@ -192,19 +197,25 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         const offered = Boolean(prices[selected?.productId ?? SUBSCRIPTION_PRODUCT_ID]);
         setError(
           offered
-            ? 'Purchase cancelled.'
-            : 'Nothing was charged. The App Store did not offer this membership on this device — check your connection and try again.',
+            ? withFailureCode('Purchase cancelled.', STORE_FAILURE.cancelled)
+            : withFailureCode(
+                'Nothing was charged. The App Store did not offer this membership on this device — check your connection and try again.',
+                STORE_FAILURE.cancelledUnavailable,
+              ),
         );
       } else if (caught instanceof StorePurchaseDeferred) {
         // The customer has done everything asked of them; someone else has to
-        // approve it. Telling them the purchase failed would be wrong.
+        // approve it. Telling them the purchase failed would be wrong — and a
+        // code on a message that is not a failure would read as one, so this is
+        // the one branch that carries none.
         setNotice(caught.message);
       } else if (caught instanceof StoreUnavailable) {
-        setError(caught.message);
+        setError(withFailureCode(caught.message, caught.failureCode));
       } else if (caught instanceof ApiError) {
-        setError(caught.message);
+        // The store took the money; writing the purchase down here did not.
+        setError(withFailureCode(caught.message, STORE_FAILURE.notRecorded));
       } else {
-        setError('Something went wrong.');
+        setError(withFailureCode('Something went wrong.', failureCodeOf(caught)));
       }
     } finally {
       setBusy(false);
@@ -218,14 +229,25 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     try {
       const purchase = await store.restore();
       if (!purchase) {
-        setError('We could not find a previous purchase on this account.');
+        setError(
+          withFailureCode(
+            'We could not find a previous purchase on this account.',
+            STORE_FAILURE.nothingToRestore,
+          ),
+        );
         return;
       }
       await logPurchase(purchase, 'restore');
       await finishQuietly(store, purchase);
       await refresh();
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      if (caught instanceof StoreUnavailable) {
+        setError(withFailureCode(caught.message, caught.failureCode));
+      } else if (caught instanceof ApiError) {
+        setError(withFailureCode(caught.message, STORE_FAILURE.notRecorded));
+      } else {
+        setError(withFailureCode('Something went wrong.', failureCodeOf(caught)));
+      }
     } finally {
       setBusy(false);
     }

@@ -14,6 +14,11 @@ import {
   type ActivePurchase,
   type StorePrice,
 } from '@getfit/shared';
+import {
+  STORE_FAILURE,
+  type CodedFailure,
+  type StoreFailureCode,
+} from './storeFailures';
 
 export type BillingPlatform = 'apple' | 'google' | 'mock';
 
@@ -62,10 +67,13 @@ export interface StoreProvider {
   finishPurchase(purchase: StorePurchase): Promise<void>;
 }
 
-export class StorePurchaseCancelled extends Error {
-  constructor() {
+export class StorePurchaseCancelled extends Error implements CodedFailure {
+  readonly failureCode: StoreFailureCode;
+
+  constructor(failureCode: StoreFailureCode = STORE_FAILURE.cancelled) {
     super('Purchase cancelled');
     this.name = 'StorePurchaseCancelled';
+    this.failureCode = failureCode;
   }
 }
 
@@ -74,19 +82,29 @@ export class StorePurchaseCancelled extends Error {
  * a Play payment method that settles later. Never an error to the customer —
  * they have done their part.
  */
-export class StorePurchaseDeferred extends Error {
+export class StorePurchaseDeferred extends Error implements CodedFailure {
+  readonly failureCode: StoreFailureCode;
+
   constructor(
     message = 'Your purchase is waiting to be approved. It will unlock as soon as it clears.',
+    failureCode: StoreFailureCode = STORE_FAILURE.deferred,
   ) {
     super(message);
     this.name = 'StorePurchaseDeferred';
+    this.failureCode = failureCode;
   }
 }
 
-export class StoreUnavailable extends Error {
-  constructor(message = 'In-app purchases are not available on this device.') {
+export class StoreUnavailable extends Error implements CodedFailure {
+  readonly failureCode: StoreFailureCode;
+
+  constructor(
+    message = 'In-app purchases are not available on this device.',
+    failureCode: StoreFailureCode = STORE_FAILURE.unknown,
+  ) {
     super(message);
     this.name = 'StoreUnavailable';
+    this.failureCode = failureCode;
   }
 }
 
@@ -163,7 +181,7 @@ export class NativeStoreProvider implements StoreProvider {
     if (this.connection) return this.connection;
 
     const iap = this.loadModule();
-    if (!iap) throw new StoreUnavailable();
+    if (!iap) throw new StoreUnavailable(undefined, STORE_FAILURE.moduleMissing);
 
     this.connection = (async () => {
       this.storeKit2 = this.enableStoreKit2(iap);
@@ -182,7 +200,13 @@ export class NativeStoreProvider implements StoreProvider {
       return await this.connection;
     } catch (error) {
       this.connection = null;
-      throw error;
+      // Reaching the store at all failed. Raw, this arrives at the paywall as
+      // "Something went wrong", which is the least useful thing it could say.
+      if (error instanceof StoreUnavailable) throw error;
+      throw new StoreUnavailable(
+        'The App Store could not be reached. Please try again.',
+        STORE_FAILURE.connectFailed,
+      );
     }
   }
 
@@ -300,7 +324,7 @@ export class NativeStoreProvider implements StoreProvider {
     for (const waiter of this.waiters.values()) {
       if (isCancellation(error)) waiter.reject(new StorePurchaseCancelled());
       else if (deferred) waiter.reject(new StorePurchaseDeferred());
-      else waiter.reject(new StoreUnavailable(storeMessage(error)));
+      else waiter.reject(new StoreUnavailable(storeMessage(error), storeFailureFor(error)));
     }
   }
 
@@ -339,6 +363,7 @@ export class NativeStoreProvider implements StoreProvider {
         this.waiters.get(productId)?.reject(
           new StoreUnavailable(
             'The store did not confirm that purchase. If you were charged, use Restore purchase.',
+            STORE_FAILURE.timedOut,
           ),
         );
       }, PURCHASE_TIMEOUT_MS);
@@ -381,7 +406,10 @@ export class NativeStoreProvider implements StoreProvider {
     const subscriptions = await iap.getSubscriptions({ skus: [productId] });
     const subscription = subscriptions.find((item) => item.productId === productId);
     if (!subscription) {
-      throw new StoreUnavailable('That membership is not available on this device.');
+      throw new StoreUnavailable(
+        'That membership is not available on this device.',
+        STORE_FAILURE.productMissing,
+      );
     }
 
     const delivered = this.awaitPurchase(productId);
@@ -394,7 +422,10 @@ export class NativeStoreProvider implements StoreProvider {
       if (this.os === 'android') {
         const offerToken = subscription.subscriptionOfferDetails?.[0]?.offerToken;
         if (!offerToken) {
-          throw new StoreUnavailable('That membership has no active offer on Google Play.');
+          throw new StoreUnavailable(
+            'That membership has no active offer on Google Play.',
+            STORE_FAILURE.noOffer,
+          );
         }
         result = await iap.requestSubscription({
           subscriptionOffers: [{ sku: productId, offerToken }],
@@ -428,7 +459,7 @@ export class NativeStoreProvider implements StoreProvider {
       }
 
       if (error instanceof StoreUnavailable) throw error;
-      throw new StoreUnavailable(storeMessage(error));
+      throw new StoreUnavailable(storeMessage(error), storeFailureFor(error));
     }
 
     return delivered.promise;
@@ -486,7 +517,10 @@ export class NativeStoreProvider implements StoreProvider {
 
   private toStorePurchase(purchase: IapPurchase, fallbackProductId: string): StorePurchase {
     if (!identifies(purchase, this.os)) {
-      throw new StoreUnavailable('That purchase could not be verified.');
+      throw new StoreUnavailable(
+        'That purchase could not be verified.',
+        STORE_FAILURE.unverifiable,
+      );
     }
     return {
       platform: this.platform,
@@ -568,6 +602,15 @@ function isDeferred(error: unknown): boolean {
 /** Stable identity for a transaction across the two stores' shapes. */
 function transactionIdOf(purchase: IapPurchase): string {
   return purchase.transactionId ?? purchase.purchaseToken ?? `${purchase.productId}-${purchase.transactionDate ?? 0}`;
+}
+
+/** Our code for a failure the store reported with one of its own. */
+function storeFailureFor(error: unknown): StoreFailureCode {
+  const code = codeOf(error);
+  if (code === 'E_ALREADY_OWNED') return STORE_FAILURE.alreadyOwned;
+  if (code === 'E_NETWORK_ERROR' || code === 'E_SERVICE_ERROR') return STORE_FAILURE.network;
+  if (code === 'E_DEFERRED_PAYMENT') return STORE_FAILURE.deferred;
+  return STORE_FAILURE.storeError;
 }
 
 function storeMessage(error: unknown): string {

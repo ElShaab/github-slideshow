@@ -204,6 +204,42 @@ edits are applied by prebuild:
 
 Press Run and the paywall opens a real StoreKit sheet that completes.
 
+### Purchase failure codes
+
+Every way a purchase can fail shows a code in brackets after the message, so a
+screenshot — from App Review, from a customer, from your own sandbox testing —
+names the line it came from. Build 9 was rejected over a photograph of
+"Purchase cancelled." that four different code paths could have produced.
+
+| Code | What happened | Where to look |
+| --- | --- | --- |
+| `GF-01` | The billing library is not linked into this build | A bare `expo start` in Expo Go, or a broken prebuild |
+| `GF-02` | `initConnection` failed; the app never reached the store | Signed out of the App Store, or no network |
+| `GF-03` | The store has no such product | Product id mismatch, or the subscription is not Ready to Submit |
+| `GF-04` | Android base plan carries no offer token | Play Console: the base plan is not active |
+| `GF-05` | A real cancellation — the store had priced the product | Nothing wrong; somebody tapped Cancel |
+| `GF-06` | "Cancelled" for a product the store never priced | **Not a cancellation.** Agreements, product metadata, or storefront |
+| `GF-07` | Waiting on approval (Ask to Buy, slow payment) | Nothing wrong; it unlocks when it clears |
+| `GF-08` | Already owned, and reading the purchase back found nothing | A transaction stuck unfinished |
+| `GF-09` | The store could not be reached, or answered with a service error | Network, or a store outage |
+| `GF-10` | The store refused with a code we have no specific case for | Check the device log for the raw `E_` code |
+| `GF-11` | A transaction arrived with no id and no receipt | StoreKit 2 engagement — see the architecture note below |
+| `GF-12` | Two minutes passed with no transaction and no error | The sheet never completed |
+| `GF-13` | The purchase succeeded; writing it down on the device did not | Local storage, not the store. The membership is real |
+| `GF-14` | Restore ran and the store reported nothing to restore | Nothing to restore on that Apple Account |
+| `GF-99` | Reached the screen without being classified | A path that needs its own code adding |
+
+`GF-05` and `GF-06` are the pair worth understanding. StoreKit reports a
+cancellation for both a tapped Cancel and a sheet that never meaningfully
+opened, so the two are indistinguishable from the error alone. They are told
+apart by whether the store priced that product: a plan the store quoted exists
+and can be bought, and the paywall falls back to the bundled figures when the
+store answers with nothing, so a price on screen is not evidence by itself.
+
+The codes are stable. Renumbering one invalidates every screenshot taken before
+the change, so a retired code leaves a gap rather than being reused; a test
+pins the whole table for that reason.
+
 ### Why the pod deployment target needs its own plugin
 
 Xcode 16 warns and Xcode 27 refuses when a target deploys below its supported
