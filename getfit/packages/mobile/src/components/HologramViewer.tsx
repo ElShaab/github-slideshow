@@ -25,6 +25,7 @@ import Svg, {
 import type { HologramData } from '@getfit/shared';
 import { useTheme } from '../theme';
 import { buildGeometry, VIEW_HEIGHT, VIEW_WIDTH } from './hologram/geometry';
+import { viewerBox } from './hologram/layout';
 import { Hologram3D } from './Hologram3D';
 import { frameFor } from './hologram/frameSources';
 
@@ -144,7 +145,7 @@ export const HologramViewer = memo(function HologramViewer({
   });
   const glowOpacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] });
 
-  const width = (size * VIEW_WIDTH) / VIEW_HEIGHT;
+  const { width } = viewerBox(size, VIEW_WIDTH, VIEW_HEIGHT);
   const scanTranslate = sweep.interpolate({ inputRange: [0, 1], outputRange: [-size * 0.15, size] });
 
   const accent = data.accentPalette?.[0] ?? colors.accent;
@@ -191,7 +192,7 @@ export const HologramViewer = memo(function HologramViewer({
   if (frame !== null) {
     return (
       <View
-        style={[{ width, height: size }, style]}
+        style={[styles.root, { width, height: size }, style]}
         accessible
         accessibilityRole="image"
         accessibilityLabel={label}
@@ -223,9 +224,14 @@ export const HologramViewer = memo(function HologramViewer({
           />
         </Svg>
 
+        {/* The width and height are not decoration: a required PNG carries
+            its own 640x1280 as an intrinsic size, and absoluteFill alone does
+            not override it. Without these the figure drew at ten times its
+            box, from the box's top-left — which is how a head ended up alone
+            in the corner of the Home card. */}
         <Image
           source={frame}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { width, height: size }]}
           resizeMode="contain"
           accessible={false}
         />
@@ -236,7 +242,7 @@ export const HologramViewer = memo(function HologramViewer({
   if (volumetric && !glFailed) {
     return (
       <View
-        style={[{ width, height: size }, style]}
+        style={[styles.root, { width, height: size }, style]}
         accessible
         accessibilityRole="image"
         accessibilityLabel={label}
@@ -254,7 +260,7 @@ export const HologramViewer = memo(function HologramViewer({
 
   return (
     <View
-      style={[{ width, height: size }, style]}
+      style={[styles.root, { width, height: size }, style]}
       accessible
       accessibilityRole="image"
       accessibilityLabel={label}
@@ -485,6 +491,10 @@ export const HologramViewer = memo(function HologramViewer({
 });
 
 const styles = StyleSheet.create({
+  /* The figure is not allowed outside its own box, whatever draws it. The
+     dimensions above already keep it in; this makes a future renderer that
+     forgets them a clipped figure rather than one loose on the screen. */
+  root: { overflow: 'hidden' },
   scanBeam: {
     position: 'absolute',
     left: 0,
