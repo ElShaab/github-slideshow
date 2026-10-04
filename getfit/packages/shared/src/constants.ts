@@ -55,7 +55,13 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     priceUsd: 19.99,
     listPriceUsd: null,
     badge: 'BEST DEAL',
-    limitedTime: true,
+    // False for the same reason `listPriceUsd` is null above. The yearly price
+    // has no end date and has never been anything else, so "Limited time
+    // offer" under it was a permanent notice about urgency that did not exist
+    // — the same 3.1.1 problem as a struck-through price nobody was ever
+    // charged. The saving shown beside it is real and stays: it is measured
+    // against the monthly plan, which the customer can genuinely buy instead.
+    limitedTime: false,
   },
 ];
 

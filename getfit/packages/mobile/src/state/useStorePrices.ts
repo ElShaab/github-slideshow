@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { indexStorePrices, type StorePrice } from '@getfit/shared';
 import type { StoreProvider } from './billing';
 
@@ -6,6 +6,16 @@ export interface StorePricesState {
   /** Store prices by product id. Empty until the store answers, or if it cannot. */
   prices: Record<string, StorePrice>;
   loading: boolean;
+  /**
+   * True once the store has answered, whatever it said.
+   *
+   * Distinct from `!loading`, which is also true before the first ask. The
+   * paywall needs to know the difference: an empty answer means the store will
+   * not sell this, while not having asked yet means nothing at all.
+   */
+  answered: boolean;
+  /** Ask again. The paywall offers this when the store priced nothing. */
+  reload: () => void;
 }
 
 /**
@@ -21,6 +31,9 @@ export function useStorePrices(
 ): StorePricesState {
   const [prices, setPrices] = useState<Record<string, StorePrice>>({});
   const [loading, setLoading] = useState(true);
+  const [answered, setAnswered] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   // Compared by value: the caller builds this list from the plan catalogue, so
   // a fresh array with the same ids must not re-open the billing connection.
@@ -39,13 +52,14 @@ export function useStorePrices(
       }
       if (cancelled) return;
       setPrices(indexStorePrices(resolved));
+      setAnswered(true);
       setLoading(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [key, store]);
+  }, [attempt, key, store]);
 
-  return { prices, loading };
+  return { prices, loading, answered, reload };
 }

@@ -541,17 +541,30 @@ interface PurchaseWaiter {
  * Whether the store itself says this subscription has already ended.
  *
  * Only ever answers from an expiry the store stated. A purchase with no expiry
- * is not judged to have lapsed — under StoreKit 1 most carry none, and guessing
- * one from the purchase date would revoke a paying customer's membership. The
- * residual gap is deliberate and documented: on StoreKit 1 an expired
- * subscription that states no expiry still reads as owned, which costs revenue
- * rather than costing a paying customer their app.
+ * is not judged to have lapsed — guessing one from the purchase date would
+ * revoke a paying customer's membership.
+ *
+ * In practice react-native-iap 12 states one on neither platform, and this
+ * returns false for every purchase it is given. That is worth saying plainly,
+ * because the comment that used to sit here claimed the opposite and made the
+ * rest of the file look safer than it is:
+ *
+ *   - iOS. `transactionSk2ToPurchaseMap` destructures `expirationDate` off the
+ *     StoreKit 2 transaction and does not carry it onto the purchase, so there
+ *     is no expiry on the object at all. The two fields this used to read —
+ *     `expirationDateIos`, `expiryTimeMillis` — were never populated by
+ *     anything; `expiryTimeMillis` is a field of Google's *server* API.
+ *   - Android. Play's client-side purchase carries no expiry either.
+ *
+ * So the filter that actually decides entitlement is the store's own:
+ * `getAvailablePurchases({ onlyIncludeActiveItems: true })`, which under
+ * StoreKit 2 reads `Transaction.currentEntitlements` and under Play asks for
+ * active purchases. This function stays as the one place an expiry would be
+ * honoured if a future version of the library reports one, and as the thing
+ * that makes `restore` and `ownedPurchase` agree with `getActivePurchases`.
  */
 export function purchaseHasLapsed(purchase: IapPurchase, now = Date.now()): boolean {
-  const stated =
-    purchase.expirationDateIos ??
-    (purchase.expiryTimeMillis ? Number(purchase.expiryTimeMillis) : undefined);
-
+  const stated = purchase.expiresAtMs;
   if (stated === undefined || !Number.isFinite(stated)) return false;
   return stated <= now;
 }
@@ -686,9 +699,16 @@ export interface IapPurchase {
   autoRenewingAndroid?: boolean;
   /** Play only: 1 means purchased, 2 means pending. */
   purchaseStateAndroid?: number;
-  /** Milliseconds since the epoch, when either store reports an expiry. */
-  expirationDateIos?: number;
-  expiryTimeMillis?: string;
+  /**
+   * Milliseconds since the epoch, if a store ever states an expiry.
+   *
+   * Nothing sets this today — see `purchaseHasLapsed`. It is named for what it
+   * means rather than after either store's field, because the two fields that
+   * were here before (`expirationDateIos`, `expiryTimeMillis`) were named
+   * after fields react-native-iap does not put on a purchase, and reading them
+   * looked like a working expiry check while always answering "not expired".
+   */
+  expiresAtMs?: number;
 }
 
 /**
@@ -708,9 +728,7 @@ function readActivePurchase(
   // is not yet an entitlement.
   if (os === 'android' && purchase.purchaseStateAndroid === 2) return null;
 
-  const expiryMs =
-    purchase.expirationDateIos ??
-    (purchase.expiryTimeMillis ? Number(purchase.expiryTimeMillis) : undefined);
+  const expiryMs = purchase.expiresAtMs;
 
   return {
     productId: purchase.productId,

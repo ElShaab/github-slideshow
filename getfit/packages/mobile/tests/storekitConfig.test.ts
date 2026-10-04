@@ -76,11 +76,19 @@ describe('the group is configured the way App Store Connect is', () => {
   });
 
   test('yearly outranks monthly, so an upgrade takes effect immediately', () => {
+    // Level 1 is the TOP of a StoreKit subscription group, not the bottom.
+    // Moving to a lower number is an upgrade and happens at once, with the
+    // unused part of the old period refunded; moving to a higher number is a
+    // downgrade and is deferred to the end of the period the customer has
+    // already paid for. Ranked the other way round — which is how this shipped
+    // in build 9 and 10 — somebody on the monthly plan who chose yearly got no
+    // transaction at all until their month ran out, and the app waited two
+    // minutes for one before giving up with GF-12.
     const monthly = byId.get('getfit_monthly_members');
     const yearly = byId.get('getfit_membership_yearly');
     assert.ok(monthly && yearly);
     assert.ok(
-      yearly.groupNumber > monthly.groupNumber,
+      yearly.groupNumber < monthly.groupNumber,
       'ranked this way round, upgrading would wait until the period ended',
     );
   });

@@ -417,18 +417,41 @@ production build; see RELEASE.md.
 
 1. In **App Store Connect → Your App → Subscriptions**, create one subscription
    group containing both auto-renewable subscriptions:
-   - `getfit_monthly_members` at **$5.00/month**
-   - `getfit_membership_yearly` at **$20.00/year**
+   - `getfit_monthly_members` at **$4.99/month**
+   - `getfit_membership_yearly` at **$19.99/year**
 
-   Put them in the same group so members can move between them, and rank the
-   yearly plan higher so an upgrade takes effect immediately.
-2. Do **not** configure an introductory offer — GetFit has no free trial. The
-   yearly plan's "was $40" is presented as a limited-time discount on our own
-   price, not as a store introductory offer.
-3. Under **App Information → App-Specific Shared Secret**, generate a secret
+   These are the prices the app shows (`SUBSCRIPTION_PRICE_USD` and the yearly
+   plan in `packages/shared/src/constants.ts`). Apple's US tiers end in .99, so
+   a product created at $5.00 or $20.00 charges a different number from the one
+   on the paywall — Guideline 3.1.2.
+
+   The identifiers have to match `packages/shared/src/constants.ts` character
+   for character, and Apple does not allow a product id to be changed after it
+   is created. Build 9 was rejected because the app asked for
+   `getfit_membership_monthly` while App Store Connect held
+   `getfit_monthly_members`: `getSubscriptions` returned nothing, and the
+   monthly plan could not be bought at all.
+
+   Put them in the same group so members can move between them, and give the
+   **yearly** plan the *lower* subscription level. Level 1 is the top of a
+   StoreKit group: moving to a lower number is an upgrade and takes effect
+   immediately, while moving to a higher one is deferred to the end of the
+   period the customer has already paid for. Ranked the other way round,
+   monthly → yearly produces no transaction until the month runs out, and the
+   app waits two minutes for one before failing with GF-12.
+2. **Submit both subscriptions with the app version.** A subscription that has
+   never been approved is not purchasable in App Review's environment, even
+   though it works in the developer's own sandbox — so the reviewer sees an
+   error on a plan that buys fine on your device. Until the first group has
+   shipped, App Store Connect says so itself: *"Your first subscription group
+   must be submitted with a new app version."* Add both to the version under
+   **App Review Information**, each with its App Review screenshot.
+3. Do **not** configure an introductory offer — GetFit has no free trial, and
+   neither plan carries a reference price or a limited-time claim.
+4. Under **App Information → App-Specific Shared Secret**, generate a secret
    and set it as `APPLE_SHARED_SECRET`.
-4. Set `APPLE_BUNDLE_ID` to your bundle identifier (default `com.getfit.app`).
-5. Add the In-App Purchase capability to the iOS target (`npx expo prebuild`
+5. Set `APPLE_BUNDLE_ID` to your bundle identifier (default `com.getfit.app`).
+6. Add the In-App Purchase capability to the iOS target (`npx expo prebuild`
    handles this when the billing module is installed).
 6. Create a sandbox tester in App Store Connect to test purchases.
 

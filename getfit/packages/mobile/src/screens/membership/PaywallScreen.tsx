@@ -34,6 +34,12 @@ import {
   failureCodeOf,
   withFailureCode,
 } from '../../state/storeFailures';
+import {
+  canBuy,
+  isChecking,
+  planAvailability,
+  unavailableMessage,
+} from '../../state/planAvailability';
 import { useSession } from '../../state/SessionProvider';
 import { useTheme } from '../../theme';
 
@@ -96,10 +102,37 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
   // What the store will actually charge, in the customer's own currency.
   // GetFit never converts — Apple and Google set each storefront's price, and
   // the figure on screen has to be the one that gets billed.
-  const { prices } = useStorePrices(
+  const {
+    prices,
+    answered: storeAnswered,
+    reload: askStoreAgain,
+  } = useStorePrices(
     store,
     useMemo(() => options.map((option) => option.productId), [options]),
   );
+
+  /**
+   * Whether the store will sell the plan the customer has chosen.
+   *
+   * This is the finding from App Review's rejection of build 9, in one value.
+   * The paywall falls back to the bundled USD figures when the store answers
+   * with nothing, so a plan the store does not sell still shows a price and
+   * still looks purchasable — and the only way anyone found out otherwise was
+   * by tapping the button and getting an error. The store has already said so
+   * by then; the app simply was not listening.
+   */
+  const availabilityOf = useCallback(
+    (productId: string | undefined) =>
+      planAvailability({
+        answered: storeAnswered,
+        priced: Boolean(productId && prices[productId]),
+        platform: store.platform,
+      }),
+    [prices, store.platform, storeAnswered],
+  );
+
+  const availability = availabilityOf(selected?.productId);
+  const unavailable = unavailableMessage(availability);
 
   const monthlyOption = useMemo(
     () => options.find((option) => option.period === 'month') ?? options[0],
@@ -194,7 +227,11 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
         // figures when the store answers with nothing, so a plan showing a
         // price is not evidence the store offered it — but a plan the store
         // DID price is evidence it exists and can be bought.
-        const offered = Boolean(prices[selected?.productId ?? SUBSCRIPTION_PRODUCT_ID]);
+        // Deliberately the same judgement the button is disabled on, rather
+        // than a second reading of `prices`: "the store never priced it" and
+        // "the store has not answered yet" are different facts, and only the
+        // first of them means the cancellation was not a cancellation.
+        const offered = availabilityOf(selected?.productId ?? SUBSCRIPTION_PRODUCT_ID) !== 'unavailable';
         setError(
           offered
             ? withFailureCode('Purchase cancelled.', STORE_FAILURE.cancelled)
@@ -220,7 +257,7 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
     } finally {
       setBusy(false);
     }
-  }, [logPurchase, prices, refresh, selected?.productId, store]);
+  }, [availabilityOf, logPurchase, refresh, selected?.productId, store]);
 
   const restore = useCallback(async () => {
     setBusy(true);
@@ -276,16 +313,25 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
               {notice}
             </Text>
           ) : null}
+          {unavailable ? (
+            <Text variant="caption" color="warning" align="center" accessibilityLiveRegion="polite">
+              {withFailureCode(unavailable, STORE_FAILURE.productMissing)}
+            </Text>
+          ) : null}
           <PrimaryButton
             label={isRenewal ? 'Renew membership' : 'Start membership'}
             onPress={() => void buy()}
-            loading={busy}
+            loading={busy || isChecking(availability)}
+            disabled={!canBuy(availability)}
             accessibilityHint={
               selectedPricing && selected
                 ? `Subscribes at ${selectedPricing.price} per ${selected.period}`
                 : undefined
             }
           />
+          {unavailable ? (
+            <GlassButton label="Try again" onPress={askStoreAgain} fullWidth />
+          ) : null}
           <GlassButton label="Restore purchase" onPress={() => void restore()} fullWidth />
         </View>
       }

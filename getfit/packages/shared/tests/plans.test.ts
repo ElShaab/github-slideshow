@@ -43,7 +43,12 @@ describe('subscription catalogue', () => {
     // which is a real alternative the customer can actually buy.
     assert.equal(yearly.listPriceUsd, null, 'a reference price we never charged came back');
     assert.equal(yearly.badge, 'BEST DEAL');
-    assert.equal(yearly.limitedTime, true);
+    // Not a limited-time offer, for the same reason there is no reference
+    // price: the yearly price has no end date and never has had one, so a
+    // standing "Limited time offer" under it manufactured an urgency that did
+    // not exist. "BEST DEAL" stays, because it is a comparison with the
+    // monthly plan and the test below proves it true.
+    assert.equal(yearly.limitedTime, false);
   });
 
   test('the yearly plan is genuinely the better deal it claims to be', () => {

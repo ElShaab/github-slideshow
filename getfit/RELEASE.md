@@ -502,7 +502,8 @@ secret and a wrong one uploads to the wrong app.
 > Apple owns the billing relationship. The paywall carries the price, the
 > period, the auto-renewal terms and links to our privacy policy and terms.
 >
-> There is no free trial. Pricing is $5.00/month or $20.00/year.
+> There is no free trial. Pricing is $4.99/month or $19.99/year, which is what
+> the App Store charges and what the paywall shows.
 
 ---
 

@@ -139,10 +139,21 @@ describe('when the StoreKit 2 switch throws', () => {
   });
 });
 
-describe('a lapsed subscription on StoreKit 1', () => {
+/*
+ * A lapsed subscription, when a store states an expiry.
+ *
+ * Read the caveat on `purchaseHasLapsed` before trusting this block: no
+ * version of react-native-iap the app ships with puts an expiry on a purchase,
+ * so on a real device none of these inputs occurs and the filter that decides
+ * entitlement is the store's own onlyIncludeActiveItems. These cover the
+ * adapter's half of the contract — that an expiry, if one is ever reported, is
+ * honoured consistently by getActivePurchases, restore and ownedPurchase —
+ * rather than describing something seen in the wild.
+ */
+describe('a lapsed subscription whose expiry the store stated', () => {
   test('is not served, even though the active-only flag was ignored', async () => {
     // StoreKit 1 hands back the whole receipt, expired entries included. The
-    // adapter used to trust the flag; here it checks the expiry itself.
+    // adapter does not trust the flag; it checks any expiry it was given.
     const store = new BridgelessStore();
     store.owned = [
       {
@@ -150,7 +161,7 @@ describe('a lapsed subscription on StoreKit 1', () => {
         transactionId: 'tx-old',
         transactionReceipt: 'r',
         transactionDate: Date.now() - 60 * DAY,
-        expirationDateIos: Date.now() - DAY,
+        expiresAtMs: Date.now() - DAY,
       },
     ];
 
@@ -165,7 +176,7 @@ describe('a lapsed subscription on StoreKit 1', () => {
         transactionId: 'tx-old',
         transactionReceipt: 'r',
         transactionDate: Date.now() - 60 * DAY,
-        expirationDateIos: Date.now() - DAY,
+        expiresAtMs: Date.now() - DAY,
       },
     ];
 
@@ -180,7 +191,7 @@ describe('a lapsed subscription on StoreKit 1', () => {
         transactionId: 'tx-now',
         transactionReceipt: 'r',
         transactionDate: Date.now(),
-        expirationDateIos: Date.now() + 20 * DAY,
+        expiresAtMs: Date.now() + 20 * DAY,
       },
     ];
 
@@ -192,19 +203,23 @@ describe('a lapsed subscription on StoreKit 1', () => {
 describe('deciding whether the store says a subscription has ended', () => {
   const now = Date.parse('2026-09-23T00:00:00.000Z');
 
+  /*
+   * These used to pass `expirationDateIos` and `expiryTimeMillis`, and they
+   * passed. Both fields were invented here: react-native-iap 12 puts neither
+   * on a purchase — `transactionSk2ToPurchaseMap` drops StoreKit 2's
+   * `expirationDate`, and `expiryTimeMillis` belongs to Google's server API,
+   * not to a purchase on the device. So the test built the input the code
+   * wanted, agreed with itself, and proved nothing about any purchase the app
+   * would ever see. The field is now named for what it means, and the test
+   * below covers the shape that actually arrives.
+   */
+
   test('an expiry in the past means it has', () => {
-    assert.equal(purchaseHasLapsed({ productId: MONTHLY, expirationDateIos: now - DAY }, now), true);
+    assert.equal(purchaseHasLapsed({ productId: MONTHLY, expiresAtMs: now - DAY }, now), true);
   });
 
   test('an expiry in the future means it has not', () => {
-    assert.equal(purchaseHasLapsed({ productId: MONTHLY, expirationDateIos: now + DAY }, now), false);
-  });
-
-  test("Play's expiry, which arrives as a string, is read too", () => {
-    assert.equal(
-      purchaseHasLapsed({ productId: MONTHLY, expiryTimeMillis: String(now - DAY) }, now),
-      true,
-    );
+    assert.equal(purchaseHasLapsed({ productId: MONTHLY, expiresAtMs: now + DAY }, now), false);
   });
 
   test('no stated expiry is never treated as expired', () => {
@@ -218,6 +233,24 @@ describe('deciding whether the store says a subscription has ended', () => {
   });
 
   test('an unreadable expiry is not treated as expired either', () => {
-    assert.equal(purchaseHasLapsed({ productId: MONTHLY, expiryTimeMillis: 'soon' }, now), false);
+    assert.equal(
+      purchaseHasLapsed({ productId: MONTHLY, expiresAtMs: Number.NaN }, now),
+      false,
+    );
+  });
+
+  test('a purchase shaped the way the library really delivers one has no expiry to read', () => {
+    // Every field here is one react-native-iap 12 genuinely populates. None of
+    // them is an expiry, which is the point: on a real device this function
+    // answers "not lapsed" for everything, and the filter that decides
+    // entitlement is the store's own onlyIncludeActiveItems.
+    const asDelivered = {
+      productId: MONTHLY,
+      transactionId: '2000000900000001',
+      transactionDate: now - 40 * DAY,
+      transactionReceipt: '',
+      purchaseToken: '',
+    };
+    assert.equal(purchaseHasLapsed(asDelivered, now), false);
   });
 });
