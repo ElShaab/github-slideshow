@@ -20,6 +20,7 @@ import {
   canBuy,
   isChecking,
   planAvailability,
+  requestedVersusOffered,
   unavailableMessage,
   type PlanAvailability,
 } from '../src/state/planAvailability';
@@ -94,5 +95,46 @@ describe('what the screen does with it', () => {
     // apiece and have them point at the same line.
     const shown = withFailureCode(unavailableMessage('unavailable') ?? '', STORE_FAILURE.productMissing);
     assert.match(shown, /\(GF-03\)$/);
+  });
+});
+
+describe('saying which identifiers were involved', () => {
+  test('names the one asked for and the ones the store answered with', () => {
+    assert.equal(
+      requestedVersusOffered('getfit_monthly_members', ['getfit_membership_yearly']),
+      'Asked for getfit_monthly_members \u00b7 the store offered getfit_membership_yearly',
+    );
+  });
+
+  test('says so plainly when the store offered nothing at all', () => {
+    // Nothing offered means the whole catalogue is missing — a different
+    // problem from one product being misnamed, and worth telling apart.
+    assert.equal(
+      requestedVersusOffered('getfit_monthly_members', []),
+      'Asked for getfit_monthly_members \u00b7 the store offered nothing',
+    );
+  });
+
+  test('lists several in a stable order, so two screenshots can be compared', () => {
+    const line = requestedVersusOffered('getfit_monthly_members', [
+      'getfit_membership_yearly',
+      'getfit_extra',
+    ]);
+    assert.match(line, /getfit_extra, getfit_membership_yearly$/);
+  });
+
+  test('survives having nothing selected', () => {
+    assert.equal(
+      requestedVersusOffered(undefined, []),
+      'Asked for nothing \u00b7 the store offered nothing',
+    );
+  });
+
+  test('carries no price, account or receipt — only identifiers', () => {
+    // It is shown on a customer's screen. Product ids are already public in
+    // the App Store listing; nothing else here may be.
+    const line = requestedVersusOffered('getfit_monthly_members', ['getfit_membership_yearly']);
+    assert.ok(!/\d+\.\d\d/.test(line), 'a price leaked into the diagnostic');
+    assert.ok(!/@/.test(line), 'an address leaked into the diagnostic');
   });
 });

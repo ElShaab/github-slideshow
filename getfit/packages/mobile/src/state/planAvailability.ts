@@ -78,3 +78,25 @@ export function unavailableMessage(availability: PlanAvailability): string | nul
   if (availability !== 'unavailable') return null;
   return 'The App Store is not offering this membership on this device right now. Nothing has been charged. Check your connection and try again.';
 }
+
+/**
+ * What the app asked the store for, and what the store answered.
+ *
+ * Shown under the message above, small and muted. It is developer-facing text
+ * on a customer-facing screen, which needs justifying: when a product is
+ * missing, the one fact nobody has is whether the identifier the binary asks
+ * for matches the identifier the store holds, and that fact is otherwise only
+ * obtainable by attaching a debugger to a TestFlight build. A support email or
+ * a reviewer's screenshot carrying this line answers it outright.
+ *
+ * It names identifiers, not prices or accounts, so there is nothing here the
+ * App Store listing does not already make public.
+ */
+export function requestedVersusOffered(
+  requested: string | undefined,
+  offered: readonly string[],
+): string {
+  const asked = requested ?? 'nothing';
+  const answered = offered.length > 0 ? [...offered].sort().join(', ') : 'nothing';
+  return `Asked for ${asked} · the store offered ${answered}`;
+}

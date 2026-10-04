@@ -38,6 +38,7 @@ import {
   canBuy,
   isChecking,
   planAvailability,
+  requestedVersusOffered,
   unavailableMessage,
 } from '../../state/planAvailability';
 import { useSession } from '../../state/SessionProvider';
@@ -314,9 +315,19 @@ export function PaywallScreen({ variant = 'paywall' }: PaywallScreenProps): Reac
             </Text>
           ) : null}
           {unavailable ? (
-            <Text variant="caption" color="warning" align="center" accessibilityLiveRegion="polite">
-              {withFailureCode(unavailable, STORE_FAILURE.productMissing)}
-            </Text>
+            <>
+              <Text variant="caption" color="warning" align="center" accessibilityLiveRegion="polite">
+                {withFailureCode(unavailable, STORE_FAILURE.productMissing)}
+              </Text>
+              {/* The identifiers, so a screenshot of this screen says whether
+                  the binary and the store disagree about the product's name or
+                  whether the store simply has nothing to sell. Without it the
+                  only way to tell the two apart is a debugger on a TestFlight
+                  build. */}
+              <Text variant="micro" color="muted" align="center" selectable>
+                {requestedVersusOffered(selected?.productId, Object.keys(prices))}
+              </Text>
+            </>
           ) : null}
           <PrimaryButton
             label={isRenewal ? 'Renew membership' : 'Start membership'}
