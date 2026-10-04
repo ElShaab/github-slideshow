@@ -25,7 +25,7 @@ describe('subscription catalogue', () => {
     // mismatch, and it is invisible until a reviewer reads the receipt.
     const monthly = planForProduct(SUBSCRIPTION_PRODUCT_ID);
     assert.ok(monthly, 'the monthly plan is missing from the catalogue');
-    assert.equal(monthly.productId, 'getfit_membership_monthly');
+    assert.equal(monthly.productId, 'getfit_monthly_members');
     assert.equal(monthly.priceUsd, 4.99);
     assert.equal(monthly.period, 'month');
     assert.equal(monthly.listPriceUsd, null, 'the monthly plan is not discounted');

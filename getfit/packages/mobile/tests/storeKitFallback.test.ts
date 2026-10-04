@@ -22,7 +22,7 @@ import {
   type IapModule,
 } from '../src/state/storeAdapter';
 
-const MONTHLY = 'getfit_membership_monthly';
+const MONTHLY = 'getfit_monthly_members';
 const DAY = 86_400_000;
 
 /** react-native-iap as it behaves when the synchronous availability call is absent. */

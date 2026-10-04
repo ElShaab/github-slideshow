@@ -2,7 +2,7 @@
  * Attaches `GetFit.storekit` to the generated Xcode Run scheme.
  *
  * Without this, a device or simulator build asks the real App Store for
- * `getfit_membership_monthly` and gets an empty array back — because the
+ * `getfit_monthly_members` and gets an empty array back — because the
  * products do not exist in App Store Connect yet, or the Paid Applications
  * agreement is not active. The paywall then fails with "That membership is not
  * available on this device", which is accurate but useless for development.

@@ -76,7 +76,7 @@ describe('the group is configured the way App Store Connect is', () => {
   });
 
   test('yearly outranks monthly, so an upgrade takes effect immediately', () => {
-    const monthly = byId.get('getfit_membership_monthly');
+    const monthly = byId.get('getfit_monthly_members');
     const yearly = byId.get('getfit_membership_yearly');
     assert.ok(monthly && yearly);
     assert.ok(

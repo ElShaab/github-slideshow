@@ -105,7 +105,7 @@ describe('subscription entitlement', () => {
       userId,
       status: 'active',
       platform: 'mock',
-      productId: 'getfit_membership_monthly',
+      productId: 'getfit_monthly_members',
       priceUsd: 5,
       originalTransactionId: 'mock-test',
       currentPeriodStart: new Date(Date.now() - 40 * 86_400_000),

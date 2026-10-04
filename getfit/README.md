@@ -417,7 +417,7 @@ production build; see RELEASE.md.
 
 1. In **App Store Connect → Your App → Subscriptions**, create one subscription
    group containing both auto-renewable subscriptions:
-   - `getfit_membership_monthly` at **$5.00/month**
+   - `getfit_monthly_members` at **$5.00/month**
    - `getfit_membership_yearly` at **$20.00/year**
 
    Put them in the same group so members can move between them, and rank the
@@ -442,7 +442,7 @@ response. The client's claim about its own subscription is never trusted.
 
 1. In the **Google Play Console → Monetise → Subscriptions**, create two
    subscriptions:
-   - `getfit_membership_monthly` with a monthly base plan at the $5 price point
+   - `getfit_monthly_members` with a monthly base plan at the $5 price point
    - `getfit_membership_yearly` with a yearly base plan at the $20 price point
 2. Do **not** add a free trial offer.
 3. In Google Cloud, enable the **Google Play Android Developer API** and create
