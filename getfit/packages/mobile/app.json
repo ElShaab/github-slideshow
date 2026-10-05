@@ -25,7 +25,7 @@
         "NSPhotoLibraryUsageDescription": "GetFit lets you choose an existing photo to keep as a private progress photo.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "10",
+      "buildNumber": "13",
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
