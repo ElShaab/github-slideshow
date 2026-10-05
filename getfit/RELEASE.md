@@ -138,13 +138,19 @@ invent these: a privacy policy is a binding document naming the data
 controller, and a made-up company is worse than no page at all. Then:
 
 ```bash
-npm run legal --workspace @getfit/mobile   # writes privacy.md and support.md
+npm run legal --workspace @getfit/mobile   # writes privacy.html and support.html
 ```
 
-That renders both pages from the markdown, strips the "Before publishing" notes
-and refuses to write anything while a placeholder remains. Commit the two
-generated files, merge to the branch GitHub Pages serves, and turn Pages on in
-**Settings → Pages** if it is not already. Preflight fails the build until the
+That renders both pages from the markdown as standalone HTML — no Jekyll, no
+layout, nothing else that has to be published beside them — strips the "Before
+publishing" notes and refuses to write anything while a placeholder remains.
+Commit the two generated files to **the branch GitHub Pages builds from**, and
+turn Pages on in **Settings → Pages** if it is not already.
+
+That branch is the step that failed for build 12: the pages were committed to
+the feature branch while Pages built `master`, so both URLs returned 404 in
+review. Check **Settings → Pages → Build and deployment → Branch**; the files
+have to be on whatever it names. Preflight fails the build until the
 placeholders are filled, so a policy naming nobody cannot ship.
 
 **Open both URLs in a browser before you submit.** App Review opens them, and a
