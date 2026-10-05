@@ -54,7 +54,7 @@ export function GoalsScreen({ navigation }: Props): React.ReactElement {
 
       {draft.goals.length > 1 ? (
         <Text variant="caption" color="muted" style={{ marginTop: spacing.xl }}>
-          The AI balances all {draft.goals.length} goals when it builds your program.
+          GetFit balances all {draft.goals.length} goals when it builds your program.
         </Text>
       ) : null}
     </Screen>

@@ -125,7 +125,7 @@ export function WorkoutCompleteScreen({ route, navigation }: Props): React.React
             What happens next
           </Text>
           <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
-            Your performance has been saved. The AI has already adjusted the weights,
+            Your performance has been saved. GetFit has already adjusted the weights,
             sets and reps for the next time each of these exercises comes up.
           </Text>
         </GlassCard>

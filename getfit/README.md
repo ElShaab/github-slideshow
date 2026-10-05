@@ -48,14 +48,14 @@ Open GetFit
   → Account created                     ← the guest is upgraded in place
   → Exercise preferences (4 choices per muscle, pick up to 3,
                           or one "Generate for me")
-  → AI program generation
+  → Program generation (deterministic rules in @getfit/shared — no AI)
   → Home → guided workout → rest timer → completion + PRs
   → Progression applied automatically
   → 7 days later: new assessment, new metrics, new hologram
   → Progress, history and goal tracking
 ```
 
-### What the AI actually does
+### What the services actually do
 
 | Service | Responsibility |
 | --- | --- |

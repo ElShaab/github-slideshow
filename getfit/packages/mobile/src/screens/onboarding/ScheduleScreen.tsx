@@ -23,7 +23,7 @@ export function ScheduleScreen({ navigation }: Props): React.ReactElement {
     <Screen footer={<PrimaryButton label="Next" onPress={next} disabled={!valid} />}>
       <OnboardingHeader
         title="Your schedule"
-        subtitle="Every workout the AI builds will fit inside the session length you choose."
+        subtitle="Every workout GetFit builds will fit inside the session length you choose."
         step={stepNumber('schedule', isHome)}
         total={totalSteps(isHome)}
         onBack={navigation.goBack}
@@ -61,7 +61,7 @@ export function ScheduleScreen({ navigation }: Props): React.ReactElement {
 
       {draft.trainingDays !== null && draft.trainingDays <= 3 ? (
         <Text variant="caption" color="muted" style={{ marginTop: spacing.xxl }}>
-          With {draft.trainingDays} {draft.trainingDays === 1 ? 'day' : 'days'} a week the AI
+          With {draft.trainingDays} {draft.trainingDays === 1 ? 'day' : 'days'} a week GetFit
           will build full-body sessions so nothing gets left behind.
         </Text>
       ) : null}

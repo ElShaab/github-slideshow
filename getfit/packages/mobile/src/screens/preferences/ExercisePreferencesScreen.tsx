@@ -133,7 +133,7 @@ export function ExercisePreferencesScreen({
           <SecondaryButton
             label="Generate for me"
             onPress={() => void generateForMe()}
-            accessibilityHint="Lets the AI choose your exercises for every muscle group"
+            accessibilityHint="Lets GetFit choose your exercises for every muscle group"
           />
           {onCancel ? (
             <SecondaryButton label="Cancel" onPress={onCancel} />
@@ -148,7 +148,7 @@ export function ExercisePreferencesScreen({
         Pick your exercises
       </Text>
       <Text variant="body" color="secondary" style={{ marginTop: spacing.md }}>
-        Choose up to {MAX_EXERCISES_PER_MUSCLE} per muscle and the AI will use exactly those.
+        Choose up to {MAX_EXERCISES_PER_MUSCLE} per muscle and your program will use exactly those.
         Skip a muscle and it picks for you.
       </Text>
 

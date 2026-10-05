@@ -54,7 +54,7 @@ export function EquipmentScreen({ navigation }: Props): React.ReactElement {
     >
       <OnboardingHeader
         title="Your equipment"
-        subtitle="Select everything you have. The AI will only prescribe these."
+        subtitle="Select everything you have. GetFit will only prescribe these."
         step={stepNumber('equipment', true)}
         total={totalSteps(true)}
         onBack={navigation.goBack}

@@ -272,7 +272,7 @@ function GuidedWorkoutRunner({
             unit="min"
             min={0}
             max={15}
-            hint="Log what you actually did — the AI adjusts your cardio as your body fat changes."
+            hint="Log what you actually did — GetFit adjusts your cardio as your body fat changes."
           />
         </GlassCard>
 

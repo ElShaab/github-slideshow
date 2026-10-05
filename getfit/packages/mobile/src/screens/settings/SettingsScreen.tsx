@@ -209,7 +209,7 @@ export function SettingsScreen({ navigation }: Props): React.ReactElement {
         <SettingsRow
           label="Exercise preferences"
           value={`${preferences.reduce((sum, p) => sum + p.exerciseIds.length, 0)} selected`}
-          description="Pick exactly which exercises the AI may program."
+          description="Pick exactly which exercises your program may use."
           onPress={() => navigation.navigate('ExercisePreferences', { fromSettings: true })}
           last
         />

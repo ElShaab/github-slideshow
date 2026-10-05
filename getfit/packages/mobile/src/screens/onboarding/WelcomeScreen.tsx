@@ -35,7 +35,7 @@ export function WelcomeScreen({ navigation }: Props): React.ReactElement {
     <Screen scroll={false} contentStyle={styles.container}>
       <View style={styles.hero}>
         <Text variant="micro" color="accent" uppercase>
-          AI Personal Trainer
+          Personal Training Program
         </Text>
         <Text variant="display" style={{ marginTop: spacing.md }} accessibilityRole="header">
           GetFit

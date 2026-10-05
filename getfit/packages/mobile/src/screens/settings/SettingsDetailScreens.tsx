@@ -469,7 +469,7 @@ export function SettingsEquipmentScreen({
       ) : (
         <>
           <Text variant="body" color="secondary" style={{ marginTop: spacing.sm }}>
-            The AI will only ever prescribe exercises you can do with these.
+            GetFit will only ever prescribe exercises you can do with these.
           </Text>
           <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
             {EQUIPMENT.filter((item) => item.selectable).map((item) => (

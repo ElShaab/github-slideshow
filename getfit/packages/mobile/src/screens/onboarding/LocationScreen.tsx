@@ -39,7 +39,7 @@ export function LocationScreen({ navigation }: Props): React.ReactElement {
     >
       <OnboardingHeader
         title="Where do you train?"
-        subtitle="The AI only ever prescribes exercises you can actually perform."
+        subtitle="GetFit only ever prescribes exercises you can actually perform."
         step={stepNumber('location', draft.trainingLocation === 'home')}
         total={totalSteps(draft.trainingLocation === 'home')}
         onBack={navigation.goBack}
