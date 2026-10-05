@@ -176,14 +176,20 @@ repo unused; to publish your own instead, fill it in, add it to `PAGES` in
 
 ### App privacy answers (App Store Connect)
 
-Answer these to match what the app does:
+Answer these to match what the app does. They have to agree with the privacy
+manifest in `app.json` (`ios.privacyManifests`), which
+`tests/privacyManifest.test.ts` checks against the database schema — so if a
+migration starts syncing something new, that test fails before this table
+quietly goes out of date.
 
 | Question | Answer |
 | --- | --- |
 | Health & Fitness data collected | **Yes** — linked to identity, app functionality |
 | Photos collected | **No** — a progress photo is optional, stays in the app's private directory on the device, and is never uploaded. Apple counts data as collected only when it leaves the device |
 | Contact info (email) | **Yes** — linked to identity, app functionality. Required to take out a membership, and verified by emailed code |
-| Purchases | **Yes** — linked to identity |
+| Contact info (name) | **Yes** — linked to identity, app functionality. The name asked for after the password, synced as `profiles.display_name`. Optional to give, but collected when given |
+| Purchases | **No** — entitlement is read from the App Store on the device, and no purchase, receipt or transaction is ever sent to us. What Apple holds about the payment is Apple's to declare, not ours |
+| Diagnostics (crash data) | **No** — the app has no crash reporter |
 | Other user content | **Yes** — linked to identity, app functionality. Only what someone types into **Send feedback**; nothing else the user writes leaves the phone |
 | Used for tracking | **No** |
 | Used for third-party advertising | **No** |
