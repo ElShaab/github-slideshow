@@ -150,7 +150,14 @@ turn Pages on in **Settings → Pages** if it is not already.
 That branch is the step that failed for build 12: the pages were committed to
 the feature branch while Pages built `master`, so both URLs returned 404 in
 review. Check **Settings → Pages → Build and deployment → Branch**; the files
-have to be on whatever it names. Preflight fails the build until the
+have to be on whatever it names.
+
+**Pages currently builds from `claude/getfit-ai-fitness-app-mw07rn`, root
+folder.** `privacy.html` and `support.html` at the root of that branch are the
+live privacy policy and support page, and every shipped build links to them.
+Do not delete, rename or move them, and do not rebase or reset that branch in
+a way that drops them. If Pages is ever switched to another branch, put both
+files there *before* switching, then `curl -sI` both URLs for a `200`. Preflight fails the build until the
 placeholders are filled, so a policy naming nobody cannot ship.
 
 **Open both URLs in a browser before you submit.** App Review opens them, and a
