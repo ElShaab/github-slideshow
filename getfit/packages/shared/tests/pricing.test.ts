@@ -15,7 +15,13 @@ import {
   YEARLY_PRODUCT_ID,
   planForProduct,
 } from '../src/constants';
-import { formatCurrency, indexStorePrices, planPricing, type StorePrice } from '../src/pricing';
+import {
+  formatCurrency,
+  formatLikeStore,
+  indexStorePrices,
+  planPricing,
+  type StorePrice,
+} from '../src/pricing';
 
 const monthlyPlan = SUBSCRIPTION_PLANS.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID);
 const yearlyPlan = SUBSCRIPTION_PLANS.find((p) => p.productId === YEARLY_PRODUCT_ID);
@@ -114,6 +120,56 @@ describe('the per-month equivalent', () => {
   test('uses the fallback price when the store is silent', () => {
     // 20 / 12 = 1.666... -> 1.67
     assert.ok(planPricing(yearlyPlan).perMonth?.includes('1.67'));
+  });
+
+  test('is written exactly the way the store wrote the price above it', () => {
+    // Build 12 showed "$19.99" from Apple and "US$1.67 a month" from us on the
+    // same card, because Intl formats for the phone's locale and Apple formats
+    // for the storefront. The store's own string is now the template.
+    const pricing = planPricing(yearlyPlan, usYearly, { plan: monthlyPlan, storePrice: usMonthly });
+    assert.equal(pricing.price, '$19.99');
+    assert.equal(pricing.perMonth, '$1.67');
+  });
+
+  test('keeps the pound sign for a UK storefront', () => {
+    const pricing = planPricing(yearlyPlan, ukYearly, { plan: monthlyPlan, storePrice: ukMonthly });
+    assert.equal(pricing.perMonth, '£1.50');
+  });
+});
+
+describe('writing an amount the way the store writes prices', () => {
+  test('a dollar storefront', () => {
+    assert.equal(formatLikeStore(1.67, '$19.99', 19.99), '$1.67');
+  });
+
+  test('whatever surrounds the number is kept', () => {
+    assert.equal(formatLikeStore(1.67, 'US$19.99', 19.99), 'US$1.67');
+    assert.equal(formatLikeStore(1.67, 'USD 19.99', 19.99), 'USD 1.67');
+  });
+
+  test('a decimal comma and a trailing symbol', () => {
+    assert.equal(formatLikeStore(1.67, '19,99\u00a0€', 19.99), '1,67\u00a0€');
+  });
+
+  test('a currency with no minor unit stays whole', () => {
+    // ¥3,000 a year is ¥250 a month, not ¥250.00.
+    assert.equal(formatLikeStore(250, '¥3,000', 3000), '¥250');
+  });
+
+  test('grouping carries over when the result needs it', () => {
+    assert.equal(formatLikeStore(1250, '¥15,000', 15000), '¥1,250');
+    assert.equal(formatLikeStore(1234.5, '1.234,56\u00a0€', 1234.56), '1.234,50\u00a0€');
+  });
+
+  test('a whole-number price written with decimals keeps its decimals', () => {
+    assert.equal(formatLikeStore(1.67, '$20.00', 20), '$1.67');
+  });
+
+  test('a string that does not say the amount it claims to is not trusted', () => {
+    // Better the device-locale fallback than a confident wrong number.
+    assert.equal(formatLikeStore(1.67, '$19.99', 24.99), null);
+    assert.equal(formatLikeStore(1.67, 'Free', 0), null);
+    assert.equal(formatLikeStore(Number.NaN, '$19.99', 19.99), null);
   });
 });
 

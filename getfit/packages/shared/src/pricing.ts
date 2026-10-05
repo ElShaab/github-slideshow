@@ -64,6 +64,65 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** The number inside a formatted price, separators and all. */
+const NUMBER_IN_PRICE = /\d(?:[\d.,'\s\u00a0\u202f]*\d)?/;
+
+/**
+ * `amount`, written the way the store wrote `template`.
+ *
+ * A price the app derives — a yearly plan per month — has to sit beside the
+ * store's own string and look like it came from the same place. Formatting it
+ * with Intl uses the *device's* locale, while the store formats for the
+ * *storefront*: a US storefront on a phone set to anywhere but en-US gets
+ * "$19.99" from Apple and "US$1.67" from us, side by side. Build 12 shipped
+ * exactly that.
+ *
+ * So the store's string is the template. Its digits, read against the amount
+ * it is known to represent, give the number of decimals; the characters
+ * between them give the decimal and grouping marks; whatever surrounds the
+ * number — "$", " €", "US$", "kr " — is kept as it is. Returns null when the
+ * template cannot be read with confidence, so the caller can fall back rather
+ * than print something plausible and wrong.
+ */
+export function formatLikeStore(
+  amount: number,
+  template: string,
+  templateAmount: number,
+): string | null {
+  const match = NUMBER_IN_PRICE.exec(template);
+  if (!match || !Number.isFinite(amount) || !Number.isFinite(templateAmount)) return null;
+  const written = match[0];
+
+  const digits = written.replace(/\D/g, '');
+  const whole = Number(digits);
+  // How many of the digits are decimals: the count that makes the digits equal
+  // the amount the store says this string is.
+  const decimals = [0, 1, 2, 3].find(
+    (places) => Math.abs(whole / 10 ** places - templateAmount) < 0.5 / 10 ** places,
+  );
+  if (decimals === undefined) return null;
+
+  // The decimal mark sits just before the last `decimals` digits; any other
+  // mark between digits is grouping.
+  let decimalMark = '';
+  let integerPart = written;
+  if (decimals > 0) {
+    let seen = 0;
+    let index = written.length - 1;
+    for (; index >= 0 && seen < decimals; index -= 1) if (/\d/.test(written[index])) seen += 1;
+    decimalMark = written[index] ?? '';
+    if (/\d/.test(decimalMark)) return null;
+    integerPart = written.slice(0, index);
+  }
+  const grouping = /\D/.exec(integerPart)?.[0] ?? '';
+
+  const [int, frac = ''] = amount.toFixed(decimals).split('.');
+  const groupedInt = grouping ? int.replace(/\B(?=(\d{3})+(?!\d))/g, grouping) : int;
+  const number = decimals > 0 ? `${groupedInt}${decimalMark}${frac}` : groupedInt;
+
+  return template.slice(0, match.index) + number + template.slice(match.index + written.length);
+}
+
 /**
  * Everything the paywall needs to render one plan.
  *
@@ -88,8 +147,15 @@ export function planPricing(
       ? formatCurrency(plan.listPriceUsd, 'USD')
       : null;
 
+  // Written in the store's own format when there is one, so it matches the
+  // price printed right above it. See `formatLikeStore`.
+  const monthlyAmount = round(amount / 12);
   const perMonth =
-    plan.period === 'year' ? formatCurrency(round(amount / 12), currency) : null;
+    plan.period === 'year'
+      ? (storePrice
+          ? formatLikeStore(monthlyAmount, storePrice.localizedPrice, storePrice.amount)
+          : null) ?? formatCurrency(monthlyAmount, currency)
+      : null;
 
   return {
     price,
