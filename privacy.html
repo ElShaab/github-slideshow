@@ -114,6 +114,8 @@
 <p>If you have not created your account yet, or you are offline, the message waits on your phone and is sent when it can be. Signing out deletes anything still waiting, unsent.</p>
 <h3>Technical data</h3>
 <p>GetFit contains <strong>no third-party analytics, advertising or tracking SDKs</strong>, and does not track you across other apps or websites. When you have an account, Supabase records standard service logs — IP address, timestamps, and which requests were made — as part of running the database.</p>
+<h3>Exercise videos</h3>
+<p>The first time you open an exercise, the app downloads its demonstration video and a still image from the GetFit website, and keeps them on your phone so they play offline after that. The website is hosted by GitHub Pages. Like any web page, the download shows GitHub your IP address and which file was asked for; nothing about you, your account or your training is sent with it.</p>
 <hr>
 <h2>Where your data is</h2>
 <table>
@@ -151,6 +153,7 @@
 <tbody>
 <tr><td><strong>Supabase</strong></td><td>Hosts the database your account's data is stored in, and handles sign-in</td></tr>
 <tr><td><strong>Apple</strong> / <strong>Google</strong></td><td>Process payments and confirm subscription status</td></tr>
+<tr><td><strong>GitHub</strong> (GitHub Pages)</td><td>Serves the exercise videos the app downloads; sees the IP address of each download, as any website does</td></tr>
 </tbody>
 </table>
 <p>Your account's data is held in the region the GetFit Supabase project is hosted in. Supabase publishes its own infrastructure providers, subprocessors and security practices at supabase.com/privacy.</p>
