@@ -104,6 +104,29 @@ Suppressing it permanently would mean everything fetched before a keyword
 existed could never be captured, which looks exactly like a broken source.
 Dismissing an item from the feed deletes the `items` row but keeps the ledger
 entry, so a re-poll never resurfaces it.
+
+### Not matched
+
+What a source fetched and no keyword matched is held in memory — the newest
+150 per source — and shown under **Not matched** in the Questions column. This
+is what tells a keyword gap apart from a dead source, which an empty feed
+cannot: Reddit can be answering perfectly while every post says "socket" or
+"PLP" and your keywords say "prosthetic socket" and "phantom limb pain".
+
+Above the posts, the words that keep recurring in them are offered as
+keywords, counted by how many posts carry them rather than raw occurrences,
+clinical vocabulary first. Everyday words need to recur more than clinical ones
+to be offered, and chatter, number words and anything already tracked are
+left out. Each suggestion carries an excerpt showing it in use.
+
+**Adding any keyword — from a suggestion, the keyword bar or the Keywords tab
+— is weighed at once against everything held**, so it captures the posts that
+use it immediately rather than at the next poll, and the toast says how many.
+No network call is made: the posts are already here. When the column is empty
+but posts were fetched, it leads with this rather than with another poll.
+
+The list is a working set, not a record. A restart empties it and the next
+poll refills it.
 Because the key includes the source, the same ID appearing on two sources is
 still stored twice.
 
@@ -545,7 +568,7 @@ staggered so every API is not called at once.
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
 | GET    | `/api/keywords` | List keywords and the valid source names |
-| POST   | `/api/keywords` | Create `{term, scope, sources, notes, enabled}` |
+| POST   | `/api/keywords` | Create `{term, scope, sources, notes, enabled}`; the reply's `recheck.added` counts posts it caught at once |
 | PUT    | `/api/keywords/:id` | Update any of those fields |
 | DELETE | `/api/keywords/:id` | Delete |
 | GET    | `/api/items` | Feed; `source`, `keyword`, `status`, `q`, `since`, `limit`, `offset` |
@@ -557,6 +580,7 @@ staggered so every API is not called at once.
 | POST   | `/api/sources/poll-all` | Poll every source in turn and report each result |
 | POST   | `/api/sources/websearch/test` | One live query; `{domain, term}` both optional |
 | POST   | `/api/sources/reddit/diagnose` | Try all four public addresses and report each |
+| GET    | `/api/sources/missed` | Fetched-but-unmatched posts and suggested keywords; `source` optional |
 | POST   | `/api/sources/:source/clear-backoff` | Clear a rate-limit backoff |
 | GET/PUT| `/api/settings` | Intervals, limits, toggles |
 | GET    | `/api/health` | Liveness plus per-source status |

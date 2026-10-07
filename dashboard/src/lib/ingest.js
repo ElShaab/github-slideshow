@@ -1,6 +1,7 @@
 'use strict';
 
 const { db } = require('../db');
+const missed = require('./missed');
 
 const stmts = {
   seen: db.prepare(
@@ -65,6 +66,7 @@ function ingest(source, candidates, matcher) {
 
     if (stmts.seen.get(source, externalId)) {
       stats.duplicates += 1;
+      missed.forget(source, externalId);
       continue;
     }
 
@@ -82,7 +84,10 @@ function ingest(source, candidates, matcher) {
       // must still be catchable by a term added tomorrow. Suppressing it
       // permanently would mean every post fetched before a keyword existed
       // could never be captured, which looks exactly like a broken source.
+      // It is held in the missed list instead, where a new keyword can reach
+      // it at once and the physician can see what is going uncaught.
       stats.unmatched += 1;
+      missed.record(source, { ...candidate, external_id: externalId });
       continue;
     }
 
@@ -115,6 +120,7 @@ function ingest(source, candidates, matcher) {
         continue;
       }
       stats.added += 1;
+      missed.forget(source, row.externalId);
       for (const hit of row.hits) {
         stmts.insertItemKeyword.run(
           info.lastInsertRowid,

@@ -24,7 +24,7 @@ const state = {
   tab: 'feed',
   keywords: [],
   settings: {},
-  feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0, items: [] },
+  feed: { source: '', keyword: '', status: '', q: '', limit: 50, offset: 0, total: 0, items: [], view: 'questions' },
   // Left column: matched research for the selected question, or the sweep.
   researchView: 'match',
   researchViewChosen: false,
@@ -212,7 +212,112 @@ function renderItems(container, items, emptyMessage, options) {
   for (const item of items) container.append(itemCard(item, options));
 }
 
+/**
+ * What the sources fetched that no keyword matched. A keyword gap and a dead
+ * source look identical from an empty feed; this is what tells them apart,
+ * and each suggested term captures its posts the moment it is tracked.
+ */
+async function loadMissed() {
+  const list = $('#feed-list');
+  try {
+    const params = new URLSearchParams();
+    if (state.feed.source) params.set('source', state.feed.source);
+    const data = await api(`/sources/missed?${params}`);
+    updateMissedButton(data.total);
+    list.innerHTML = '';
+
+    const head = el('div', 'missed-head');
+    const back = el('button', 'tiny ghost', '← Back to questions');
+    back.addEventListener('click', () => showFeedView('questions'));
+    head.append(back);
+    head.append(
+      el(
+        'p',
+        'subtle',
+        data.total
+          ? `${data.total} recent post${data.total === 1 ? '' : 's'} were fetched and matched none of your keywords. ` +
+              'Tracking a word below captures the posts that use it straight away.'
+          : 'Nothing is waiting: every post the sources returned either matched a keyword or has not been fetched yet. Poll a source and check again.'
+      )
+    );
+    list.append(head);
+    if (!data.total) return;
+
+    if (data.suggestions.length) {
+      list.append(el('h3', '', 'Words that keep coming up'));
+      const chips = el('div', 'suggestions');
+      for (const suggestion of data.suggestions) {
+        const chip = el('div', `suggestion${suggestion.domain ? ' domain' : ''}`);
+        const add = el('button', 'tiny', `+ ${suggestion.term}`);
+        add.title = suggestion.sample || '';
+        add.addEventListener('click', async () => {
+          add.disabled = true;
+          try {
+            await trackKeyword(suggestion.term);
+            loadMissed();
+          } catch (err) {
+            toast(err.message, true);
+            add.disabled = false;
+          }
+        });
+        chip.append(add, el('span', 'subtle', `${suggestion.posts} posts`));
+        chips.append(chip);
+      }
+      list.append(chips);
+    }
+
+    list.append(el('h3', '', 'The posts'));
+    for (const post of data.posts) {
+      const card = el('div', 'item missed');
+      const meta = el('div', 'item-head');
+      meta.append(el('span', `badge source-${post.source}`, SOURCE_LABELS[post.source] || post.source));
+      if (post.origin) meta.append(el('span', '', post.origin));
+      if (post.author && post.author !== post.origin) meta.append(el('span', '', post.author));
+      if (post.kind) meta.append(el('span', 'badge', post.kind));
+      card.append(meta);
+      card.append(el('div', 'item-text tight', post.text));
+      if (post.url) {
+        const link = el('a', '', 'Open ↗');
+        link.href = post.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        card.append(link);
+      }
+      list.append(card);
+    }
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function updateMissedButton(total) {
+  const button = $('#feed-missed');
+  if (!button) return;
+  button.textContent = total ? `Not matched (${total})` : 'Not matched';
+}
+
+function showFeedView(view) {
+  state.feed.view = view;
+  $('#feed-missed').classList.toggle('is-active', view === 'missed');
+  $('.col-feed .pager').classList.toggle('hidden', view === 'missed');
+  if (view === 'missed') loadMissed();
+  else loadFeed();
+}
+
+async function refreshMissedCount() {
+  try {
+    const params = new URLSearchParams();
+    if (state.feed.source) params.set('source', state.feed.source);
+    const data = await api(`/sources/missed?${params}`);
+    updateMissedButton(data.total);
+    return data.total;
+  } catch {
+    return 0;
+  }
+}
+
 async function loadFeed() {
+  if (state.feed.view === 'missed') return loadMissed();
   const params = new URLSearchParams();
   const f = state.feed;
   params.set('source', f.source || COMMUNITY_SOURCES.join(','));
@@ -227,7 +332,13 @@ async function loadFeed() {
     state.feed.total = data.total;
     state.feed.items = data.items;
     renderItems($('#feed-list'), data.items, emptyFeedMessage());
-    if (!data.items.length) $('#feed-list').append(pollEverythingButton());
+    const unmatched = await refreshMissedCount();
+    if (!data.items.length) {
+      // With posts fetched but none matched, the keyword gap is the answer,
+      // so lead with it rather than with another poll.
+      if (unmatched) $('#feed-list').append(missedPrompt(unmatched));
+      $('#feed-list').append(pollEverythingButton());
+    }
     const from = data.total === 0 ? 0 : f.offset + 1;
     const to = Math.min(f.offset + f.limit, data.total);
     $('#feed-range').textContent = `${from}-${to} of ${data.total}`;
@@ -318,7 +429,13 @@ function pollEverythingButton() {
       }
       await refreshHealth();
       refreshCounts();
-      loadFeed();
+      if (results.some((r) => r.ok && r.fetched && !r.added && r.unmatched)) {
+        const go = el('button', 'tiny', 'See what did not match');
+        go.addEventListener('click', () => showFeedView('missed'));
+        report.append(go);
+      } else {
+        loadFeed();
+      }
     } catch (err) {
       report.append(el('div', 'error', err.message));
     } finally {
@@ -330,6 +447,19 @@ function pollEverythingButton() {
   row.append(button);
   wrap.append(row, report);
   return wrap;
+}
+
+function missedPrompt(total) {
+  const box = el('div', 'banner');
+  box.append(
+    document.createTextNode(
+      `${total} post${total === 1 ? ' was' : 's were'} fetched but matched none of your keywords. `
+    )
+  );
+  const open = el('button', 'tiny', 'See them and the words they use');
+  open.addEventListener('click', () => showFeedView('missed'));
+  box.append(open);
+  return box;
 }
 
 async function refreshCounts() {
@@ -433,18 +563,37 @@ function renderKeywordBar() {
   }
 }
 
+/**
+ * Adds a keyword everywhere and says what it caught. The server weighs a new
+ * keyword straight away against posts already fetched and unmatched, so the
+ * answer is often "N posts captured" rather than "wait for the next poll".
+ */
+async function trackKeyword(term) {
+  // New terms apply everywhere by default; the Keywords tab narrows them.
+  const created = await api('/keywords', { method: 'POST', body: { term, scope: 'all' } });
+  const caught = (created.recheck && created.recheck.added) || 0;
+  toast(
+    caught
+      ? `Now tracking "${created.term}" — ${caught} post${caught === 1 ? '' : 's'} already fetched now match`
+      : `Now tracking "${created.term}" — it applies from the next poll`
+  );
+  await loadKeywordBar();
+  if (state.tab === 'keywords') loadKeywords();
+  if (caught) {
+    refreshCounts();
+    loadFeed();
+  }
+  return created;
+}
+
 async function addKeywordFromBar(event) {
   event.preventDefault();
   const input = $('#keyword-bar-input');
   const term = input.value.trim();
   if (!term) return;
   try {
-    // New terms apply everywhere by default; the Keywords tab narrows them.
-    const created = await api('/keywords', { method: 'POST', body: { term, scope: 'all' } });
+    await trackKeyword(term);
     input.value = '';
-    toast(`Now tracking "${created.term}"`);
-    await loadKeywordBar();
-    if (state.tab === 'keywords') loadKeywords();
   } catch (err) {
     toast(err.message, true);
   }
@@ -2484,6 +2633,9 @@ function init() {
       state.feed.offset = 0;
       loadFeed();
     }, 300)
+  );
+  $('#feed-missed').addEventListener('click', () =>
+    showFeedView(state.feed.view === 'missed' ? 'questions' : 'missed')
   );
   $('#feed-refresh').addEventListener('click', () => {
     refreshCounts();

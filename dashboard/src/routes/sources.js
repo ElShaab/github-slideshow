@@ -7,6 +7,11 @@ const subreddits = require('../lib/subreddits');
 const feeds = require('../lib/feeds');
 const feedSource = require('../sources/feeds');
 const reddit = require('../sources/reddit');
+const missed = require('../lib/missed');
+const keywordStore = require('../lib/keywords');
+
+/** The question sources; literature is matched differently and kept apart. */
+const COMMUNITY = ['reddit', 'x', 'youtube', 'feeds', 'websearch'];
 const youtubeChannels = require('../lib/youtubeChannels');
 const youtube = require('../sources/youtube');
 const searchSites = require('../lib/searchSites');
@@ -16,6 +21,40 @@ const router = express.Router();
 
 router.get('/', (req, res) => {
   res.json({ sources: scheduler.status(), logs: state.recentLogs(25) });
+});
+
+/**
+ * What the sources fetched that no keyword matched, with the words that keep
+ * recurring in it. This is the view that tells a keyword gap apart from a
+ * dead source.
+ */
+router.get('/missed', (req, res) => {
+  const wanted = String(req.query.source || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => COMMUNITY.includes(s));
+  const sources = wanted.length ? wanted : COMMUNITY;
+
+  const posts = missed.recent(sources);
+  const tracked = keywordStore.list().map((k) => k.term);
+  res.json({
+    total: posts.length,
+    by_source: sources.reduce((acc, source) => {
+      const n = posts.filter((p) => p.source === source).length;
+      if (n) acc[source] = n;
+      return acc;
+    }, {}),
+    suggestions: missed.suggest(posts, tracked),
+    posts: posts.slice(0, 60).map((p) => ({
+      source: p.source,
+      external_id: p.external_id,
+      origin: p.origin || null,
+      author: p.author || null,
+      url: p.url || null,
+      kind: p.kind || null,
+      text: String(p.text || '').slice(0, 400),
+    })),
+  });
 });
 
 /** Every source, in turn, so an empty feed can be diagnosed in one click. */

@@ -232,6 +232,26 @@ main { max-width: 1720px; margin: 0 auto; padding: 1.25rem; }
 .snippets textarea { min-height: 4.5rem; }
 .snippets p { margin: 0; }
 
+.missed-head { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+.missed-head p { margin: 0; font-size: 0.82rem; }
+.col-feed h3 { margin: 0.4rem 0 0; font-size: 0.82rem; color: var(--text-dim); }
+.suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface);
+  font-size: 0.75rem;
+}
+.suggestion.domain { border-color: var(--accent); }
+.suggestion button { border-radius: 99px; }
+.item.missed { border-left-color: var(--border); opacity: 0.92; }
+#feed-missed.is-active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.banner .tiny { margin-left: 0.4rem; }
+
 .poll-report { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.8rem; font-size: 0.8rem; }
 .poll-line {
   padding: 0.4rem 0.55rem;

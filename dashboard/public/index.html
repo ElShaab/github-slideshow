@@ -112,7 +112,7 @@
                 </div>
                 <div class="hidden snippets" id="wb-snippets"></div>
                 <textarea id="wb-draft-text" rows="12" spellcheck="true"
-                  placeholder="No draft yet. Match the research on the left, tick the papers to use, then generate a draft you can edit here."></textarea>
+                  placeholder="No draft yet. Match the research on the left, tick the papers to use, then build a draft — or just type a reply here and save it."></textarea>
                 <div class="row" id="wb-draft-controls">
                   <div class="status-group" id="wb-draft-status"></div>
                   <button class="ghost tiny" id="wb-draft-save">Save</button>
@@ -130,7 +130,13 @@
           <div class="console-col col-feed">
             <div class="col-head">
               <h2>Questions</h2>
-              <button class="ghost tiny" id="feed-refresh">Refresh</button>
+              <div class="row">
+                <button class="ghost tiny" id="feed-missed"
+                  title="Posts the sources fetched that matched none of your keywords">
+                  Not matched
+                </button>
+                <button class="ghost tiny" id="feed-refresh">Refresh</button>
+              </div>
             </div>
             <div class="col-body">
               <div class="filters" id="feed-filters">
