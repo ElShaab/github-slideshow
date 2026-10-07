@@ -120,7 +120,10 @@ test('reddit re-poll adds nothing new', async () => {
   try {
     const result = await reddit.poll();
     assert.equal(result.added, 0);
-    assert.equal(result.duplicates, 3);
+    // Two captured posts are duplicates; the one that matched nothing is
+    // weighed again rather than suppressed for good.
+    assert.equal(result.duplicates, 2);
+    assert.equal(result.unmatched, 1);
   } finally {
     mock.restore();
   }
@@ -162,7 +165,11 @@ test('a 403 block page becomes an actionable error, not a wall of CSS', async ()
 
   assert.match(message, /datacenter IPs/);
   assert.match(message, /REDDIT_CLIENT_ID/);
-  assert.match(message, /both the public feed and the public JSON endpoint/);
+  // Every address that was tried is named with what it said, so the failure
+  // is readable rather than inferred.
+  assert.match(message, /feed on www\.reddit\.com: HTTP 403/);
+  assert.match(message, /feed on old\.reddit\.com/);
+  assert.match(message, /JSON on www\.reddit\.com: HTTP 403/);
   assert.ok(!message.includes('--rem360'), 'the block page markup must not reach the log');
   // One cause, stated once, rather than repeated per subreddit.
   assert.equal(message.match(/datacenter IPs/g).length, 1);
@@ -259,6 +266,123 @@ test('a block page served as 200 is not mistaken for an empty feed', async () =>
   } finally {
     mock.restore();
   }
+});
+
+/** Reddit's own feed is Atom, but RSS turns up on mirrors. */
+function rssFeed(entries) {
+  return `<?xml version="1.0"?><rss version="2.0"><channel><title>r/amputee</title>
+${entries
+  .map(
+    (e) => `<item><title>${e.title}</title><link>https://www.reddit.com${e.permalink}</link>` +
+      `<guid>${e.id}</guid><author>/u/${e.author}</author>` +
+      `<pubDate>Mon, 05 Oct 2026 08:00:00 +0000</pubDate>` +
+      `<description>&lt;p&gt;${e.body}&lt;/p&gt;</description></item>`
+  )
+  .join('')}
+</channel></rss>`;
+}
+
+test('old.reddit.com is tried when www refuses, and RSS is read as well as Atom', async () => {
+  reddit.forgetPreferred();
+  const mock = mockFetch({
+    'www.reddit.com': { status: 403, body: '<body class=theme-beta></body>', headers: { 'content-type': 'text/html' } },
+    'old.reddit.com/r/amputee/new/.rss': {
+      body: rssFeed([
+        {
+          id: 't3_rss9',
+          author: 'oldreader',
+          title: 'Phantom limb pain since my revision',
+          permalink: '/r/amputee/comments/rss9/phantom/',
+          body: 'Worse since the revision surgery.',
+        },
+      ]),
+      headers: { 'content-type': 'application/rss+xml' },
+    },
+    'old.reddit.com/r/amputee/comments/.rss': { body: rssFeed([]), headers: { 'content-type': 'application/rss+xml' } },
+  });
+
+  let result;
+  try {
+    result = await reddit.poll();
+  } finally {
+    mock.restore();
+  }
+
+  assert.equal(result.added, 1);
+  const post = items.query({ source: 'reddit' }).items.find((i) => i.external_id === 't3_rss9');
+  assert.equal(post.author, 'u/oldreader');
+  assert.equal(post.kind, 'post');
+  assert.equal(post.url, 'https://www.reddit.com/r/amputee/comments/rss9/phantom/');
+  assert.match(post.text, /^Phantom limb pain since my revision\n\nWorse since the revision surgery\.$/);
+});
+
+test('the address that answered is reused instead of re-probing per subreddit', async () => {
+  // The previous test settled on old.reddit.com; www must not be touched again.
+  const mock = mockFetch({
+    'www.reddit.com': () => {
+      throw new Error('www must not be re-probed while old.reddit.com answers');
+    },
+    'old.reddit.com': { body: rssFeed([]), headers: { 'content-type': 'application/rss+xml' } },
+  });
+  try {
+    await reddit.poll();
+    assert.ok(!mock.calls.some((u) => u.includes('www.reddit.com')), 'www was not called');
+    assert.ok(mock.calls.some((u) => u.includes('old.reddit.com')), 'old was');
+  } finally {
+    mock.restore();
+    reddit.forgetPreferred();
+  }
+});
+
+test('diagnose reports every address without putting a block page in the log', async () => {
+  reddit.forgetPreferred();
+  const blockPage =
+    '<body class=theme-beta><div><style>.theme-light,:root{--rem360:22.5rem}</style></div></body>';
+  const mock = mockFetch({
+    'www.reddit.com/r/amputee/new/.rss': { status: 403, body: blockPage, headers: { 'content-type': 'text/html' } },
+    'old.reddit.com/r/amputee/new/.rss': {
+      body: rssFeed([
+        {
+          id: 't3_diag',
+          author: 'someone',
+          title: 'Phantom limb pain question',
+          permalink: '/r/amputee/comments/diag/x/',
+          body: 'Body text.',
+        },
+      ]),
+      headers: { 'content-type': 'application/rss+xml' },
+    },
+    'www.reddit.com/r/amputee/new.json': { status: 403, body: blockPage, headers: { 'content-type': 'text/html' } },
+    'old.reddit.com/r/amputee/new.json': { body: { data: { children: [] } } },
+  });
+
+  let report;
+  try {
+    report = await reddit.diagnose();
+  } finally {
+    mock.restore();
+    reddit.forgetPreferred();
+  }
+
+  assert.equal(report.subreddit, 'amputee');
+  assert.equal(report.using_oauth, false);
+  assert.match(report.user_agent, /^nodejs:amputee-research-dashboard:/);
+  assert.equal(report.attempts.length, 4, 'all four addresses are tried, not just the first');
+
+  const byId = Object.fromEntries(report.attempts.map((a) => [a.id, a]));
+  assert.equal(byId['feed-www'].ok, false);
+  assert.equal(byId['feed-www'].status, 403);
+  assert.equal(byId['feed-old'].ok, true);
+  assert.equal(byId['feed-old'].items, 1);
+  assert.match(byId['feed-old'].sample, /Phantom limb pain question/);
+  assert.equal(byId['json-www'].ok, false);
+  // An empty listing is an answer, not a refusal, but it is reported as empty.
+  assert.equal(byId['json-old'].ok, false);
+  assert.match(byId['json-old'].error, /empty/);
+
+  const serialized = JSON.stringify(report);
+  assert.ok(!serialized.includes('--rem360'), 'no block-page markup reaches the report');
+  assert.ok(!serialized.includes('theme-beta'));
 });
 
 test('with client credentials, reads go through the OAuth API', async () => {

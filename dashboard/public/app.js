@@ -306,9 +306,11 @@ function pollEverythingButton() {
         line.append(
           document.createTextNode(
             result.ok
-              ? `: ${result.added || 0} new from ${result.fetched || 0} fetched${
-                  result.notes ? ` — ${result.notes}` : ''
-                }`
+              ? `: ${result.added || 0} new from ${result.fetched || 0} fetched` +
+                (result.fetched && !result.added && result.unmatched
+                  ? ` — none of them matched your keywords`
+                  : '') +
+                (result.notes ? ` — ${result.notes}` : '')
               : `: ${result.error || result.message || result.skipped}`
           )
         );
@@ -642,7 +644,12 @@ function sourceCard(source) {
     try {
       const result = await api(`/sources/${source.id}/poll?force=true`, { method: 'POST' });
       if (result.ok) {
-        toast(`${source.label}: ${result.added || 0} new item(s) from ${result.fetched || 0} fetched`);
+        toast(
+          `${source.label}: ${result.added || 0} new item(s) from ${result.fetched || 0} fetched` +
+            (result.fetched && !result.added && result.unmatched
+              ? ' — none matched your keywords'
+              : '')
+        );
       } else {
         toast(`${source.label}: ${result.error || result.message || result.skipped}`, true);
       }
@@ -751,10 +758,11 @@ function literatureControls(source) {
 
 function redditControls(source) {
   const wrap = el('div');
-  // Which of the three read paths is in use, so a silent source is diagnosable.
+  // Which read path is in use, so a silent source is diagnosable.
   if (source.details.reads_via) {
     wrap.append(el('p', 'subtle', `Reading via ${source.details.reads_via}.`));
   }
+  wrap.append(redditDiagnostics());
   wrap.append(el('h3', '', 'Subreddits'));
   wrap.append(
     chipList(source.details.subreddits, {
@@ -808,6 +816,90 @@ function redditControls(source) {
   comments.prepend(checkbox);
   comments.append(' Also pull new comments (not just posts)');
   wrap.append(comments);
+  return wrap;
+}
+
+/**
+ * Reddit can fail four different ways and they look identical from the feed.
+ * This tries each address once and prints what it actually said.
+ */
+function redditDiagnostics() {
+  const wrap = el('div');
+  const row = el('div', 'row');
+  const run = el('button', 'tiny ghost', 'Check Reddit');
+  run.title = 'Try every public address once and report what each one answers';
+  row.append(run);
+  wrap.append(row);
+
+  const output = el('div', 'poll-report');
+  wrap.append(output);
+
+  run.addEventListener('click', async () => {
+    run.disabled = true;
+    run.textContent = 'Checking…';
+    output.innerHTML = '';
+    try {
+      const report = await api('/sources/reddit/diagnose', { method: 'POST' });
+      output.append(
+        el(
+          'div',
+          'subtle',
+          `r/${report.subreddit} · ${report.user_agent}` +
+            (report.using_oauth ? ' · using app credentials' : '')
+        )
+      );
+      // Reddit documents that the agent should name the account behind it,
+      // and is readier to answer one that does.
+      if (!/\(by \/u\//.test(report.user_agent)) {
+        const hint = el('div', 'subtle');
+        hint.append(
+          document.createTextNode(
+            'Reddit asks that the user agent name your account. Declare your ' +
+              'Reddit username under Linked accounts below and it is added ' +
+              'automatically — '
+          )
+        );
+        const jump = el('button', 'tiny ghost', 'Add it');
+        jump.addEventListener('click', () => {
+          const card = [...$$('#source-cards .card')].find((c) =>
+            c.textContent.includes('Linked accounts')
+          );
+          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        hint.append(jump);
+        output.append(hint);
+      }
+      for (const attempt of report.attempts) {
+        const line = el('div', `poll-line${attempt.ok ? '' : ' bad'}`);
+        line.append(el('b', '', attempt.label));
+        line.append(
+          document.createTextNode(
+            attempt.ok
+              ? `: answered with ${attempt.items} item(s) in ${attempt.ms}ms`
+              : `: ${attempt.error} (${attempt.ms}ms)`
+          )
+        );
+        if (attempt.sample) line.append(el('div', 'subtle', attempt.sample));
+        output.append(line);
+      }
+      if (!report.attempts.some((a) => a.ok)) {
+        output.append(
+          el(
+            'div',
+            'subtle',
+            'No public address answered. Register a Reddit app and set ' +
+              'REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET, or run the dashboard ' +
+              'from a home connection.'
+          )
+        );
+      }
+    } catch (err) {
+      output.append(el('div', 'error', err.message));
+    } finally {
+      run.disabled = false;
+      run.textContent = 'Check Reddit';
+    }
+  });
   return wrap;
 }
 

@@ -96,9 +96,14 @@ Every source normalizes to the same record:
 
 ### Deduplication
 
-`seen_items (source, external_id)` is the dedup ledger and is written even for
-items that matched no keyword. Dismissing an item from the feed deletes the
-`items` row but keeps the ledger entry, so a re-poll never resurfaces it.
+`seen_items (source, external_id)` is the dedup ledger, and it records **only
+what was actually captured**. An item that matched no keyword is deliberately
+left out: the keyword list changes — that is what the keyword bar is for — and
+a post passed over today must still be catchable by a term added tomorrow.
+Suppressing it permanently would mean everything fetched before a keyword
+existed could never be captured, which looks exactly like a broken source.
+Dismissing an item from the feed deletes the `items` row but keeps the ledger
+entry, so a re-poll never resurfaces it.
 Because the key includes the source, the same ID appearing on two sources is
 still stored twice.
 
@@ -335,18 +340,32 @@ endpoints. One private or banned subreddit is reported as a note; if *every*
 subreddit fails, the whole poll is marked as an error, stating the shared
 cause once rather than repeating it per subreddit.
 
-**Without app credentials the public Atom feeds are the primary path**, not a
-fallback. Reddit refuses the public JSON endpoints for a growing share of
-clients — it blocks them from datacenter IP ranges, Replit's included, and
-answers with an HTML block page rather than a JSON error — so trying JSON
-first only buys a 403 per subreddit per poll. The same listings publish feeds
-at `/r/<sub>/new/.rss` and `/r/<sub>/comments/.rss`: an official, public
-interface that needs no app registration. The JSON endpoint is still tried
-when a feed fails, since it carries more where it answers (score, comment
-count, flair). A block page served with HTTP 200 counts as a failure, so it is
-never mistaken for an empty feed. The Sources card says which path is in use.
+**Without app credentials four public addresses are tried in turn**, best
+first, because Reddit gates them differently and unevenly:
 
-If both are refused, the two ways out remain:
+1. the feed at `https://www.reddit.com/r/<sub>/new/.rss`
+2. the same feed on `old.reddit.com`
+3. the JSON listing on `www.reddit.com`
+4. the JSON listing on `old.reddit.com`
+
+Feeds come first because Reddit refuses the JSON endpoints for a growing share
+of clients — it blocks them from datacenter IP ranges, Replit's included, and
+answers with an HTML block page rather than a JSON error. Both RSS and Atom
+are read, since mirrors differ. Whichever address answers is remembered, so a
+poll does not re-probe the dead ones per subreddit, and a block page served
+with HTTP 200 counts as a failure rather than an empty feed. When nothing
+answers, the error names every address and what each one said.
+
+**Check Reddit**, on the Sources card, tries all four once and prints what
+each answered, with no block-page markup in the output. That turns "Reddit is
+not working" from an inference into a fact, and it is the first thing to press
+when nothing is arriving.
+
+Reddit also asks that the `User-Agent` name the account behind it, and is
+readier to answer one that does. Declare your Reddit username under **Linked
+accounts** and it is added automatically; the check says so when it is missing.
+
+If no address answers, the two ways out remain:
 
 1. **Read through the OAuth API** (recommended, and what the endpoints are
    for). Register an app at reddit.com/prefs/apps and set `REDDIT_CLIENT_ID`
@@ -537,6 +556,7 @@ staggered so every API is not called at once.
 | POST   | `/api/sources/:source/poll` | Poll now (`?force=true` ignores backoff) |
 | POST   | `/api/sources/poll-all` | Poll every source in turn and report each result |
 | POST   | `/api/sources/websearch/test` | One live query; `{domain, term}` both optional |
+| POST   | `/api/sources/reddit/diagnose` | Try all four public addresses and report each |
 | POST   | `/api/sources/:source/clear-backoff` | Clear a rate-limit backoff |
 | GET/PUT| `/api/settings` | Intervals, limits, toggles |
 | GET    | `/api/health` | Liveness plus per-source status |

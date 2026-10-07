@@ -77,10 +77,12 @@ function ingest(source, candidates, matcher) {
       hits = [{ id: null, term: candidate.fallbackKeyword }];
     }
     if (!hits.length) {
-      // Mark unmatched items as seen too: re-fetching them next poll will not
-      // make them match, and skipping the lookup keeps later polls cheap.
+      // Deliberately NOT marked as seen. The keyword list changes - that is
+      // the whole point of the keyword bar - and an item passed over today
+      // must still be catchable by a term added tomorrow. Suppressing it
+      // permanently would mean every post fetched before a keyword existed
+      // could never be captured, which looks exactly like a broken source.
       stats.unmatched += 1;
-      accepted.push({ externalId, item: null });
       continue;
     }
 
@@ -102,10 +104,11 @@ function ingest(source, candidates, matcher) {
     });
   }
 
+  // Only what was actually kept goes in the ledger, so dismissing an item
+  // still suppresses it while an unmatched one stays open to a later keyword.
   const write = db.transaction((rows) => {
     for (const row of rows) {
       stmts.markSeen.run(source, row.externalId);
-      if (!row.item) continue;
       const info = stmts.insertItem.run(row.item);
       if (!info.changes) {
         stats.duplicates += 1;

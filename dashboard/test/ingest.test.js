@@ -46,8 +46,48 @@ test('re-polling the same IDs adds nothing', () => {
     matcherFor('reddit')
   );
   assert.equal(stats.added, 0);
-  assert.equal(stats.duplicates, 2);
+  // The captured one is a duplicate; the unmatched one is simply weighed
+  // again, because the keyword list it failed against can change.
+  assert.equal(stats.duplicates, 1);
+  assert.equal(stats.unmatched, 1);
   assert.equal(items.query({ source: 'reddit' }).total, 1);
+});
+
+test('a keyword added later catches a post that was already passed over', () => {
+  // The bicycle post above has been fetched twice and matched nothing. This
+  // is the case that made a working source look broken: anything fetched
+  // before a keyword existed could never be captured.
+  keywords.create({ term: 'bicycles' });
+  const stats = ingest(
+    'reddit',
+    [candidate('t3_b', 'Unrelated post about bicycles')],
+    matcherFor('reddit')
+  );
+  assert.equal(stats.added, 1, 'the new keyword reaches back to it');
+  const caught = items.query({ source: 'reddit' }).items.find((i) => i.external_id === 't3_b');
+  assert.deepEqual(caught.keywords_matched, ['bicycles']);
+
+  // And once captured it is in the ledger, so it is not captured twice.
+  const again = ingest(
+    'reddit',
+    [candidate('t3_b', 'Unrelated post about bicycles')],
+    matcherFor('reddit')
+  );
+  assert.equal(again.added, 0);
+  assert.equal(again.duplicates, 1);
+});
+
+test('a dismissed item stays dismissed, it does not come back on the next poll', () => {
+  const captured = items.query({ source: 'reddit' }).items.find((i) => i.external_id === 't3_b');
+  items.remove(captured.id);
+
+  const stats = ingest(
+    'reddit',
+    [candidate('t3_b', 'Unrelated post about bicycles')],
+    matcherFor('reddit')
+  );
+  assert.equal(stats.added, 0, 'the ledger entry from capture still suppresses it');
+  assert.equal(stats.duplicates, 1);
 });
 
 test('dedup is per source, so the same ID on another source still lands', () => {

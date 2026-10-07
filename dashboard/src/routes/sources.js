@@ -6,6 +6,7 @@ const state = require('../lib/state');
 const subreddits = require('../lib/subreddits');
 const feeds = require('../lib/feeds');
 const feedSource = require('../sources/feeds');
+const reddit = require('../sources/reddit');
 const youtubeChannels = require('../lib/youtubeChannels');
 const youtube = require('../sources/youtube');
 const searchSites = require('../lib/searchSites');
@@ -39,6 +40,15 @@ router.post('/:source/clear-backoff', (req, res) => {
 });
 
 /* ---- Reddit: subreddit list ---- */
+
+/** Tries every public address once and reports what each one answered. */
+router.post('/reddit/diagnose', async (req, res) => {
+  try {
+    res.json(await reddit.diagnose());
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'The check failed' });
+  }
+});
 
 router.get('/reddit/subreddits', (req, res) => {
   res.json(subreddits.list());
