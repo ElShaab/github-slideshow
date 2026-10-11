@@ -147,8 +147,9 @@ test('building a draft stores it against the question, with no network call', as
   assert.equal(created.data.draft.status, 'draft');
   assert.equal(created.data.draft.model, null);
   assert.equal(created.data.draft.usage.composed, true);
-  assert.match(created.data.draft.content, /QUESTION/);
-  assert.match(created.data.draft.content, /WRITE YOUR REPLY HERE/);
+  // A postable reply, not a worksheet.
+  assert.ok(!/QUESTION|EVIDENCE|WRITE YOUR REPLY/.test(created.data.draft.content));
+  assert.match(created.data.draft.content, /(?:concluded|reported): "/);
   assert.equal(created.data.draft.citations.length, 1);
   assert.equal(created.data.match_used.count, 1);
 
@@ -189,7 +190,7 @@ test('the snippets stored in settings are what a built draft carries', async () 
   await call(`/api/drafts/${built.data.draft.id}`, { method: 'DELETE' });
 });
 
-test('only the ticked papers are handed to the model', async () => {
+test('only the ticked papers are quoted', async () => {
   // Three cached papers; the console ticks the first and the third.
   researchStore.save(question.id, {
     terms: ['phantom limb pain'],
@@ -221,12 +222,14 @@ test('only the ticked papers are handed to the model', async () => {
   );
 
   const draft = created.data.draft.content;
-  assert.match(draft, /\[1\] Paper 1/);
-  assert.match(draft, /\[2\] Paper 3/);
-  assert.ok(!draft.includes('Paper 2'), 'the unticked paper is left out');
-  // Each ticked paper's own conclusion, quoted.
+  // The strongest ticked paper is quoted; the other ticked one is listed
+  // beneath; the unticked one is nowhere.
   assert.match(draft, /"Findings of paper 1\."/);
-  assert.match(draft, /"Findings of paper 3\."/);
+  assert.ok(!draft.includes('paper 2'), 'the unticked paper is left out');
+  assert.deepEqual(
+    created.data.draft.citations.map((c) => [c.title, c.quoted]),
+    [['Paper 1', true], ['Paper 3', false]]
+  );
 
   await call(`/api/items/${question.id}/drafts`).then(({ data }) =>
     Promise.all(
@@ -241,7 +244,9 @@ test('ticking every paper is the same as ticking none', async () => {
     body: { use: [0, 1, 2] },
   });
   assert.equal(created.data.match_used.count, 3);
-  assert.match(created.data.draft.content, /\[3\] Paper 3/);
+  // All three travel with the draft; the reply itself quotes the first two.
+  assert.equal(created.data.draft.citations.length, 3);
+  assert.equal(created.data.draft.citations[2].quoted, false);
   await call(`/api/drafts/${created.data.draft.id}`, { method: 'DELETE' });
 });
 

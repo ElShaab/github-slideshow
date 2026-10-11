@@ -370,6 +370,38 @@ function adoptWebsearchOnByDefault() {
 
 adoptWebsearchOnByDefault();
 
+/**
+ * The first snippet defaults were written for a draft with a blank body the
+ * physician filled in. A reply posted as built reads better without them, so
+ * an install still carrying the old defaults word for word moves to the new
+ * ones. Anything the physician edited is left exactly as it is.
+ */
+function refreshUneditedSnippets() {
+  const marker = db
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get('draft.snippets_v2_applied');
+  if (marker) return;
+
+  const OLD = {
+    'draft.opening':
+      'Here is what the research actually says on this, in plain language. ' +
+      'General information rather than advice about your own case.',
+    'draft.closing':
+      'If this is affecting you day to day, it is worth raising with your ' +
+      'prosthetist or care team — they can look at your situation in a way ' +
+      'nobody can from a thread.',
+  };
+  const update = db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?');
+  for (const [key, oldValue] of Object.entries(OLD)) {
+    update.run(DEFAULT_SETTINGS[key], key, oldValue);
+  }
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+    'draft.snippets_v2_applied',
+    new Date().toISOString()
+  );
+}
+
+
 const SOURCES = ['reddit', 'x', 'youtube', 'feeds', 'pubmed', 'websearch', 'literature'];
 
 const DEFAULT_SETTINGS = {
@@ -446,15 +478,15 @@ const DEFAULT_SETTINGS = {
   'reply.enabled': 'true',
   'reply.confirm_each': 'true',
 
-  // Reusable lines the composed draft wraps the reply body in. Both are
-  // edited in the UI; both may be blank.
-  'draft.opening':
-    'Here is what the research actually says on this, in plain language. ' +
-    'General information rather than advice about your own case.',
+  // Reusable lines a built reply is wrapped in. Both are edited in the UI and
+  // both may be blank; a reply that opens straight on the research reads most
+  // naturally, so the opening starts empty.
+  'draft.opening': '',
   'draft.closing':
-    'If this is affecting you day to day, it is worth raising with your ' +
-    'prosthetist or care team — they can look at your situation in a way ' +
-    'nobody can from a thread.',
+    "Everyone's body is different, so your prosthetist is the best person to " +
+    'talk it through with.',
+  'draft.closing_share': '',
+  'draft.max_quoted': '1',
 
   // The daily literature sweep covers PubMed along with five other
   // databases, so the standalone poll is off by default; turn it on in
@@ -517,5 +549,7 @@ function seed() {
 }
 
 seed();
+// After the seed, so the new defaults it refers to are declared and stored.
+refreshUneditedSnippets();
 
 module.exports = { db, SOURCES, DEFAULT_SETTINGS };

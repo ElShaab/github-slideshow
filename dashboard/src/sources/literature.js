@@ -9,6 +9,7 @@ const state = require('../lib/state');
 const { mergeWorks } = require('../research/merge');
 const { classify } = require('../research/evidence');
 const { relevance } = require('../research/rank');
+const { hasLimbLossContext } = require('../research/terms');
 const { PROVIDERS } = require('../research');
 
 /**
@@ -173,6 +174,11 @@ async function poll() {
         }
         // Keyword search on these APIs is broad; keep what actually matches.
         if (relevance(work, [term]) < minRelevance) {
+          dropped += 1;
+          return false;
+        }
+        // "prosthetic" alone finds heart valves and hip joints.
+        if (!hasLimbLossContext(work)) {
           dropped += 1;
           return false;
         }

@@ -19,7 +19,9 @@ const PROVIDERS = [
 ];
 
 const SNIPPET_LENGTH = 320;
-const ABSTRACT_LIMIT = 2000;
+// Conclusions sit at the end of an abstract, so a short cap cut exactly the
+// part a draft quotes. This only guards the cache against something pathological.
+const ABSTRACT_LIMIT = 12000;
 
 function enabledProviders() {
   return PROVIDERS.filter((p) => settings.getBool(`research.provider_${p.id}`, true));

@@ -169,6 +169,26 @@ different source labels. Re-enable it in Sources if you want it back.
 Every captured question can be matched against six research databases at once,
 from the **For this question** view of the console's left column.
 
+**Every result must be about limb loss.** Matching is by shared words, which
+lets "prosthetic" find a heart-valve trial and "socket" a dental implant — and
+a registered trial then outranks real answers on evidence level alone. So a
+result has to mention amputation, a limb, a level (transtibial, below-knee…),
+a residual limb, osseointegration or similar, in its title or abstract, or it
+is dropped. The daily sweep applies the same rule.
+
+**Two papers are merged only if they are the same paper.** Titles that are
+close (character similarity of 0.9 or more) must also agree on every content
+word. "Transtibial prosthesis suspension systems: systematic review of
+literature" and "Transfemoral prosthesis suspension systems: a systematic
+review of the literature" are different papers from the same group in the same
+year, at 0.904 similarity; merging them put one paper's abstract under the
+other's title. A duplicate costs a line in a list; a conflation costs a false
+citation.
+
+Abstracts are cached whole. They used to be cut at 2,000 characters, which on
+a long abstract removed exactly the conclusion a reply quotes; a match made
+before this change should be **Re-run**.
+
 | Database | Credentials | What it adds |
 | -------- | ----------- | ------------ |
 | PubMed (E-utilities) | none | Biomedical literature, publication types |
@@ -225,67 +245,87 @@ limiting is reported as a chip on that provider and the rest still merge.
 
 ## Draft building
 
-**Build draft**, above the middle column, assembles a draft from what is
-already in the database. No model, no network call, no API key: the whole
-thing is string handling over the cached research match.
+**Build draft**, above the middle column, writes a reply you can post as it
+stands, from what is already in the database. No model, no network call, no
+API key.
 
-What it produces, in order:
+The text box holds only the reply — no headings, no markers, nothing to delete
+before posting:
 
-1. **The question**, restated in full and verbatim, with the source, the
-   thread it came from, the author and the date.
-2. **The evidence**: every ticked paper numbered `[1]`, `[2]`, … with its
-   title, journal, year, evidence level, open-access status and link — and
-   under each, **its conclusion quoted from the stored abstract, word for
-   word**.
-3. **The reply**, below a marked divider: your opening snippet, a clearly
-   marked blank section, and your closing snippet.
+> For anyone weighing this up, a 2014 systematic review concluded: "no clinical
+> evidence is available to suggest what kind of suspension system could have an
+> influential effect as a 'standard' system for all transtibial amputees.
+> However, among various suspension systems for transtibial amputees, the
+> Iceross system was favored by the majority of users in terms of function and
+> comfort." https://pubmed.ncbi.nlm.nih.gov/24315710/
 
-The rule the whole thing rests on is that nothing about a study is written by
-the dashboard. Every word inside quotation marks is copied from that study's
-abstract as the database holds it, because a paraphrase produced by string
-handling would be a claim nobody checked. What the reply actually argues is
-left blank for you to write.
+That is: an optional opening line, what the strongest ticked paper concluded
+with a link to it, and a closing line. The working material — every ticked
+paper, whether it was quoted, and if not, why — is listed beneath the draft,
+where it informs the reply without being part of what you copy.
+
+**Nothing about a study is written here.** The finding sits inside quotation
+marks, copied from that study's own abstract as one unbroken run of its text.
+The words around it say only what kind of study it was and when, which the
+metadata states outright. A leading "In summary," is dropped so the quote
+reads as a finding — what is left is still the abstract's own words — and
+quotation marks inside a quote become single quotes, the usual convention.
+
+**How it reads the question.** A question gets the answer straight. A post
+sharing how something went is not answered at; the research is offered "for
+anyone weighing this up". When the match found only weak results, the reply
+says the research is thin rather than sounding confident. With nothing usable,
+it says there isn't much published research, and quotes nothing.
+
+**What it will not quote.** A trial registration (no results), a paper with no
+stored abstract, or a conclusion that ends mid-word — which means the abstract
+was cut off, by a provider or an old cache. Those are skipped, the next ticked
+paper is used, and the note beneath the draft says why. Press **Re-run** on the
+research to fetch a cut-off abstract again.
 
 ### Finding the conclusion
 
-Three rules, tried in order, and the draft says which one fired:
+Three rules, tried in order:
 
 - **A labelled section.** Structured abstracts carry their section names
   (`CONCLUSIONS:`, `INTERPRETATION:`, `CONCLUSIONS AND RELEVANCE:`), so the
   text after the last such heading is taken, stopping at whatever section
-  follows — funding, registration, keywords. PubMed's `Label` attributes are
-  preserved for exactly this reason.
+  follows. PubMed's `Label` attributes are preserved for exactly this reason.
 - **A conclusion cue.** Failing that, a sentence opening with "In conclusion",
   "We conclude", "These findings suggest" and similar, to the end.
-- **The last two sentences**, labelled in the draft as *"Last lines of the
-  abstract, quoted (no conclusion section was labelled)"* so a weaker
-  extraction is never passed off as the author's own conclusion.
+- **The last two sentences.** A reply says such a paper "reported" rather than
+  "concluded", since an unstructured abstract's last lines are usually, but
+  not always, its conclusion.
 
 Sentence splitting protects abbreviations (`et al.`, `vs.`, `Fig.`, `0.5 mg.`),
 initials and decimals, and a quote is never cut mid-sentence to meet the length
-cap — a truncated quote is not a quote. Where the stored abstract is itself an
-extract, the note says so rather than letting a trailing ellipsis pass for the
-author's punctuation. A registered trial says it has no results to quote; a
-paper with no stored abstract says so and tells you to read it first.
+cap.
 
 ### Snippets
 
-The opening and closing lines are stored in SQLite (`draft.opening`,
-`draft.closing`) and edited from **Snippets** in the draft column. Either may
-be empty. They apply to the next draft you build, never retroactively.
+Edited from **Snippets** in the draft column and stored in SQLite:
+
+| Setting | Default | Used for |
+| ------- | ------- | -------- |
+| `draft.opening` | empty | The first line of every reply |
+| `draft.closing` | a pointer to the prosthetist | The last line of a reply to a question |
+| `draft.closing_share` | empty | The last line of a reply to someone sharing an experience |
+| `draft.max_quoted` | `1` | Papers quoted: 1 for the shortest reply, or 2 |
+
+An install still carrying the first defaults word for word moves to these;
+anything you edited is kept.
 
 ### Picking papers
 
-Every paper the match returned starts ticked. Unticking narrows what the draft
-quotes — the button reads *Build from 3* when three are ticked, and they are
-numbered in the order they appear on screen, so the citation numbers line up
-with the column beside them.
+Every paper the match returned starts ticked, and the reply quotes the first
+usable one in the order they appear. **Ticking still decides what is said**:
+the dashboard matches words, and cannot tell that a review of *hybrid
+shape-capture* techniques is not about a *hybrid suspension* socket. Untick
+what does not fit before building.
 
-Drafts are stored per question with status **Draft / Edited / Used**. Saving
-edited text moves a draft from Draft to Edited automatically. The papers a
-draft was built from are stored with it, so the citation numbers stay
-resolvable. A draft can also be written from scratch: type into the box and
-**Save** stores it like any other.
+Drafts are stored per question with status **Draft / Edited / Used**, and
+saving edited text moves a draft to Edited. A draft can also be written from
+scratch: type into the box and **Save** stores it like any other.
 
 ## Replying from the dashboard
 

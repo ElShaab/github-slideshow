@@ -494,7 +494,9 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .citations { margin-top: 0.75rem; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
 .citations .cite { color: var(--text-dim); }
-.citations .cite b { color: var(--text); font-weight: 600; }
+.citations .cite b { color: var(--text-dim); font-weight: 600; }
+.citations .cite.quoted b { color: var(--ok); }
+.citations .cite-note { font-size: 0.76rem; margin: 0.15rem 0 0.25rem; color: var(--text-dim); font-style: italic; }
 
 .result {
   background: var(--surface);

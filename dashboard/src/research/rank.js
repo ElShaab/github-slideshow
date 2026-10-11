@@ -1,6 +1,7 @@
 'use strict';
 
 const { classify } = require('./evidence');
+const { hasLimbLossContext } = require('./terms');
 
 /**
  * How well a work answers the question, from term overlap. Title hits count
@@ -91,7 +92,13 @@ function rankWorks(works, terms, options = {}) {
     return { ...work, ...scored };
   });
 
-  const relevant = graded
+  // Off-topic before anything else: a prosthetic heart valve trial shares
+  // words with an amputee's question and outranks real answers on evidence
+  // level alone. Pass requireContext: false to rank outside this domain.
+  const onTopic =
+    options.requireContext === false ? graded : graded.filter(hasLimbLossContext);
+
+  const relevant = onTopic
     .filter((work) => work.relevance >= minRelevance)
     .sort((a, b) => b.score - a.score);
 
@@ -103,6 +110,7 @@ function rankWorks(works, terms, options = {}) {
   return {
     results: top,
     considered: graded.length,
+    off_topic: graded.length - onTopic.length,
     no_strong_matches: !top.length || !strong,
     note: !top.length
       ? 'No results from any database matched this question closely enough to show.'

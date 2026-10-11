@@ -43,6 +43,44 @@ function similarity(a, b) {
 
 const FUZZY_THRESHOLD = 0.9;
 
+/** Words that carry no identity in a title, so differing on them is harmless. */
+const TITLE_FILLER = new Set([
+  'the', 'and', 'for', 'with', 'from', 'into', 'its', 'their', 'our', 'via',
+  'versus', 'among', 'between', 'within', 'after', 'about', 'how', 'what',
+]);
+
+/** A title's content words, plural folded, so "system" and "systems" agree. */
+function contentTokens(title) {
+  return new Set(
+    titleKey(title)
+      .split(' ')
+      .filter((token) => token.length > 2 && !TITLE_FILLER.has(token))
+      .map((token) => token.replace(/s$/, ''))
+  );
+}
+
+/**
+ * Whether two titles name the same work.
+ *
+ * Character similarity alone is not enough. "Transtibial prosthesis
+ * suspension systems: systematic review of literature" and "Transfemoral
+ * prosthesis suspension systems: a systematic review of the literature" are
+ * two different papers - same group, same year - and score 0.904, over the
+ * threshold. Merging them pinned one paper's abstract to the other's title,
+ * a citation that is simply false. So titles that are close must also agree
+ * on every content word; a word in one and not the other (transtibial,
+ * transfemoral, upper, lower, children) means two works. A duplicate costs a
+ * line in a list. A conflation costs a wrong citation.
+ */
+function sameWork(a, b) {
+  if (similarity(a, b) < FUZZY_THRESHOLD) return false;
+  const left = contentTokens(a);
+  const right = contentTokens(b);
+  for (const token of left) if (!right.has(token)) return false;
+  for (const token of right) if (!left.has(token)) return false;
+  return true;
+}
+
 function pickLonger(a, b) {
   if (!a) return b || null;
   if (!b) return a;
@@ -136,7 +174,7 @@ function mergeWorks(lists) {
           // A registered trial and a published paper are different records
           // even when their titles match.
           !!candidate.registry === !!entry.registry &&
-          similarity(candidate.title, entry.title) >= FUZZY_THRESHOLD
+          sameWork(candidate.title, entry.title)
       );
     }
 
@@ -155,4 +193,12 @@ function mergeWorks(lists) {
   return merged;
 }
 
-module.exports = { mergeWorks, normalizeDoi, similarity, titleKey, bestDate, FUZZY_THRESHOLD };
+module.exports = {
+  mergeWorks,
+  normalizeDoi,
+  similarity,
+  sameWork,
+  titleKey,
+  bestDate,
+  FUZZY_THRESHOLD,
+};

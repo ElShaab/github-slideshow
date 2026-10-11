@@ -18,6 +18,8 @@ router.get('/drafts/status', (req, res) => {
     configured: true,
     opening: settings.get('draft.opening') || '',
     closing: settings.get('draft.closing') || '',
+    closing_share: settings.get('draft.closing_share') || '',
+    max_quoted: Number(settings.get('draft.max_quoted')) === 2 ? 2 : 1,
     counts: drafts.summary(),
   });
 });

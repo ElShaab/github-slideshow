@@ -224,7 +224,22 @@ function extractTerms(question, options = {}) {
   return { terms: chosen.map((c) => c.term), detail: chosen };
 }
 
+/**
+ * Evidence that a work is about limb loss at all. Word overlap alone lets
+ * "prosthetic" match a heart valve and "socket" match a dental implant, and a
+ * registered trial then outranks real answers on evidence level alone. Every
+ * result must show one of these somewhere in its title or abstract.
+ */
+const LIMB_LOSS_CONTEXT =
+  /amput|\blimbs?\b|limb[- ]loss|trans-?tibial|trans-?femoral|trans-?radial|trans-?humeral|below[- ]knee|above[- ]knee|below[- ]elbow|above[- ]elbow|residual limb|\bstump|osseointegrat|phantom (?:limb|pain|sensation)|prosthetist|\bbka\b|\baka\b|artificial (?:leg|arm|limb)|disarticulation|lower[- ](?:extremity|limb) prosthe|upper[- ](?:extremity|limb) prosthe/i;
+
+function hasLimbLossContext(work) {
+  return LIMB_LOSS_CONTEXT.test(`${work.title || ''} ${work.abstract || ''}`);
+}
+
 module.exports = {
+  LIMB_LOSS_CONTEXT,
+  hasLimbLossContext,
   extractTerms,
   normalizeText,
   tokenize,

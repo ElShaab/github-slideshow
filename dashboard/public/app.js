@@ -30,7 +30,7 @@ const state = {
   researchViewChosen: false,
   health: null,
   editingKeyword: null,
-  snippets: { opening: '', closing: '' },
+  snippets: { opening: '', closing: '', closing_share: '', max_quoted: 1 },
   workbench: {
     itemId: null,
     match: null,
@@ -2037,12 +2037,14 @@ function renderDraft() {
     statusGroup.append(btn);
   }
 
+  // The working material behind the reply: every ticked paper, what it
+  // concluded, and why any was left out. It informs the reply without being
+  // part of the text that gets copied.
   if (draft.citations && draft.citations.length) {
-    citations.append(el('div', 'subtle', 'Studies given to the model:'));
+    citations.append(el('div', 'subtle', 'Papers behind this reply — for your reference, not part of the post:'));
     for (const cite of draft.citations) {
-      const line = el('div', 'cite');
-      const label = el('b', '', `[${cite.n}] `);
-      line.append(label);
+      const line = el('div', `cite${cite.quoted ? ' quoted' : ''}`);
+      line.append(el('b', '', cite.quoted ? 'Quoted · ' : 'Not quoted · '));
       if (cite.url) {
         const link = el('a', '', cite.title);
         link.href = cite.url;
@@ -2050,13 +2052,14 @@ function renderDraft() {
         link.rel = 'noopener noreferrer';
         line.append(link);
       } else {
-        line.append(document.createTextNode(cite.title));
+        line.append(document.createTextNode(cite.title || 'Untitled'));
       }
       line.append(
         document.createTextNode(
           ` — ${[cite.venue, cite.year, cite.evidence].filter(Boolean).join(', ')}`
         )
       );
+      if (cite.note) line.append(el('div', 'cite-note', cite.note));
       citations.append(line);
     }
   }
@@ -2065,12 +2068,17 @@ function renderDraft() {
 async function refreshDraftAvailability() {
   try {
     const status = await api('/drafts/status');
-    state.snippets = { opening: status.opening || '', closing: status.closing || '' };
+    state.snippets = {
+      opening: status.opening || '',
+      closing: status.closing || '',
+      closing_share: status.closing_share || '',
+      max_quoted: status.max_quoted === 2 ? 2 : 1,
+    };
     $('#wb-generate').title =
       'Builds the question, the ticked papers and their quoted conclusions into a draft';
     $('#wb-draft-hint').textContent =
-      'The draft is built here from the ticked papers: each conclusion is quoted ' +
-      'from its stored abstract, word for word. The reply itself is yours to write.';
+      'A reply you can post as it stands, built from the ticked papers. Each ' +
+      'finding is quoted word for word from its abstract; edit anything you like.';
   } catch {
     // Non-fatal: the button stays enabled and any failure surfaces on click.
   }
@@ -2088,7 +2096,8 @@ function renderSnippetEditor() {
   box.innerHTML = '';
   const fields = [
     ['draft.opening', 'Opening line', state.snippets.opening],
-    ['draft.closing', 'Closing line', state.snippets.closing],
+    ['draft.closing', 'Closing line, for questions', state.snippets.closing],
+    ['draft.closing_share', 'Closing line, for posts sharing an experience', state.snippets.closing_share],
   ];
   const inputs = {};
   for (const [key, label, value] of fields) {
@@ -2101,16 +2110,34 @@ function renderSnippetEditor() {
     inputs[key] = area;
   }
 
+  const countLabel = el('label', '', 'Papers quoted in a reply');
+  const count = el('select');
+  for (const n of [1, 2]) {
+    const option = el('option', '', n === 1 ? '1 — shortest' : '2 — when a second source adds something');
+    option.value = String(n);
+    if (state.snippets.max_quoted === n) option.selected = true;
+    count.append(option);
+  }
+  countLabel.append(count);
+  box.append(countLabel);
+
   const row = el('div', 'row');
   const save = el('button', 'tiny', 'Save snippets');
   save.addEventListener('click', async () => {
     const entries = {
       'draft.opening': inputs['draft.opening'].value,
       'draft.closing': inputs['draft.closing'].value,
+      'draft.closing_share': inputs['draft.closing_share'].value,
+      'draft.max_quoted': count.value,
     };
     await saveSettings(entries);
-    state.snippets = { opening: entries['draft.opening'], closing: entries['draft.closing'] };
-    toast('Snippets saved — they apply to the next draft you build');
+    state.snippets = {
+      opening: entries['draft.opening'],
+      closing: entries['draft.closing'],
+      closing_share: entries['draft.closing_share'],
+      max_quoted: Number(count.value),
+    };
+    toast('Saved — applies to the next reply you build');
   });
   const hide = el('button', 'tiny ghost', 'Close');
   hide.addEventListener('click', () => box.classList.add('hidden'));
@@ -2493,9 +2520,11 @@ async function generateDraft() {
     renderReply();
     const built = data.draft.usage || {};
     toast(
-      built.papers
-        ? `Draft built from ${built.papers} paper(s), ${built.quoted || 0} with a quoted conclusion`
-        : 'Draft built — no papers were ticked, so it cites nothing'
+      built.quoted
+        ? `Reply built — quotes ${built.quoted} of the ${built.papers} ticked paper(s)`
+        : built.papers
+          ? 'Reply built — none of the ticked papers had a usable conclusion; see the notes below it'
+          : 'Reply built — no papers were ticked, so it cites nothing'
     );
   } catch (err) {
     toast(err.message, true);

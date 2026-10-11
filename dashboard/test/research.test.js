@@ -128,6 +128,35 @@ test('different papers stay separate', () => {
   assert.equal(merged.length, 2);
 });
 
+test('two different papers with near-identical titles are never merged', () => {
+  // A real pair: same research group, same year, 0.904 character similarity.
+  // Merging them put the transtibial review's abstract under the transfemoral
+  // review's title, which is a false citation.
+  const transtibial = {
+    title: 'Transtibial prosthesis suspension systems: systematic review of literature.',
+    year: 2014,
+    venue: 'Clinical biomechanics',
+    pmid: '24315710',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/24315710/',
+    abstract: 'CONCLUSIONS: no clinical evidence is available for transtibial amputees.',
+    sources: ['pubmed'],
+  };
+  const transfemoral = {
+    title: 'Transfemoral prosthesis suspension systems: a systematic review of the literature.',
+    year: 2014,
+    venue: 'American journal of physical medicine & rehabilitation',
+    abstract: 'CONCLUSIONS: suspension for transfemoral users remains understudied.',
+    sources: ['openalex'],
+  };
+  assert.ok(similarity(transtibial.title, transfemoral.title) >= 0.9, 'they do look alike');
+
+  const merged = mergeWorks([transtibial, transfemoral]);
+  assert.equal(merged.length, 2, 'they stay two records');
+  const tt = merged.find((w) => /Transtibial/.test(w.title));
+  assert.match(tt.abstract, /transtibial/, 'each keeps its own abstract');
+  assert.equal(tt.url, 'https://pubmed.ncbi.nlm.nih.gov/24315710/');
+});
+
 test('a registered trial does not merge into a published paper of the same name', () => {
   const merged = mergeWorks([
     [{ source: 'pubmed', title: 'Mirror therapy for phantom limb pain' }],
@@ -205,4 +234,46 @@ test('weak-but-present matches are flagged rather than presented as answers', ()
   );
   assert.equal(ranked.no_strong_matches, true);
   assert.match(ranked.note, /weak/i);
+});
+
+test('off-topic results that only share words with the question are dropped', () => {
+  const { rankWorks } = require('../src/research/rank');
+  // The three that actually turned up for a question about a hybrid LBKA socket.
+  const offTopic = [
+    {
+      title: 'Immediate and Delayed Implant Placement Using Socket Shield Technique and Autogenous Dentin Graft',
+      abstract: 'A randomized trial of the socket shield technique in dental implant placement.',
+      registry: true,
+      evidence: { level: 2, label: 'Registered randomized trial', weight: 4 },
+    },
+    {
+      title: 'Anticoagulation Regiments in Patients With Prosthetic Heart Valve Thrombosis',
+      abstract: 'Patients with prosthetic valve thrombosis randomized to anticoagulation regimens.',
+      registry: true,
+      evidence: { level: 2, label: 'Registered randomized trial', weight: 4 },
+    },
+    {
+      title: 'The Influence of Antibiotic Prophylaxis on Intraoperative Prosthetic Joint Infection Cultures',
+      abstract: 'Prosthetic joint infection cultures after antibiotic prophylaxis in revision arthroplasty.',
+      registry: true,
+      evidence: { level: 2, label: 'Registered randomized trial', weight: 4 },
+    },
+  ];
+  const onTopic = {
+    title: 'Systematic review of effects of current transtibial prosthetic socket designs',
+    abstract: 'Socket designs for people with transtibial amputation were compared.',
+    evidence: { level: 1, label: 'Guideline / systematic review', weight: 5 },
+  };
+
+  const ranked = rankWorks([...offTopic, onTopic], ['prosthetic', 'socket', 'hybrid']);
+  assert.deepEqual(
+    ranked.results.map((w) => w.title),
+    [onTopic.title],
+    'only the limb-loss paper survives'
+  );
+  assert.equal(ranked.off_topic, 3);
+
+  // The gate can be switched off for a different domain.
+  const open = rankWorks([...offTopic, onTopic], ['prosthetic', 'socket'], { requireContext: false });
+  assert.ok(open.results.length > 1);
 });
