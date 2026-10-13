@@ -76,11 +76,11 @@
         <h1>GetFit</h1>
         <p>Privacy Policy</p>
       </header>
-<p><strong>Last updated: 12 October 2026</strong></p>
+<p><strong>Last updated: 13 October 2026</strong></p>
 <p>GetFit is operated by <strong>Mohamed Hussein</strong> (&quot;we&quot;, &quot;us&quot;), who can be reached at <strong><a href="mailto:getfit.app.support@gmail.com">getfit.app.support@gmail.com</a></strong> about anything in this policy. It explains what we collect, why, and what control you have over it.</p>
 <hr>
 <h2>The short version</h2>
-<p>Your body analysis is calculated on your phone. Progress photos never leave it, and each is deleted once it has been read. You can see your analysis and try the app without an account.</p>
+<p>Your body analysis and your nutrition targets are calculated on your phone. Progress photos and food photos never leave it, and each is deleted once it has been read. You can see your analysis and try the app without an account.</p>
 <p>When you take out a membership we ask you to create one: an email address, a code we send to check it is yours, and a password. The membership itself belongs to your Apple or Google account; the GetFit account is what puts your training data somewhere it survives a lost phone. The database is run by Supabase, and every row in it is locked to your account.</p>
 <hr>
 <h2>What we collect</h2>
@@ -100,6 +100,15 @@
 <p>This is <strong>health-related personal data</strong>. Where GDPR applies it is a special category of data under Article 9, processed on the basis of your explicit consent, which you give by entering your measurements and running an analysis. You can withdraw that consent at any time by deleting your account, which also erases the data from the device.</p>
 <h3>Training data</h3>
 <p>Your program, the workouts you complete, the weights and repetitions you log — including lifts you log from the Progress tab outside a workout — personal records, and your goals. When you remove a logged lift, the same applies as for body figures: the lift is erased from our database and only a marker that an entry was removed is kept.</p>
+<h3>Food, water and nutrition</h3>
+<p>If you use the Nutrition tab: the foods you log, with the amount, the meal, the day and the nutrient values of that food; the water you log; the activity level, pace and check-in day you choose; any targets you set yourself; the results of your weekly check-ins; foods you create; your favourites; and whether calorie numbers are hidden. Targets are worked out on your phone from your profile, goals and weight trend. Food values come from a database inside the app (USDA FoodData Central), so searching for a food never goes online.</p>
+<p>This is also <strong>health-related personal data</strong>, processed on the basis of your explicit consent, which you give by setting up the Nutrition tab and logging food. When you remove an entry it is erased from our database, and only a marker that it was removed is kept, as for body figures.</p>
+<h3>Food photos (optional, iPhone only)</h3>
+<p>You can photograph a meal, or choose a photo, instead of searching. <strong>The photo is read on your phone</strong> by the image recognition built into iOS (Apple's Vision framework), which suggests what the food might be. You then choose the food and the amount yourself; nothing is logged until you do.</p>
+<ul>
+<li><strong>The photo is not kept.</strong> It is deleted from the phone as soon as it has been read. If you chose it from your photo library, the original in your library is not changed.</li>
+<li><strong>Food photos never leave your phone.</strong> They are not uploaded, not synced to your account, and not sent to Apple or anyone else. The food you log records only that it was added from a photo suggestion.</li>
+</ul>
 <h3>Account data</h3>
 <p>Your email address and a password, collected when you take out a membership. <strong>We never see your password.</strong> It is handled and hashed by Supabase Auth; what GetFit receives is a session token, which is kept in your phone's keychain.</p>
 <p>We email you a short code to check the address is yours. We do this so that your training data can be returned to you on a new phone — an address we cannot reach is an account you could be locked out of. (The membership itself comes back with <strong>Restore purchase</strong>, from your Apple or Google account.)</p>
@@ -118,7 +127,7 @@
 <h3>Exercise videos</h3>
 <p>The first time you open an exercise, the app downloads its demonstration video and a still image from the GetFit website, and keeps them on your phone so they play offline after that. The website is hosted by GitHub Pages. Like any web page, the download shows GitHub your IP address and which file was asked for; nothing about you, your account or your training is sent with it.</p>
 <h3>Reminders</h3>
-<p>If you turn them on, GetFit can remind you on days you have a training session and when your weekly check-in unlocks. These are <strong>local notifications</strong>: your phone schedules and shows them itself. No notification passes through us or any push service, no device or push token is collected, and nothing about your reminders leaves the phone. They never show your weight, body fat or any other figure. Turn them off any time in <strong>Settings → Notifications</strong>, or in your phone's settings.</p>
+<p>If you turn them on, GetFit can remind you on days you have a training session and when your weekly check-in unlocks, and, separately, a few times a day to drink water. These are <strong>local notifications</strong>: your phone schedules and shows them itself. No notification passes through us or any push service, no device or push token is collected, and nothing about your reminders leaves the phone. They never show your weight, body fat or any other figure. Turn them off any time in <strong>Settings → Notifications</strong>, or in your phone's settings.</p>
 <hr>
 <h2>Where your data is</h2>
 <table>
@@ -128,6 +137,8 @@
 <tr><td>Program and training history</td><td>On your phone</td><td>On your phone <strong>and</strong> in your account</td></tr>
 <tr><td>Progress photos</td><td>On your phone, only until read</td><td>Never uploaded; deleted once read</td></tr>
 <tr><td>Outline widths read from a photo</td><td>On your phone</td><td>On your phone <strong>and</strong> in your account, with the assessment</td></tr>
+<tr><td>Food and water log, nutrition targets and settings</td><td>On your phone</td><td>On your phone <strong>and</strong> in your account</td></tr>
+<tr><td>Food photos</td><td>On your phone, only until read</td><td>Never uploaded; deleted once read</td></tr>
 <tr><td>Email address</td><td>Not collected</td><td>In your account</td></tr>
 <tr><td>Your name</td><td>Not collected</td><td>In your account, if you give one</td></tr>
 <tr><td>Password</td><td>Not collected</td><td>Hashed by Supabase; never seen by us</td></tr>
@@ -144,6 +155,8 @@
 <tr><td>Estimating your body composition</td><td>Measurements, height, weight, age, sex</td><td>Explicit consent (Art. 9(2)(a))</td></tr>
 <tr><td>Measuring your outline from that photo, on your phone, to shape your 3D figure</td><td>Photo (on the device), outline widths</td><td>Explicit consent (Art. 9(2)(a))</td></tr>
 <tr><td>Building and progressing your program</td><td>Body metrics, training history, goals</td><td>Contract</td></tr>
+<tr><td>Working out nutrition targets and tracking what you eat and drink</td><td>Profile, goals, weight trend, body fat, food and water log</td><td>Explicit consent (Art. 9(2)(a))</td></tr>
+<tr><td>Suggesting a food from a photo, on your phone</td><td>Photo (on the device)</td><td>Consent — you choose to take or pick it</td></tr>
 <tr><td>Keeping your data across devices</td><td>Email, training data, assessments</td><td>Contract</td></tr>
 <tr><td>Keeping the service secure and working</td><td>Technical data</td><td>Legitimate interests</td></tr>
 <tr><td>Improving the app</td><td>Feedback you choose to send</td><td>Consent — you send it or you do not</td></tr>
@@ -162,13 +175,14 @@
 </table>
 <p>Your account's data is held in the region the GetFit Supabase project is hosted in. Supabase publishes its own infrastructure providers, subprocessors and security practices at supabase.com/privacy.</p>
 <p>There is <strong>no third-party object storage</strong> and no photo hosting of any kind, because photos are never uploaded.</p>
-<p>There is <strong>no AI or image-analysis subprocessor</strong>. Body composition is computed on your own phone from your measurements, and your photos are never sent anywhere for analysis: the outline is measured on the phone itself.</p>
+<p>There is <strong>no AI or image-analysis subprocessor</strong>. Body composition is computed on your own phone from your measurements, and your photos are never sent anywhere for analysis: the outline is measured on the phone itself, and food photos are recognised by iOS on the phone. Nutrition targets and vitamin and mineral figures are calculated on the phone too.</p>
 <p>We do <strong>not</strong> sell your personal information, and we do not share it for cross-context behavioural advertising.</p>
 <hr>
 <h2>How long we keep it</h2>
 <ul>
 <li><strong>Photos:</strong> on your phone until you delete the assessment or the app. We never hold a copy.</li>
 <li><strong>Assessments and training history:</strong> until you delete your account.</li>
+<li><strong>Food and water log and nutrition settings:</strong> until you remove an entry or delete your account.</li>
 <li><strong>Account record:</strong> until you delete your account.</li>
 <li><strong>Feedback you sent:</strong> until you delete your account, which deletes it with everything else.</li>
 <li><strong>Subscription records:</strong> held by Apple or Google, not by us.</li>
@@ -176,7 +190,7 @@
 </ul>
 <h2>Deleting everything</h2>
 <p><strong>Settings → Privacy → Delete account.</strong></p>
-<p>This is immediate and permanent. It erases your profile, every assessment, your whole training history, your goals and any feedback you sent us — both from this phone and from our database — and signs you out. There are no photos to delete: each is deleted once it has been read. Nothing is retained in a recoverable form, and there is no grace period.</p>
+<p>This is immediate and permanent. It erases your profile, every assessment, your whole training history, your goals, your food and water log and nutrition settings, and any feedback you sent us — both from this phone and from our database — and signs you out. There are no photos to delete: each is deleted once it has been read. Nothing is retained in a recoverable form, and there is no grace period.</p>
 <p>If the deletion cannot reach our database — for example because you are offline — the app tells you so and <strong>does not</strong> delete the local copy, so that you are never told your data is gone while it is still stored. Try again when you have a connection.</p>
 <p>Deleting your GetFit account does <strong>not</strong> cancel your subscription — Apple and Google own that relationship. Cancel it in your App Store or Play Store account settings, or you will continue to be billed.</p>
 <h2>Your rights</h2>
