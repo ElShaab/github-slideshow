@@ -76,12 +76,13 @@
         <h1>GetFit</h1>
         <p>Privacy Policy</p>
       </header>
-<p><strong>Last updated: 13 October 2026</strong></p>
+<p><strong>Last updated: 15 October 2026</strong></p>
 <p>GetFit is operated by <strong>Mohamed Hussein</strong> (&quot;we&quot;, &quot;us&quot;), who can be reached at <strong><a href="mailto:getfit.app.support@gmail.com">getfit.app.support@gmail.com</a></strong> about anything in this policy. It explains what we collect, why, and what control you have over it.</p>
 <hr>
 <h2>The short version</h2>
 <p>Your body analysis and your nutrition targets are calculated on your phone. Progress photos and food photos never leave it, and each is deleted once it has been read. You can see your analysis and try the app without an account.</p>
 <p>When you take out a membership we ask you to create one: an email address, a code we send to check it is yours, and a password. The membership itself belongs to your Apple or Google account; the GetFit account is what puts your training data somewhere it survives a lost phone. The database is run by Supabase, and every row in it is locked to your account.</p>
+<p>GetFit advertises on Facebook and Instagram. <strong>Only if you allow it</strong>, the app tells Meta when it is installed and opened and when a membership starts, so we can see which ads work. Nothing about your body, training, food or account goes with it, and it stays off unless you say yes.</p>
 <hr>
 <h2>What we collect</h2>
 <h3>Your measurements</h3>
@@ -123,7 +124,17 @@
 <p>Feedback is entirely optional, and nothing in the app depends on it. Please do not type anything into it you would rather we did not keep: it is free text, so whatever you write is what we store. It is deleted with your account.</p>
 <p>If you have not created your account yet, or you are offline, the message waits on your phone and is sent when it can be. Signing out deletes anything still waiting, unsent.</p>
 <h3>Technical data</h3>
-<p>GetFit contains <strong>no third-party analytics, advertising or tracking SDKs</strong>, and does not track you across other apps or websites. When you have an account, Supabase records standard service logs — IP address, timestamps, and which requests were made — as part of running the database.</p>
+<p>GetFit contains <strong>no third-party analytics or tracking SDKs</strong>, and does not track you across other apps or websites. It does contain Meta's SDK, used only to measure our own ads and only if you allow it (see &quot;Ad measurement with Meta&quot; below). When you have an account, Supabase records standard service logs — IP address, timestamps, and which requests were made — as part of running the database.</p>
+<h3>Ad measurement with Meta (optional)</h3>
+<p>GetFit advertises on Facebook and Instagram, and uses Meta's software development kit (SDK) to see which of those ads lead to people installing the app and taking out a membership. It is <strong>off unless you allow it</strong>: the app asks once, on Home, and you can change your answer at any time in <strong>Settings → Privacy → Ad measurement with Meta</strong>.</p>
+<p>If you allow it, Meta's SDK sends Meta:</p>
+<ul>
+<li>that the app was installed and opened, and when a membership is bought or renewed (the product and price, as the App Store or Google Play reports them);</li>
+<li>the device and app details the SDK reads automatically: device model, system version, app version, language, time zone and IP address;</li>
+<li>an identifier the SDK creates for this installation of the app.</li>
+</ul>
+<p>It never sends your measurements, health, training or food data, photos, name, email address or GetFit account, because GetFit sends Meta no information of its own — only the SDK's automatic events. The SDK is set never to collect your device's advertising identifier (IDFA on iPhone, advertising ID on Android), and GetFit does not track you across other companies' apps or websites. On iPhone, Meta reports on our ads through Apple's SKAdNetwork and its own Aggregated Event Measurement, which are designed to work without tracking.</p>
+<p>Meta (Meta Platforms Ireland Ltd in the EEA, UK and Switzerland; Meta Platforms, Inc. elsewhere) uses these events under its own privacy policy, at facebook.com/privacy/policy, as a separate controller rather than on our behalf. If you turn ad measurement off, the SDK stops sending events straight away and is not started again.</p>
 <h3>Exercise videos</h3>
 <p>The first time you open an exercise, the app downloads its demonstration video and a still image from the GetFit website, and keeps them on your phone so they play offline after that. The website is hosted by GitHub Pages. Like any web page, the download shows GitHub your IP address and which file was asked for; nothing about you, your account or your training is sent with it.</p>
 <h3>Reminders</h3>
@@ -143,6 +154,7 @@
 <tr><td>Your name</td><td>Not collected</td><td>In your account, if you give one</td></tr>
 <tr><td>Password</td><td>Not collected</td><td>Hashed by Supabase; never seen by us</td></tr>
 <tr><td>Feedback you send</td><td>Waits on your phone</td><td>Sent to us, and kept until you delete your account</td></tr>
+<tr><td>App installs, opens and membership starts</td><td>Never sent</td><td>Sent to Meta, only if you allow ad measurement</td></tr>
 <tr><td>Payment details</td><td>Never collected</td><td>Never collected</td></tr>
 </tbody>
 </table>
@@ -160,6 +172,7 @@
 <tr><td>Keeping your data across devices</td><td>Email, training data, assessments</td><td>Contract</td></tr>
 <tr><td>Keeping the service secure and working</td><td>Technical data</td><td>Legitimate interests</td></tr>
 <tr><td>Improving the app</td><td>Feedback you choose to send</td><td>Consent — you send it or you do not</td></tr>
+<tr><td>Measuring which of our ads work</td><td>Installs, app opens, membership starts, device and app details</td><td>Consent — given on Home or in Settings, and withdrawn there at any time</td></tr>
 </tbody>
 </table>
 <hr>
@@ -174,9 +187,10 @@
 </tbody>
 </table>
 <p>Your account's data is held in the region the GetFit Supabase project is hosted in. Supabase publishes its own infrastructure providers, subprocessors and security practices at supabase.com/privacy.</p>
+<p>If you allow ad measurement, <strong>Meta</strong> receives the events described in &quot;Ad measurement with Meta&quot; and uses them under its own privacy policy, as a separate controller. Nothing else about you goes to Meta.</p>
 <p>There is <strong>no third-party object storage</strong> and no photo hosting of any kind, because photos are never uploaded.</p>
-<p>There is <strong>no AI or image-analysis subprocessor</strong>. Body composition is computed on your own phone from your measurements, and your photos are never sent anywhere for analysis: the outline is measured on the phone itself, and food photos are recognised by iOS on the phone. Nutrition targets and vitamin and mineral figures are calculated on the phone too.</p>
-<p>We do <strong>not</strong> sell your personal information, and we do not share it for cross-context behavioural advertising.</p>
+<p>There is <strong>no AI or image-analysis subprocessor</strong>. Body composition is computed on your own phone from your measurements, and your photos are never sent anywhere for analysis: the outline is measured on the phone itself, and food photos are recognised on the phone by a model built into the app. Nutrition targets and vitamin and mineral figures are calculated on the phone too.</p>
+<p>We do <strong>not</strong> sell your personal information. Apart from the ad-measurement events above, which are sent only if you allow them and can be turned off at any time in Settings → Privacy, we do not share it for advertising.</p>
 <hr>
 <h2>How long we keep it</h2>
 <ul>
@@ -187,11 +201,13 @@
 <li><strong>Feedback you sent:</strong> until you delete your account, which deletes it with everything else.</li>
 <li><strong>Subscription records:</strong> held by Apple or Google, not by us.</li>
 <li><strong>Supabase service logs:</strong> kept for Supabase's own retention period as part of running the database.</li>
+<li><strong>Ad-measurement events:</strong> held by Meta under its own retention policy, only if you allowed them. We do not receive or keep a copy.</li>
 </ul>
 <h2>Deleting everything</h2>
 <p><strong>Settings → Privacy → Delete account.</strong></p>
 <p>This is immediate and permanent. It erases your profile, every assessment, your whole training history, your goals, your food and water log and nutrition settings, and any feedback you sent us — both from this phone and from our database — and signs you out. There are no photos to delete: each is deleted once it has been read. Nothing is retained in a recoverable form, and there is no grace period.</p>
 <p>If the deletion cannot reach our database — for example because you are offline — the app tells you so and <strong>does not</strong> delete the local copy, so that you are never told your data is gone while it is still stored. Try again when you have a connection.</p>
+<p>Ad-measurement events already sent to Meta, if you allowed them, are held by Meta rather than by us; turning ad measurement off stops any more being sent, and Meta's own privacy tools cover the rest.</p>
 <p>Deleting your GetFit account does <strong>not</strong> cancel your subscription — Apple and Google own that relationship. Cancel it in your App Store or Play Store account settings, or you will continue to be billed.</p>
 <h2>Your rights</h2>
 <p>Depending on where you live you may have the right to access, correct, export, delete or restrict processing of your data, and to object to it. Most of this is available directly in the app; for anything else, contact us and we will respond within the period the law requires.</p>
