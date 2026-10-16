@@ -76,7 +76,7 @@
         <h1>GetFit</h1>
         <p>Privacy Policy</p>
       </header>
-<p><strong>Last updated: 15 October 2026</strong></p>
+<p><strong>Last updated: 16 October 2026</strong></p>
 <p>GetFit is operated by <strong>Mohamed Hussein</strong> (&quot;we&quot;, &quot;us&quot;), who can be reached at <strong><a href="mailto:getfit.app.support@gmail.com">getfit.app.support@gmail.com</a></strong> about anything in this policy. It explains what we collect, why, and what control you have over it.</p>
 <hr>
 <h2>The short version</h2>
@@ -119,6 +119,7 @@
 <h3>Subscription data</h3>
 <p>Which plan you bought and when the period ends, read from the App Store or Play Store on the device.</p>
 <p><strong>We never see or store your payment details.</strong> All payments are handled by Apple or Google, and GetFit checks your membership with the store directly from your phone.</p>
+<p>Apple also tells our server when an App Store subscription starts, renews, fails to renew, ends or is refunded. We keep a record of each of these notices: what happened, the plan, its price and currency, the dates, whether it was a test purchase, and Apple's transaction numbers for it. It comes from Apple, not from your phone, and it contains nothing that identifies you: no name, no email address, and no link to your GetFit account. We use it to keep track of sales and refunds, and a short summary of each one is emailed to us.</p>
 <h3>Feedback you send us</h3>
 <p>If you use <strong>Send feedback</strong> — from Settings, or from the sheet the app offers once after your first few workouts — we store exactly what you typed, together with your account id, the app version and whether you are on iOS or Android. Nothing else is attached, and the app does not read your training data or your photos into it.</p>
 <p>Feedback is entirely optional, and nothing in the app depends on it. Please do not type anything into it you would rather we did not keep: it is free text, so whatever you write is what we store. It is deleted with your account.</p>
@@ -156,6 +157,7 @@
 <tr><td>Feedback you send</td><td>Waits on your phone</td><td>Sent to us, and kept until you delete your account</td></tr>
 <tr><td>App installs, opens and membership starts</td><td>Never sent</td><td>Sent to Meta, only if you allow ad measurement</td></tr>
 <tr><td>Payment details</td><td>Never collected</td><td>Never collected</td></tr>
+<tr><td>App Store subscription events (plan, price, dates, Apple's transaction numbers)</td><td>Sent to us by Apple, not by the app; not linked to you</td><td>The same</td></tr>
 </tbody>
 </table>
 <p>The app keeps its own copy on the device at all times, which is why it works with no signal. When you have an account, that copy is synchronised with the database in the background.</p>
@@ -181,8 +183,9 @@
 <table>
 <thead><tr><th>Subprocessor</th><th>What it handles</th></tr></thead>
 <tbody>
-<tr><td><strong>Supabase</strong></td><td>Hosts the database your account's data is stored in, and handles sign-in</td></tr>
-<tr><td><strong>Apple</strong> / <strong>Google</strong></td><td>Process payments and confirm subscription status</td></tr>
+<tr><td><strong>Supabase</strong></td><td>Hosts the database your account's data is stored in (and the subscription events above), and handles sign-in</td></tr>
+<tr><td><strong>Apple</strong> / <strong>Google</strong></td><td>Process payments and confirm subscription status; Apple also notifies us of subscription events</td></tr>
+<tr><td><strong>Google</strong> (Gmail)</td><td>Carries our own email summaries of those subscription events, which name no one</td></tr>
 <tr><td><strong>GitHub</strong> (GitHub Pages)</td><td>Serves the exercise videos the app downloads; sees the IP address of each download, as any website does</td></tr>
 </tbody>
 </table>
@@ -199,7 +202,7 @@
 <li><strong>Food and water log and nutrition settings:</strong> until you remove an entry or delete your account.</li>
 <li><strong>Account record:</strong> until you delete your account.</li>
 <li><strong>Feedback you sent:</strong> until you delete your account, which deletes it with everything else.</li>
-<li><strong>Subscription records:</strong> held by Apple or Google, not by us.</li>
+<li><strong>Subscription records:</strong> held by Apple or Google. The App Store subscription events Apple sends us are kept as our record of sales and refunds. They are not linked to your GetFit account, so deleting your account does not remove them.</li>
 <li><strong>Supabase service logs:</strong> kept for Supabase's own retention period as part of running the database.</li>
 <li><strong>Ad-measurement events:</strong> held by Meta under its own retention policy, only if you allowed them. We do not receive or keep a copy.</li>
 </ul>
