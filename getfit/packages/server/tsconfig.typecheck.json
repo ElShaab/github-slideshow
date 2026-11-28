@@ -1,0 +1,10 @@
+{
+  // Type-checks the tests alongside the source. The build config deliberately
+  // excludes tests so they are never emitted into the production bundle.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}
