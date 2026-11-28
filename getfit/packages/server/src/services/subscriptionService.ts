@@ -1,0 +1,351 @@
+import {
+  SUBSCRIPTION_PRODUCT_ID,
+  planForProduct,
+  type BillingPlatform,
+  type Entitlement,
+  type Subscription,
+  type SubscriptionStatus,
+} from '@getfit/shared';
+import { BillingVerificationError, getBillingProvider } from '../billing';
+import { subscriptionRepository } from '../repositories/subscriptionRepository';
+import { errors } from '../utils/errors';
+import { logger } from '../utils/logger';
+
+export interface PurchaseInput {
+  userId: string;
+  platform: BillingPlatform;
+  receipt: string;
+  productId?: string;
+  packageName?: string;
+}
+
+/**
+ * SubscriptionService
+ *
+ * The single source of truth for whether a user may use the paid product.
+ * Entitlement is always recomputed on the server from a stored, store-verified
+ * period — the client's own claim is never consulted.
+ */
+export class SubscriptionService {
+  /**
+   * Evaluates entitlement now. An `active` subscription whose period has
+   * already ended is transitioned to `expired` here rather than waiting for a
+   * background job, so the very next request is correctly gated.
+   */
+  async getEntitlement(userId: string, now = new Date()): Promise<Entitlement> {
+    const subscription = await subscriptionRepository.get(userId);
+
+    if (!subscription || subscription.status === 'none') {
+      return {
+        active: false,
+        status: 'none',
+        expiresAt: null,
+        productId: null,
+        platform: null,
+        evaluatedAt: now.toISOString(),
+      };
+    }
+
+    const periodEnd = subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+    const withinPeriod = periodEnd !== null && periodEnd.getTime() > now.getTime();
+
+    let status = subscription.status;
+
+    // `cancelled` still grants access until the paid period runs out.
+    const grantsAccess = status === 'active' || status === 'restored' || status === 'cancelled';
+
+    if (grantsAccess && !withinPeriod) {
+      status = 'expired';
+      await subscriptionRepository.setStatus(userId, 'expired');
+      await subscriptionRepository.recordEvent({
+        userId,
+        subscriptionId: subscription.id,
+        eventType: 'period_ended',
+        fromStatus: subscription.status,
+        toStatus: 'expired',
+        platform: subscription.platform,
+        payload: { periodEnd: subscription.currentPeriodEnd },
+      });
+    }
+
+    return {
+      active: grantsAccess && withinPeriod,
+      status,
+      expiresAt: subscription.currentPeriodEnd,
+      productId: subscription.productId || null,
+      platform: subscription.platform,
+      evaluatedAt: now.toISOString(),
+    };
+  }
+
+  /** Verifies a store purchase and, if valid, grants the membership. */
+  async purchase(input: PurchaseInput): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
+    const productId = input.productId ?? SUBSCRIPTION_PRODUCT_ID;
+
+    // The client picks the plan, so the catalogue is what bounds that choice.
+    // An unrecognised product would otherwise be priced as if it were the
+    // monthly plan and granted whatever period the receipt happened to carry.
+    const plan = planForProduct(productId);
+    if (!plan) {
+      logger.warn('Purchase named a product we do not sell', { productId });
+      throw errors.invalidInput('That membership is not available.');
+    }
+
+    const existing = await subscriptionRepository.get(input.userId);
+
+    await subscriptionRepository.recordEvent({
+      userId: input.userId,
+      subscriptionId: existing?.id ?? null,
+      eventType: 'purchase_attempt',
+      fromStatus: existing?.status ?? null,
+      toStatus: 'pending',
+      platform: input.platform,
+      payload: { productId },
+    });
+
+    let verified;
+    try {
+      const provider = getBillingProvider(input.platform);
+      verified = await provider.verify({
+        platform: input.platform,
+        receipt: input.receipt,
+        productId,
+        packageName: input.packageName,
+      });
+    } catch (error) {
+      const reason = error instanceof BillingVerificationError ? error.reason : 'unknown';
+      logger.warn('Purchase verification failed', { reason, platform: input.platform });
+
+      // A failed verification must never take away time the user already paid
+      // for. An App Store outage during "Restore purchase" would otherwise
+      // cancel a live membership, so the stored period is only rewritten when
+      // there is no active entitlement left to protect.
+      const entitlement = await this.getEntitlement(input.userId);
+      if (!entitlement.active) {
+        await subscriptionRepository.upsert({
+          userId: input.userId,
+          status: 'failed',
+          platform: input.platform,
+          productId,
+          priceUsd: plan.priceUsd,
+          // null preserves whatever receipt is already bound to this account.
+          originalTransactionId: null,
+          currentPeriodStart: existing?.currentPeriodStart
+            ? new Date(existing.currentPeriodStart)
+            : null,
+          currentPeriodEnd: existing?.currentPeriodEnd ? new Date(existing.currentPeriodEnd) : null,
+          cancelAtPeriodEnd: existing?.cancelAtPeriodEnd ?? false,
+        });
+      }
+
+      await subscriptionRepository.recordEvent({
+        userId: input.userId,
+        subscriptionId: existing?.id ?? null,
+        eventType: 'purchase_failed',
+        fromStatus: existing?.status ?? null,
+        toStatus: entitlement.active ? entitlement.status : 'failed',
+        platform: input.platform,
+        payload: { reason, preservedActivePeriod: entitlement.active },
+      });
+
+      throw errors.paymentFailed();
+    }
+
+    if (!verified.valid || verified.revoked) {
+      // A revocation is the store voiding the entitlement — that ends access
+      // now. A merely invalid receipt is not: the user may hold a live period
+      // from a different purchase, and presenting a stale receipt must not
+      // cancel it.
+      const entitlement = verified.revoked ? null : await this.getEntitlement(input.userId);
+      const protectActivePeriod = entitlement?.active === true;
+
+      if (!protectActivePeriod) {
+        await subscriptionRepository.upsert({
+          userId: input.userId,
+          status: verified.revoked ? 'cancelled' : 'failed',
+          platform: input.platform,
+          productId,
+          priceUsd: plan.priceUsd,
+          // Never bind a receipt that did not verify. Recording it here let
+          // someone present a stranger's refunded receipt, claim its permanent
+          // transaction id onto their own row, and lock the rightful owner out
+          // of ever subscribing. null preserves any binding already held.
+          originalTransactionId: null,
+          currentPeriodStart: verified.periodStart,
+          currentPeriodEnd: verified.revoked ? new Date() : null,
+          cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
+        });
+      }
+      await subscriptionRepository.recordEvent({
+        userId: input.userId,
+        subscriptionId: existing?.id ?? null,
+        eventType: verified.revoked ? 'purchase_revoked' : 'purchase_invalid',
+        fromStatus: existing?.status ?? null,
+        toStatus: verified.revoked ? 'cancelled' : 'failed',
+        platform: input.platform,
+        payload: verified.raw,
+      });
+      throw errors.paymentFailed('That purchase is no longer valid.');
+    }
+
+    // One purchase entitles one account. Without this the same receipt could be
+    // presented by any number of accounts and every one of them would be
+    // granted the membership.
+    if (verified.originalTransactionId && input.platform !== 'mock') {
+      const boundTo = await subscriptionRepository.findByTransaction(
+        verified.originalTransactionId,
+      );
+      if (boundTo && boundTo.userId !== input.userId) {
+        logger.warn('Purchase already bound to another account', { platform: input.platform });
+        await subscriptionRepository.recordEvent({
+          userId: input.userId,
+          subscriptionId: existing?.id ?? null,
+          eventType: 'purchase_rejected',
+          fromStatus: existing?.status ?? null,
+          toStatus: existing?.status ?? null,
+          platform: input.platform,
+          payload: { reason: 'receipt_bound_to_other_account' },
+        });
+        throw errors.paymentFailed(
+          'That purchase is already linked to another GetFit account. Sign in with that account to use it.',
+        );
+      }
+    }
+
+    const active = verified.periodEnd.getTime() > Date.now();
+    const status: SubscriptionStatus = active
+      ? verified.cancelAtPeriodEnd
+        ? 'cancelled'
+        : 'active'
+      : 'expired';
+
+    let subscription: Subscription;
+    try {
+      subscription = await subscriptionRepository.upsert({
+        userId: input.userId,
+        status,
+        platform: input.platform,
+        productId: verified.productId,
+        priceUsd: plan.priceUsd,
+        originalTransactionId: verified.originalTransactionId,
+        currentPeriodStart: verified.periodStart,
+        currentPeriodEnd: verified.periodEnd,
+        cancelAtPeriodEnd: verified.cancelAtPeriodEnd,
+      });
+    } catch (error) {
+      // The check above is read-then-write, so two accounts redeeming the same
+      // receipt at once can both pass it. The unique index is the real
+      // guarantee; translate its violation into the same answer rather than
+      // letting a constraint error surface as a 500.
+      if ((error as { code?: string }).code === '23505') {
+        logger.warn('Concurrent redemption of the same receipt', { platform: input.platform });
+        throw errors.paymentFailed(
+          'That purchase is already linked to another GetFit account. Sign in with that account to use it.',
+        );
+      }
+      throw error;
+    }
+
+    await subscriptionRepository.recordEvent({
+      userId: input.userId,
+      subscriptionId: subscription.id,
+      eventType: 'purchase_verified',
+      fromStatus: existing?.status ?? null,
+      toStatus: status,
+      platform: input.platform,
+      payload: { environment: verified.environment, periodEnd: verified.periodEnd.toISOString() },
+    });
+
+    return { subscription, entitlement: await this.getEntitlement(input.userId) };
+  }
+
+  /** "Restore purchases" — re-verifies an existing receipt on a new device. */
+  async restore(input: PurchaseInput): Promise<{ subscription: Subscription; entitlement: Entitlement }> {
+    const result = await this.purchase(input);
+    if (result.entitlement.active) {
+      const restored = await subscriptionRepository.setStatus(input.userId, 'restored');
+      await subscriptionRepository.recordEvent({
+        userId: input.userId,
+        subscriptionId: result.subscription.id,
+        eventType: 'purchase_restored',
+        fromStatus: result.subscription.status,
+        toStatus: 'restored',
+        platform: input.platform,
+        payload: {},
+      });
+      return {
+        subscription: restored ?? result.subscription,
+        entitlement: await this.getEntitlement(input.userId),
+      };
+    }
+    return result;
+  }
+
+  /**
+   * Records a user-initiated cancellation. Access continues until the paid
+   * period ends, which is how both stores behave.
+   */
+  /**
+   * Cancels a membership that GetFit itself owns.
+   *
+   * Apple and Google own the billing relationship for a store purchase, and
+   * nothing this server writes can stop them charging the card. Flipping our
+   * own row to `cancelled` for a store subscription would tell the user they
+   * had cancelled while the renewal still went through — so it is refused, and
+   * the app sends them to the store's own subscription settings instead.
+   */
+  async cancel(userId: string): Promise<Entitlement> {
+    const existing = await subscriptionRepository.get(userId);
+    if (!existing) throw errors.notFound('No membership found.');
+
+    if (existing.platform === 'apple' || existing.platform === 'google') {
+      throw errors.invalidInput(
+        existing.platform === 'apple'
+          ? 'Apple manages this subscription. Cancel it in your Apple Account settings — Settings → Membership takes you there.'
+          : 'Google Play manages this subscription. Cancel it in your Play Store subscriptions — Settings → Membership takes you there.',
+      );
+    }
+
+    await subscriptionRepository.setStatus(userId, 'cancelled');
+    await subscriptionRepository.recordEvent({
+      userId,
+      subscriptionId: existing.id,
+      eventType: 'cancellation_requested',
+      fromStatus: existing.status,
+      toStatus: 'cancelled',
+      platform: existing.platform,
+      payload: {},
+    });
+    return this.getEntitlement(userId);
+  }
+
+  /** Development helper used by the dev-mode test harness. */
+  async forceExpire(userId: string): Promise<Entitlement> {
+    const existing = await subscriptionRepository.get(userId);
+    if (!existing) throw errors.notFound('No membership found.');
+
+    await subscriptionRepository.upsert({
+      userId,
+      status: 'expired',
+      platform: existing.platform,
+      productId: existing.productId,
+      priceUsd: existing.priceUsd,
+      originalTransactionId: null,
+      currentPeriodStart: existing.currentPeriodStart ? new Date(existing.currentPeriodStart) : null,
+      currentPeriodEnd: new Date(Date.now() - 1000),
+      cancelAtPeriodEnd: existing.cancelAtPeriodEnd,
+    });
+    await subscriptionRepository.recordEvent({
+      userId,
+      subscriptionId: existing.id,
+      eventType: 'forced_expiry',
+      fromStatus: existing.status,
+      toStatus: 'expired',
+      platform: existing.platform,
+      payload: { dev: true },
+    });
+    return this.getEntitlement(userId);
+  }
+}
+
+export const subscriptionService = new SubscriptionService();
